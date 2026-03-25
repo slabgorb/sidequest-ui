@@ -1,0 +1,62 @@
+export interface CharacterSheetData {
+  name: string;
+  class: string;
+  level: number;
+  stats: Record<string, number>;
+  abilities: string[];
+  backstory: string;
+  portrait_url?: string;
+}
+
+export interface CharacterSheetProps {
+  data: CharacterSheetData;
+}
+
+export function CharacterSheet({ data }: CharacterSheetProps) {
+  return (
+    <div data-testid="character-sheet" className="p-6 space-y-4">
+      <div className="flex items-start gap-4">
+        {data.portrait_url && (
+          <img
+            src={data.portrait_url}
+            alt={data.name}
+            className="w-24 h-24 rounded object-cover"
+          />
+        )}
+        <div>
+          <h2 className="text-2xl font-bold text-[var(--primary)]">{data.name}</h2>
+          <p className="text-sm text-muted-foreground">
+            Level {data.level} {data.class}
+          </p>
+        </div>
+      </div>
+
+      {Object.keys(data.stats).length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(data.stats).map(([stat, value]) => (
+            <div key={stat} className="flex justify-between px-2 py-1 rounded bg-[var(--surface)]">
+              <span className="capitalize text-[var(--primary)]">{stat}</span>
+              <span className="font-mono">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.abilities.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Abilities</h3>
+          <ul className="list-disc list-inside text-sm">
+            {data.abilities.map((ability) => (
+              <li key={ability}>{ability}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-sm font-semibold mb-1">Backstory</h3>
+        <p className="text-sm font-[var(--font-narrative)]">{data.backstory}</p>
+      </div>
+    </div>
+  );
+}

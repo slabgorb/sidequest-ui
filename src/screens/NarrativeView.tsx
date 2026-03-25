@@ -1,0 +1,391 @@
+import { useEffect, useRef, useMemo, useCallback, useState } from "react";
+import DOMPurify from "dompurify";
+import { MessageType, type GameMessage } from "@/types/protocol";
+import { toRoman } from "@/lib/utils";
+
+export interface NarrativeViewProps {
+  messages: GameMessage[];
+  thinking?: boolean;
+}
+
+interface NarrativeSegment {
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker";
+  html?: string;
+  url?: string;
+  alt?: string;
+  caption?: string;
+  text?: string;
+  width?: number;
+  height?: number;
+}
+
+/** Lightweight markdown→HTML for narrator prose. No external dependency.
+ *  DOMPurify handles sanitization — we only convert markdown syntax to HTML. */
+function markdownToHtml(text: string): string {
+  return text
+    // Headers (### h3, ## h2, # h1) — must come before bold/italic
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    // Horizontal rules
+    .replace(/^---+$/gm, "<hr>")
+    // Bold (**text**)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    // Italic (*text*)
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    // Paragraphs — double newline becomes paragraph break
+    .replace(/\n\n/g, "</p><p>")
+    // Single newlines become line breaks
+    .replace(/\n/g, "<br>");
+}
+
+function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
+  const segments: NarrativeSegment[] = [];
+  let chunkBuffer = "";
+
+  const flushChunks = () => {
+    if (chunkBuffer) {
+      segments.push({ kind: "text", html: DOMPurify.sanitize(markdownToHtml(chunkBuffer)) });
+      chunkBuffer = "";
+    }
+  };
+
+  for (const msg of messages) {
+    switch (msg.type) {
+      case MessageType.NARRATION_CHUNK:
+        chunkBuffer += msg.payload.text as string;
+        break;
+      case MessageType.NARRATION_END:
+        flushChunks();
+        segments.push({ kind: "separator" });
+        break;
+      case MessageType.NARRATION:
+        flushChunks();
+        segments.push({
+          kind: "text",
+          html: DOMPurify.sanitize(markdownToHtml(msg.payload.text as string)),
+        });
+        break;
+      case MessageType.IMAGE:
+        flushChunks();
+        segments.push({
+          kind: "image",
+          url: msg.payload.url as string,
+          alt: (msg.payload.alt ?? msg.payload.description) as string | undefined,
+          caption: (msg.payload.caption ?? msg.payload.description) as string | undefined,
+          width: msg.payload.width as number | undefined,
+          height: msg.payload.height as number | undefined,
+        });
+        break;
+      case MessageType.SESSION_EVENT: {
+        const event = msg.payload.event as string;
+        // Skip non-display events (theme, connect, ready are infrastructure)
+        if (event === "theme_css" || event === "connected" || event === "ready") break;
+        flushChunks();
+        const playerName = msg.payload.player_name as string;
+        const label =
+          event === "join"
+            ? `${playerName} joined the session`
+            : event === "leave"
+              ? `${playerName} left the session`
+              : `${playerName}: ${event}`;
+        segments.push({ kind: "system", text: label });
+        break;
+      }
+      case MessageType.TURN_STATUS: {
+        flushChunks();
+        const name = msg.payload.player_name as string;
+        const status = msg.payload.status as string;
+        segments.push({
+          kind: "turn-status",
+          text: status === "active" ? `${name}'s turn` : `${name}: ${status}`,
+        });
+        break;
+      }
+      case MessageType.ERROR:
+        flushChunks();
+        segments.push({
+          kind: "error",
+          text: msg.payload.message as string,
+        });
+        break;
+      case MessageType.CHARACTER_SHEET: {
+        flushChunks();
+        const charName = msg.payload.name as string;
+        const charClass = msg.payload.class as string | undefined;
+        const level = msg.payload.level as number | undefined;
+        const parts = [charName, charClass, level != null ? `Lv ${level}` : null]
+          .filter(Boolean)
+          .join(" — ");
+        segments.push({ kind: "system", text: parts });
+        break;
+      }
+      case MessageType.PLAYER_ACTION: {
+        flushChunks();
+        const action = msg.payload.action as string;
+        const aside = msg.payload.aside as boolean | undefined;
+        if (action) {
+          segments.push({
+            kind: aside ? "player-aside" : "player-action",
+            text: aside ? `[aside] ${action}` : action,
+          });
+        }
+        break;
+      }
+      case MessageType.CHAPTER_MARKER: {
+        flushChunks();
+        const location = msg.payload.location as string;
+        if (location) {
+          segments.push({ kind: "chapter-marker", text: location });
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  // Flush any remaining chunks
+  flushChunks();
+
+  return segments;
+}
+
+function useDinkusGlyph(messages: GameMessage[]): string {
+  const [glyph, setGlyph] = useState("◇");
+  // Re-read when messages change — theme_css arrives as a message
+  useEffect(() => {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--dinkus-glyph").trim();
+    const clean = raw.replace(/^['"]|['"]$/g, "");
+    if (clean) setGlyph(clean);
+  }, [messages]);
+  return glyph;
+}
+
+function useRunningHeader(messages: GameMessage[]) {
+  return useMemo(() => {
+    let chapterTitle: string | null = null;
+    let turnCount = 0;
+    for (const msg of messages) {
+      if (msg.type === MessageType.CHAPTER_MARKER) {
+        const loc = msg.payload.location as string;
+        if (loc) chapterTitle = loc;
+      }
+      if (msg.type === MessageType.PLAYER_ACTION) {
+        turnCount++;
+      }
+    }
+    return { chapterTitle, turnCount };
+  }, [messages]);
+}
+
+export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const dinkusGlyph = useDinkusGlyph(messages);
+  const { chapterTitle, turnCount } = useRunningHeader(messages);
+
+  const segments = useMemo(() => buildSegments(messages), [messages]);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+    autoScrollRef.current = atBottom;
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && autoScrollRef.current) {
+      el.scrollTop = el.scrollHeight - el.clientHeight;
+    }
+  }, [segments]);
+
+  // Escape closes lightbox
+  useEffect(() => {
+    if (!lightboxUrl) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxUrl(null);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [lightboxUrl]);
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 relative">
+      {/* Running header — book page top */}
+      {chapterTitle && (
+        <div
+          data-testid="running-header"
+          className="sticky top-0 z-10 flex items-baseline justify-between
+                     px-6 pt-3 pb-4
+                     bg-gradient-to-b from-background via-background/95 to-transparent
+                     pointer-events-none select-none"
+        >
+          <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
+            ◇ {chapterTitle}
+          </span>
+          {turnCount > 0 && (
+            <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
+              {toRoman(turnCount)}
+            </span>
+          )}
+        </div>
+      )}
+      <div
+        ref={scrollRef}
+        data-testid="narrative-view"
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-6 py-8 space-y-4 flex flex-col justify-end"
+      >
+      {segments.length === 0 && (
+        <div className="flex-1 flex items-end justify-center pb-8">
+          <p className="text-sm italic text-muted-foreground/50 animate-pulse">
+            The narrator gathers their thoughts...
+          </p>
+        </div>
+      )}
+      {segments.map((seg, i) => {
+        switch (seg.kind) {
+          case "text":
+            return (
+              <div
+                key={i}
+                className="prose dark:prose-invert text-xl leading-relaxed max-w-prose mx-auto"
+                dangerouslySetInnerHTML={{ __html: seg.html! }}
+              />
+            );
+          case "image": {
+            const aspectRatio = seg.width && seg.height
+              ? `${seg.width} / ${seg.height}`
+              : undefined;
+            return (
+              <figure key={i} className="my-8 max-w-prose mx-auto">
+                <div
+                  className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90"
+                  style={aspectRatio ? { aspectRatio } : undefined}
+                  onClick={() => setLightboxUrl(seg.url ?? null)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter") setLightboxUrl(seg.url ?? null); }}
+                >
+                  <img
+                    src={seg.url}
+                    alt={seg.alt ?? ""}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {seg.caption && (
+                  <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
+                    {seg.caption}
+                  </figcaption>
+                )}
+              </figure>
+            );
+          }
+          case "separator":
+            return (
+              <hr
+                key={i}
+                data-testid="segment-separator"
+                className="border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
+              />
+            );
+          case "system":
+            return (
+              <div
+                key={i}
+                data-testid="system-message"
+                className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-prose mx-auto"
+              >
+                {seg.text}
+              </div>
+            );
+          case "turn-status":
+            return (
+              <div
+                key={i}
+                data-testid="turn-status"
+                className="text-sm font-semibold text-accent-foreground py-1"
+              >
+                {seg.text}
+              </div>
+            );
+          case "error":
+            return (
+              <div
+                key={i}
+                role="alert"
+                className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-prose mx-auto border border-destructive/10"
+              >
+                {seg.text}
+              </div>
+            );
+          case "player-action":
+            return (
+              <div
+                key={i}
+                data-testid="player-action"
+                className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-1"
+              >
+                {seg.text}
+              </div>
+            );
+          case "player-aside":
+            return (
+              <div
+                key={i}
+                data-testid="player-aside"
+                className="text-sm text-muted-foreground/50 italic max-w-prose mx-auto my-1"
+              >
+                {seg.text}
+              </div>
+            );
+          case "chapter-marker":
+            return (
+              <div
+                key={i}
+                data-testid="chapter-marker"
+                className="my-8 max-w-prose mx-auto -ml-4"
+              >
+                <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground/70">
+                  ◇&ensp;{seg.text}
+                </span>
+              </div>
+            );
+        }
+      })}
+
+      {/* Thinking indicator */}
+      {thinking && (
+        <div
+          data-testid="thinking-indicator"
+          className="flex items-center justify-center gap-3 max-w-prose mx-auto py-2 text-muted-foreground/30"
+        >
+          <span className="text-sm animate-pulse [animation-delay:0ms]">{dinkusGlyph}</span>
+          <span className="text-sm animate-pulse [animation-delay:200ms]">{dinkusGlyph}</span>
+          <span className="text-sm animate-pulse [animation-delay:400ms]">{dinkusGlyph}</span>
+        </div>
+      )}
+
+      {/* Lightbox overlay */}
+      {lightboxUrl && (
+        <div
+          data-testid="image-lightbox"
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer"
+          onClick={() => setLightboxUrl(null)}
+          onKeyDown={(e) => { if (e.key === "Escape") setLightboxUrl(null); }}
+        >
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}

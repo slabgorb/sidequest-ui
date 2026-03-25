@@ -1,0 +1,164 @@
+import { useState } from "react";
+import { toRoman } from "@/lib/utils";
+
+export interface CreationChoice {
+  label: string;
+  description: string;
+}
+
+export interface CreationScene {
+  phase: string;
+  scene_index?: number;
+  total_scenes?: number;
+  prompt?: string;
+  summary?: string;
+  message?: string;
+  choices?: CreationChoice[];
+  allows_freeform?: boolean;
+  input_type?: string;
+  character_preview?: Record<string, unknown>;
+}
+
+export interface CharacterCreationProps {
+  scene: CreationScene | null;
+  loading: boolean;
+  onRespond: (payload: Record<string, unknown>) => void;
+}
+
+export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
+  const [inputValue, setInputValue] = useState("");
+
+  if (loading) {
+    return (
+      <div data-testid="character-creation">
+        <div data-testid="creation-loading" role="status"
+             className="flex items-center justify-center min-h-[200px]">
+          <p className="text-sm italic text-muted-foreground/50 animate-pulse">
+            The old woman considers your words...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!scene) {
+    return <div data-testid="character-creation" />;
+  }
+
+  const handleChoice = (index: number) => {
+    onRespond({ action: "choice", index });
+  };
+
+  const handleFreeform = () => {
+    onRespond({ action: "freeform", text: inputValue });
+    setInputValue("");
+  };
+
+  const handleName = () => {
+    onRespond({ action: "name", name: inputValue });
+    setInputValue("");
+  };
+
+  const handleConfirm = () => {
+    onRespond({ action: "confirm" });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (scene.input_type === "name") handleName();
+    else handleFreeform();
+  };
+
+  if (scene.phase === "confirmation") {
+    return (
+      <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
+        <h2 className="text-lg font-semibold tracking-tight">Your Character</h2>
+        <div className="bg-card/80 border border-border/50 rounded-lg p-6 w-full max-w-lg space-y-1">
+          <div className="text-xs tracking-widest uppercase text-muted-foreground/60 mb-4">Character Sheet</div>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground font-sans">{scene.summary}</div>
+        </div>
+        <p className="text-base italic text-foreground/80 max-w-prose">{scene.message}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={handleConfirm}
+            className="inline-flex items-center justify-center rounded-lg text-sm font-semibold h-11 px-8 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => onRespond({ action: "back" })}
+            className="inline-flex items-center justify-center rounded-lg text-sm font-medium h-11 px-6 py-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto relative">
+      {scene.scene_index != null && scene.total_scenes != null && (
+        <span className="absolute top-4 right-4 text-xs tracking-widest text-muted-foreground/40 font-light">
+          {toRoman(scene.scene_index + 1)}
+        </span>
+      )}
+
+      <div className="text-center mt-2 mb-4">
+        <span className="text-muted-foreground/30 text-sm tracking-[0.5em]">
+          ── ◇ ──
+        </span>
+      </div>
+
+      <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">{scene.prompt}</p>
+
+      {scene.choices && scene.choices.length > 0 && (
+        <div className="flex flex-col gap-4 w-full max-w-prose">
+          {scene.choices.map((choice, i) => (
+            <div
+              key={i}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleChoice(i)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleChoice(i); }}
+              className="cursor-pointer text-foreground/50 hover:text-foreground focus-visible:text-foreground focus-visible:outline-none py-1"
+            >
+              <span className="italic font-medium text-lg">{choice.label}</span>
+              {choice.description && (
+                <span className="text-sm ml-1">— {choice.description}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {(scene.allows_freeform || scene.input_type === "freeform" || scene.input_type === "name") && (
+        <form onSubmit={handleSubmit} className="flex gap-2 w-full max-w-lg">
+          <input
+            type="text"
+            role="textbox"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Or tell her in your own words..."
+            className="flex-1 rounded-md border border-input bg-background text-sm px-3 py-2 placeholder:italic placeholder:text-muted-foreground/50"
+          />
+          <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50">Submit</button>
+        </form>
+      )}
+
+      {scene.input_type === "confirm" && (
+        <div className="flex gap-3">
+          <button onClick={handleConfirm} className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90">
+            Confirm
+          </button>
+          <button
+            onClick={() => onRespond({ action: "back" })}
+            className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
