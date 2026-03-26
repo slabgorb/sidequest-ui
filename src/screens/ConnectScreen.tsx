@@ -6,6 +6,8 @@ export interface ConnectScreenProps {
   genres: string[];
   isConnecting?: boolean;
   error?: string | null;
+  genreError?: boolean;
+  onRetryGenres?: () => void;
 }
 
 const STORAGE_KEY = "sidequest-connect";
@@ -39,6 +41,8 @@ export function ConnectScreen({
   genres,
   isConnecting = false,
   error,
+  genreError = false,
+  onRetryGenres,
 }: ConnectScreenProps) {
   const [saved] = useState(loadSavedState);
   const isInitialMount = useRef(true);
@@ -173,6 +177,24 @@ export function ConnectScreen({
             <p className="text-sm italic text-muted-foreground/40 animate-pulse">
               Discovering worlds…
             </p>
+          )}
+
+          {genreError && (
+            <div className="text-center mt-2">
+              <p className="text-sm italic text-destructive/70 mb-2">
+                Could not load worlds. Is the server running?
+              </p>
+              {onRetryGenres && (
+                <button
+                  type="button"
+                  onClick={onRetryGenres}
+                  className="text-sm italic text-foreground/60 hover:text-foreground
+                             transition-colors bg-transparent border-0 cursor-pointer underline"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
           )}
         </div>
 
