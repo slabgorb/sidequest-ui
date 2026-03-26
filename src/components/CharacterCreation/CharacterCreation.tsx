@@ -46,21 +46,21 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
   }
 
   const handleChoice = (index: number) => {
-    onRespond({ action: "choice", index });
+    onRespond({ phase: "scene", choice: String(index + 1) });
   };
 
   const handleFreeform = () => {
-    onRespond({ action: "freeform", text: inputValue });
+    onRespond({ phase: "scene", choice: inputValue });
     setInputValue("");
   };
 
   const handleName = () => {
-    onRespond({ action: "name", name: inputValue });
+    onRespond({ phase: "scene", choice: inputValue });
     setInputValue("");
   };
 
   const handleConfirm = () => {
-    onRespond({ action: "confirm" });
+    onRespond({ phase: "confirmation", choice: "1" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,7 +86,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Confirm
           </button>
           <button
-            onClick={() => onRespond({ action: "back" })}
+            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
             className="inline-flex items-center justify-center rounded-lg text-sm font-medium h-11 px-6 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
@@ -152,7 +152,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Confirm
           </button>
           <button
-            onClick={() => onRespond({ action: "back" })}
+            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
