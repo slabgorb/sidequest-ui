@@ -66,6 +66,7 @@ function AppInner() {
   const [creationLoading, setCreationLoading] = useState(false);
   const [character, setCharacter] = useState<Record<string, unknown> | null>(null);
   const [genres, setGenres] = useState<string[]>([]);
+  const [genreError, setGenreError] = useState(false);
   const [thinking, setThinking] = useState(false);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
@@ -82,12 +83,27 @@ function AppInner() {
   const [combatState, setCombatState] = useState<CombatState | null>(null);
 
   // Fetch available genres from the server — never hardcode
-  useEffect(() => {
+  const fetchGenres = useCallback(() => {
+    setGenreError(false);
     fetch("/api/genres")
-      .then((res) => res.json())
-      .then((data) => setGenres(Object.keys(data).sort()))
-      .catch(() => setGenres([]));
+      .then((res) => {
+        if (!res.ok) throw new Error("fetch failed");
+        return res.json();
+      })
+      .then((data) => {
+        const keys = Object.keys(data).sort();
+        if (keys.length === 0) throw new Error("no genres");
+        setGenres(keys);
+      })
+      .catch(() => {
+        setGenres([]);
+        setGenreError(true);
+      });
   }, []);
+
+  useEffect(() => {
+    fetchGenres();
+  }, [fetchGenres]);
 
   // Audio engine — unified mixer for TTS, music, SFX
   const audio = useAudio();
@@ -342,6 +358,8 @@ function AppInner() {
               genres={genres}
               isConnecting={isConnecting}
               error={socketError}
+              genreError={genreError}
+              onRetryGenres={fetchGenres}
             />
           </ErrorBoundary>
         )}
