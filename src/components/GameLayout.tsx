@@ -169,7 +169,7 @@ export function GameLayout({
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0">
             <NarrativeView messages={messages} thinking={thinking} />
-            <div className="border-t border-border/50 px-4 py-4 bg-card/50">
+            <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0">
               <InputBar
                 onSend={onSend}
                 disabled={disabled}
