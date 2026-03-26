@@ -237,7 +237,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         ref={scrollRef}
         data-testid="narrative-view"
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-6 py-8 space-y-4 flex flex-col justify-end"
+        className="flex-1 overflow-y-auto px-6 py-8 space-y-4 flex flex-col"
       >
       {segments.length === 0 && (
         <div className="flex-1 flex items-end justify-center pb-8">
@@ -343,6 +343,8 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               </div>
             );
           case "chapter-marker":
+            // Skip rendering inline if the running header already shows this location
+            if (chapterTitle === seg.text) return null;
             return (
               <div
                 key={i}

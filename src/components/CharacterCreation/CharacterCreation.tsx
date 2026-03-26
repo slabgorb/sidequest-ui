@@ -46,21 +46,21 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
   }
 
   const handleChoice = (index: number) => {
-    onRespond({ action: "choice", index });
+    onRespond({ phase: "scene", choice: String(index + 1) });
   };
 
   const handleFreeform = () => {
-    onRespond({ action: "freeform", text: inputValue });
+    onRespond({ phase: "scene", choice: inputValue });
     setInputValue("");
   };
 
   const handleName = () => {
-    onRespond({ action: "name", name: inputValue });
+    onRespond({ phase: "scene", choice: inputValue });
     setInputValue("");
   };
 
   const handleConfirm = () => {
-    onRespond({ action: "confirm" });
+    onRespond({ phase: "confirmation", choice: "1" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,7 +86,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Confirm
           </button>
           <button
-            onClick={() => onRespond({ action: "back" })}
+            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
             className="inline-flex items-center justify-center rounded-lg text-sm font-medium h-11 px-6 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
@@ -113,7 +113,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
       <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">{scene.prompt}</p>
 
       {scene.choices && scene.choices.length > 0 && (
-        <div className="flex flex-col gap-4 w-full max-w-prose">
+        <div className="flex flex-col gap-3 w-full max-w-prose">
           {scene.choices.map((choice, i) => (
             <div
               key={i}
@@ -121,11 +121,14 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
               tabIndex={0}
               onClick={() => handleChoice(i)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleChoice(i); }}
-              className="cursor-pointer text-foreground/50 hover:text-foreground focus-visible:text-foreground focus-visible:outline-none py-1"
+              className="cursor-pointer rounded-lg border border-border/40 bg-card/50 px-4 py-3
+                         text-foreground/70 hover:text-foreground hover:border-border hover:bg-card/80
+                         focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                         transition-colors"
             >
-              <span className="italic font-medium text-lg">{choice.label}</span>
+              <span className="font-medium text-lg">{choice.label}</span>
               {choice.description && (
-                <span className="text-sm ml-1">— {choice.description}</span>
+                <span className="block text-sm text-muted-foreground mt-0.5">{choice.description}</span>
               )}
             </div>
           ))}
@@ -133,8 +136,16 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
       )}
 
       {(scene.allows_freeform || scene.input_type === "freeform" || scene.input_type === "name") && (
-        <form onSubmit={handleSubmit} className="flex gap-2 w-full max-w-lg">
-          <input
+        <>
+          {scene.choices && scene.choices.length > 0 && (
+            <div className="flex items-center gap-3 w-full max-w-lg text-muted-foreground/40">
+              <div className="flex-1 border-t border-border/30" />
+              <span className="text-xs tracking-widest uppercase">or</span>
+              <div className="flex-1 border-t border-border/30" />
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex gap-2 w-full max-w-lg">
+            <input
             type="text"
             role="textbox"
             value={inputValue}
@@ -142,8 +153,9 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             placeholder="Or tell her in your own words..."
             className="flex-1 rounded-md border border-input bg-background text-sm px-3 py-2 placeholder:italic placeholder:text-muted-foreground/50"
           />
-          <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50">Submit</button>
-        </form>
+            <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50">Submit</button>
+          </form>
+        </>
       )}
 
       {scene.input_type === "confirm" && (
@@ -152,7 +164,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Confirm
           </button>
           <button
-            onClick={() => onRespond({ action: "back" })}
+            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
