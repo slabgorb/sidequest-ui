@@ -150,6 +150,11 @@ function AppInner() {
 
     if (msg.type === MessageType.SESSION_EVENT) {
       const event = msg.payload.event as string;
+      // Reset pending narration state on reconnect — previous turn's request
+      // is lost when the server restarts, so clear the spinner.
+      if (event === "connected" || event === "ready") {
+        setThinking(false);
+      }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
@@ -238,6 +243,7 @@ function AppInner() {
     onMessage: handleMessage,
     onBinaryMessage: handleBinaryMessage,
   });
+  // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
 
   // WebRTC voice chat — wire signaling through the game server
@@ -251,12 +257,11 @@ function AppInner() {
       });
     }, []),
   });
+  // eslint-disable-next-line react-hooks/immutability
   voiceHandleSignalRef.current = voiceChat.handleSignal;
 
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
-      // Unlock audio on user gesture (required by browsers)
-      audio.engine?.ensureResumed();
       saveSession(playerName, genre, world);
       connect();
       setConnected(true);
@@ -303,6 +308,28 @@ function AppInner() {
     },
     [send, executeSlashCommand],
   );
+
+  // Unlock AudioContext on first user gesture (click or keypress).
+  // Chrome's autoplay policy blocks audio until a user interaction occurs.
+  // We cannot call ensureResumed() eagerly or from auto-reconnect.
+  useEffect(() => {
+    const engine = audio.engine;
+    if (!engine) return;
+
+    const unlock = () => {
+      engine.ensureResumed();
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+
+    document.addEventListener("click", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+  }, [audio.engine]);
 
   // Auto-reconnect on page refresh if we have a saved session
   useEffect(() => {
