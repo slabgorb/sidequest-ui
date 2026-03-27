@@ -175,6 +175,33 @@ export function GameLayout({
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0">
             <NarrativeView messages={messages} thinking={thinking} />
+
+            {/* Character HUD — persistent single-player status bar */}
+            {characters.length > 0 && characters.length <= 1 && (
+              <div
+                data-testid="character-hud"
+                className="flex items-center gap-4 px-6 py-1.5 border-t border-border/30 bg-card/30 text-xs text-muted-foreground/70 shrink-0"
+              >
+                {characters.map((c) => (
+                  <div key={c.player_id} className="flex items-center gap-3">
+                    <span className="font-medium text-foreground/80">{c.name}</span>
+                    <span>{c.class} Lv {c.level}</span>
+                    <span>
+                      HP {c.hp}/{c.hp_max}
+                      {c.hp / c.hp_max < 0.3 && (
+                        <span className="text-destructive/80 ml-1">!</span>
+                      )}
+                    </span>
+                    {c.status_effects.length > 0 && (
+                      <span className="text-accent-foreground/60">
+                        {c.status_effects.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0">
               <InputBar
                 onSend={onSend}

@@ -349,10 +349,11 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               <div
                 key={i}
                 data-testid="chapter-marker"
-                className="my-8 max-w-prose mx-auto -ml-4"
+                className="my-12 max-w-prose mx-auto text-center"
               >
-                <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground/70">
-                  ◇&ensp;{seg.text}
+                <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">◇ ◇ ◇</div>
+                <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">
+                  {seg.text}
                 </span>
               </div>
             );
