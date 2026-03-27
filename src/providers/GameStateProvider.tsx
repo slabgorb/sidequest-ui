@@ -44,6 +44,7 @@ export interface GameStateProviderProps {
 }
 
 const JOURNAL_STORAGE_KEY = 'sq_journal';
+const GAME_STATE_STORAGE_KEY = 'sq_game_state';
 
 function loadJournalFromStorage(): JournalEntry[] {
   try {
@@ -66,8 +67,32 @@ function saveJournalToStorage(journal: JournalEntry[]): void {
   }
 }
 
+function loadGameStateFromStorage(): ClientGameState | null {
+  try {
+    const raw = sessionStorage.getItem(GAME_STATE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as ClientGameState;
+      if (parsed && typeof parsed.location === 'string') return parsed;
+    }
+  } catch {
+    // ignore corrupt sessionStorage
+  }
+  return null;
+}
+
+function saveGameStateToStorage(state: ClientGameState): void {
+  try {
+    sessionStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function GameStateProvider({ children }: GameStateProviderProps) {
   const [state, setStateRaw] = useState<ClientGameState>(() => {
+    // Hydrate from sessionStorage first (HMR survival), then fall back to journal
+    const saved = loadGameStateFromStorage();
+    if (saved) return saved;
     const journal = loadJournalFromStorage();
     return journal.length > 0
       ? { ...EMPTY_GAME_STATE, journal }
@@ -75,7 +100,12 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   });
   const setState = useCallback((s: ClientGameState) => setStateRaw(s), []);
 
-  // Persist journal to localStorage whenever it changes
+  // Persist full game state to sessionStorage for HMR survival
+  useEffect(() => {
+    saveGameStateToStorage(state);
+  }, [state]);
+
+  // Persist journal to localStorage (survives full page reload)
   useEffect(() => {
     if (state.journal && state.journal.length > 0) {
       saveJournalToStorage(state.journal);
