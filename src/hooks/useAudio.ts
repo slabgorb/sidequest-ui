@@ -8,11 +8,8 @@ export function useAudio() {
     engineRef.current = AudioEngine.getInstance();
   }
 
-  useEffect(() => {
-    return () => {
-      engineRef.current?.dispose();
-    };
-  }, []);
+  // AudioEngine is a singleton — never dispose it.
+  // Closing the AudioContext kills all audio and the ref can't recover.
 
   const resume = useCallback(async () => {
     await engineRef.current?.resume();
