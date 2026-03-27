@@ -52,7 +52,7 @@ export class AudioEngine {
   private static instance: AudioEngine | null = null;
 
   static getInstance(): AudioEngine {
-    if (!AudioEngine.instance) {
+    if (!AudioEngine.instance || AudioEngine.instance.ctx.state === "closed") {
       AudioEngine.instance = new AudioEngine();
     }
     return AudioEngine.instance;
