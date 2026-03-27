@@ -96,7 +96,7 @@ export function AudioStatus({
     return (
       <button
         data-testid="audio-toggle"
-        className="fixed bottom-4 left-4 z-30 w-11 h-11 flex items-center justify-center
+        className="fixed bottom-4 left-4 z-20 w-11 h-11 flex items-center justify-center
                    rounded-full bg-background/80 backdrop-blur-sm border border-border/20
                    text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors"
         onClick={() => setExpanded(true)}
@@ -112,7 +112,7 @@ export function AudioStatus({
       ref={panelRef}
       data-testid="audio-status"
       data-expanded="true"
-      className="fixed bottom-4 left-4 z-30 w-56 rounded-lg bg-background/95 backdrop-blur-md
+      className="fixed bottom-4 left-4 z-20 w-56 rounded-lg bg-background/95 backdrop-blur-md
                  border border-border/20 shadow-lg p-3 flex flex-col gap-2"
     >
       {nowPlaying && (
