@@ -61,16 +61,28 @@ function watcherReducer(
   }
 }
 
+function buildWatcherUrl(port?: number): string {
+  if (port !== undefined) {
+    return `ws://localhost:${port}/ws/watcher`;
+  }
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}/ws/watcher`;
+}
+
 export function useWatcherSocket(
-  port: number,
-  enabled: boolean,
+  portOrEnabled: number | boolean,
+  maybeEnabled?: boolean,
 ): WatcherState {
+  // Support both (port, enabled) and (enabled) signatures
+  const port = typeof portOrEnabled === "number" ? portOrEnabled : undefined;
+  const enabled = typeof portOrEnabled === "boolean" ? portOrEnabled : (maybeEnabled ?? false);
+
   const [state, dispatch] = useReducer(watcherReducer, initialState);
 
   useEffect(() => {
     if (!enabled) return;
 
-    const ws = new WebSocket(`ws://localhost:${port}/ws/watcher`);
+    const ws = new WebSocket(buildWatcherUrl(port));
 
     ws.onopen = () => dispatch({ type: "CONNECTED" });
 
