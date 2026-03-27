@@ -238,6 +238,7 @@ function AppInner() {
     onMessage: handleMessage,
     onBinaryMessage: handleBinaryMessage,
   });
+  // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
 
   // WebRTC voice chat — wire signaling through the game server
@@ -251,6 +252,7 @@ function AppInner() {
       });
     }, []),
   });
+  // eslint-disable-next-line react-hooks/immutability
   voiceHandleSignalRef.current = voiceChat.handleSignal;
 
   const handleConnect = useCallback(
