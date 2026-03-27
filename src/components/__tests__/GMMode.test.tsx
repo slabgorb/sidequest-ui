@@ -83,9 +83,13 @@ describe("GMMode component", () => {
 
   it("shows turn events with severity coloring", () => {
     render(<GMMode state={mockWatcherState} onClose={vi.fn()} />);
-    // Events from turn data should be visible
-    expect(screen.getByText(/narrator/i)).toBeInTheDocument();
-    expect(screen.getByText(/intent_router/i)).toBeInTheDocument();
+    // Events from turn data should be visible in the Event Stream section specifically.
+    // "narrator" also appears as a subsystem histogram label, so scope the query.
+    // getByText finds the header <div> inside CollapsibleSection; .parentElement
+    // reaches the outer wrapper that contains both the header and the content sibling.
+    const eventStream = screen.getByText(/Event Stream/i).closest("div")!.parentElement!;
+    expect(within(eventStream).getByText(/narrator/i)).toBeInTheDocument();
+    expect(within(eventStream).getByText(/intent_router/i)).toBeInTheDocument();
   });
 
   // =========================================================================
@@ -143,7 +147,10 @@ describe("GMMode component", () => {
 
   it("shows alert messages with turn numbers", () => {
     render(<GMMode state={mockWatcherState} onClose={vi.fn()} />);
-    expect(screen.getByText(/rusty lockbox/i)).toBeInTheDocument();
+    // "rusty lockbox" appears in both the Event Stream (turn 2 warning) and in
+    // the Validation Alerts section. Scope to Validation Alerts to test the right thing.
+    const alertSection = screen.getByText(/Validation Alerts/i).closest("div")!.parentElement!;
+    expect(within(alertSection).getByText(/rusty lockbox/i)).toBeInTheDocument();
   });
 
   // =========================================================================
