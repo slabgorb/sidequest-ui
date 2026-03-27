@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { NarrativeView } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 import { PartyPanel } from "@/components/PartyPanel";
 import { AudioStatus } from "@/components/AudioStatus";
 import { OverlayManager } from "@/components/OverlayManager";
+import GMMode from "@/components/GMMode";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { useWhisper } from "@/hooks/useWhisper";
+import { useGMMode } from "@/hooks/useGMMode";
+import { useWatcherSocket } from "@/hooks/useWatcherSocket";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { CharacterSummary } from "@/components/PartyPanel";
@@ -49,6 +52,9 @@ export function GameLayout({
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
   const isTablet = breakpoint === "tablet";
+
+  const [gmEnabled, toggleGM] = useGMMode();
+  const watcherState = useWatcherSocket(gmEnabled);
 
   const [overlayOpen, setOverlayOpen] = useState(false);
 
@@ -192,6 +198,13 @@ export function GameLayout({
 
         {/* Combat overlay — visible only during combat */}
         {combatState && <CombatOverlay combat={combatState} />}
+
+        {/* GM Mode debug panel — toggled via Ctrl+Shift+G or ?gm=true */}
+        {gmEnabled && (
+          <Suspense fallback={null}>
+            <GMMode state={watcherState} onClose={toggleGM} />
+          </Suspense>
+        )}
 
         {/* AudioStatus — always visible */}
         <AudioStatus
