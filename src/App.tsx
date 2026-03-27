@@ -117,8 +117,13 @@ function AppInner() {
       const { header, audioData } = decodeVoiceFrame(data);
       if (audioData.byteLength === 0) return;
 
-      // Route raw PCM s16le through AudioEngine voice channel with ducking
-      audio.engine.playVoicePCM(audioData, header.sample_rate || 24000);
+      if (header.format === 'pcm_s16le') {
+        // Route raw PCM s16le through AudioEngine voice channel with ducking
+        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000);
+      } else {
+        // WAV or other format — use Web Audio decodeAudioData
+        audio.engine.playVoice(audioData);
+      }
     },
     [audio.engine],
   );
