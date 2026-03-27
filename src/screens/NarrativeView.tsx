@@ -191,7 +191,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 50;
     autoScrollRef.current = atBottom;
   }, []);
 
@@ -200,7 +200,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     if (el && autoScrollRef.current) {
       el.scrollTop = el.scrollHeight - el.clientHeight;
     }
-  }, [segments]);
+  }, [segments, thinking, messages.length]);
 
   // Escape closes lightbox
   useEffect(() => {
