@@ -75,8 +75,12 @@ export function useWatcherSocket(
     ws.onopen = () => dispatch({ type: "CONNECTED" });
 
     ws.onmessage = (e: MessageEvent) => {
-      const event = JSON.parse(e.data as string) as WatcherEvent;
-      dispatch({ type: "EVENT_RECEIVED", payload: event });
+      try {
+        const event = JSON.parse(e.data as string) as WatcherEvent;
+        dispatch({ type: "EVENT_RECEIVED", payload: event });
+      } catch {
+        // Ignore malformed JSON from watcher — debug panel should not crash
+      }
     };
 
     ws.onclose = () => dispatch({ type: "DISCONNECTED" });
