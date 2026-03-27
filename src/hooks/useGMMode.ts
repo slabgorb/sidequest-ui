@@ -10,9 +10,9 @@ export function useGMMode(): [boolean, () => void] {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl+Shift+G or Ctrl+Shift+` (backtick) — two shortcuts because
-      // Ctrl+Shift+G conflicts with "Find Previous" in some browsers
-      if (e.ctrlKey && e.shiftKey && (e.key === "G" || e.key === "`")) {
+      // Ctrl+Shift+G / Cmd+Shift+G or Ctrl+Shift+` / Cmd+Shift+`
+      // Supports both Ctrl (Windows/Linux) and Cmd (macOS)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "G" || e.key === "`")) {
         e.preventDefault();
         setEnabled((prev) => !prev);
       }

@@ -297,7 +297,7 @@ function AppInner() {
   const voiceHandleSignalRef = useRef<(peerId: string, signal: Record<string, unknown>) => void>(() => {});
   const sendRef = useRef<typeof send | null>(null);
 
-  const { connect, send, readyState, error } = useGameSocket({
+  const { connect, disconnect, send, readyState, error } = useGameSocket({
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
     onMessage: handleMessage,
     onBinaryMessage: handleBinaryMessage,
@@ -367,6 +367,25 @@ function AppInner() {
     },
     [send, executeSlashCommand],
   );
+
+  // Bug 6: Leave game — disconnect, clear state, return to lobby
+  const handleLeave = useCallback(() => {
+    disconnect();
+    clearSession();
+    setConnected(false);
+    setMessages([]);
+    setCharacter(null);
+    setCreationScene(null);
+    setThinking(false);
+    setCharacterSheet(null);
+    setInventoryData(null);
+    setMapData(null);
+    setPartyMembers([]);
+    setCombatState(null);
+    sessionPhaseRef.current = "connect";
+    setSessionPhase("connect");
+    autoReconnectAttempted.current = false;
+  }, [disconnect]);
 
   // Unlock AudioContext on first user gesture (click or keypress).
   // Chrome's autoplay policy blocks audio until a user interaction occurs.
@@ -468,6 +487,7 @@ function AppInner() {
               messages={gameMessages}
               characters={characters}
               onSend={handleSend}
+              onLeave={handleLeave}
               disabled={readyState !== WebSocket.OPEN || thinking}
               thinking={thinking}
               characterSheet={characterSheet}

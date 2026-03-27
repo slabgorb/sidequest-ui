@@ -24,6 +24,7 @@ export interface GameLayoutProps {
   messages: GameMessage[];
   characters: CharacterSummary[];
   onSend: (text: string, aside: boolean) => void;
+  onLeave?: () => void;
   disabled: boolean;
   thinking?: boolean;
   characterSheet?: CharacterSheetData | null;
@@ -39,6 +40,7 @@ export function GameLayout({
   messages,
   characters,
   onSend,
+  onLeave,
   disabled,
   thinking,
   characterSheet = null,
@@ -174,6 +176,18 @@ export function GameLayout({
 
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0">
+            {/* Top bar with leave button */}
+            {onLeave && (
+              <div className="flex items-center justify-end px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
+                <button
+                  onClick={onLeave}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
+                  title="Return to lobby"
+                >
+                  Leave Game
+                </button>
+              </div>
+            )}
             <NarrativeView messages={messages} thinking={thinking} />
 
             {/* Character HUD — persistent single-player status bar */}
