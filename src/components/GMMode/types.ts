@@ -39,8 +39,9 @@ export interface WatcherState {
   latestSnapshot: GameSnapshot | null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type WatcherAction =
-  | { type: "EVENT_RECEIVED"; payload: WatcherEvent }
+  | { type: "EVENT_RECEIVED"; payload: WatcherEvent | Record<string, any> }
   | { type: "DISCONNECTED" }
   | { type: "CONNECTED" }
   | { type: "CLEAR_ALERTS" };

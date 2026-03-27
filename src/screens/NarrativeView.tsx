@@ -78,10 +78,16 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         });
         break;
       case MessageType.SESSION_EVENT: {
-        const event = msg.payload.event as string;
+        const event = msg.payload.event as string | undefined;
         // Skip non-display events (theme, connect, ready are infrastructure)
         if (event === "theme_css" || event === "connected" || event === "ready") break;
         flushChunks();
+        // Slash command results have a `text` field instead of event/player_name
+        const sysText = msg.payload.text as string | undefined;
+        if (sysText) {
+          segments.push({ kind: "system", text: sysText });
+          break;
+        }
         const playerName = msg.payload.player_name as string;
         const label =
           event === "join"
@@ -191,7 +197,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 2;
+    const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 50;
     autoScrollRef.current = atBottom;
   }, []);
 
@@ -200,7 +206,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     if (el && autoScrollRef.current) {
       el.scrollTop = el.scrollHeight - el.clientHeight;
     }
-  }, [segments]);
+  }, [segments, thinking, messages.length]);
 
   // Escape closes lightbox
   useEffect(() => {
@@ -349,10 +355,11 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               <div
                 key={i}
                 data-testid="chapter-marker"
-                className="my-8 max-w-prose mx-auto -ml-4"
+                className="my-12 max-w-prose mx-auto text-center"
               >
-                <span className="text-sm font-semibold tracking-widest uppercase text-muted-foreground/70">
-                  ◇&ensp;{seg.text}
+                <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">◇ ◇ ◇</div>
+                <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">
+                  {seg.text}
                 </span>
               </div>
             );

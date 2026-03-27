@@ -58,13 +58,47 @@ function clearSession() {
   }
 }
 
+// Bug 2: HMR state persistence — survive Vite hot reload without losing game progress
+const HMR_STATE_KEY = "sidequest-hmr-state";
+
+interface HmrState {
+  messages: GameMessage[];
+  sessionPhase: SessionPhase;
+  character: Record<string, unknown> | null;
+}
+
+function loadHmrState(): HmrState | null {
+  try {
+    const raw = sessionStorage.getItem(HMR_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as HmrState;
+  } catch {
+    return null;
+  }
+}
+
+function saveHmrState(state: HmrState): void {
+  try {
+    // Keep only the last 100 messages to avoid quota issues
+    const trimmed = {
+      ...state,
+      messages: state.messages.slice(-100),
+    };
+    sessionStorage.setItem(HMR_STATE_KEY, JSON.stringify(trimmed));
+  } catch {
+    // non-critical — quota exceeded
+  }
+}
+
 function AppInner() {
-  const [messages, setMessages] = useState<GameMessage[]>([]);
+  // Bug 2: Hydrate from sessionStorage on mount (HMR recovery)
+  const hmrState = loadHmrState();
+  const [messages, setMessages] = useState<GameMessage[]>(hmrState?.messages ?? []);
   const [connected, setConnected] = useState(false);
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>("connect");
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(hmrState?.sessionPhase ?? "connect");
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
-  const [character, setCharacter] = useState<Record<string, unknown> | null>(null);
+  const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genreError, setGenreError] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -81,6 +115,11 @@ function AppInner() {
 
   // Combat state from COMBAT_EVENT messages
   const [combatState, setCombatState] = useState<CombatState | null>(null);
+
+  // Bug 2: Persist critical state to sessionStorage for HMR survival
+  useEffect(() => {
+    saveHmrState({ messages, sessionPhase, character });
+  }, [messages, sessionPhase, character]);
 
   // Fetch available genres from the server — never hardcode
   const fetchGenres = useCallback(() => {
@@ -227,6 +266,21 @@ function AppInner() {
       return;
     }
 
+    // Server says the session is gone — re-send the connect handshake so the
+    // server can restore (or start fresh).  This happens after a server restart
+    // when the client's WebSocket auto-reconnects but never re-sent the connect.
+    if (msg.type === MessageType.ERROR && msg.payload.reconnect_required) {
+      const saved = loadSession();
+      if (saved && sendRef.current) {
+        sendRef.current({
+          type: MessageType.SESSION_EVENT,
+          payload: { event: "connect", player_name: saved.playerName, genre: saved.genre, world: saved.world },
+          player_id: "",
+        });
+      }
+      return; // Don't show this error in the narrative
+    }
+
     // WebRTC signaling — route to useVoiceChat, never display as narrative
     if (msg.type === MessageType.VOICE_SIGNAL) {
       const from = msg.payload.from as string | undefined;
@@ -336,15 +390,19 @@ function AppInner() {
     };
   }, [audio.engine]);
 
-  // Auto-reconnect on page refresh if we have a saved session
+  // Auto-reconnect on page refresh if we have a saved session.
+  // This must run regardless of sessionPhase — after a server restart the
+  // client's HMR state may say "game" but the WebSocket is dead and the
+  // server has no session.  Re-sending the connect handshake lets the server
+  // restore the session (or route to character creation if there's nothing
+  // saved in SQLite).
   useEffect(() => {
     if (autoReconnectAttempted.current) return;
-    if (sessionPhase !== "connect") return;
     const saved = loadSession();
     if (!saved) return;
     autoReconnectAttempted.current = true;
     handleConnect(saved.playerName, saved.genre, saved.world);
-  }, [sessionPhase, handleConnect]);
+  }, [handleConnect]);
 
   // If connection fails, clear saved session so we don't loop
   useEffect(() => {
