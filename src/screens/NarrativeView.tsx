@@ -78,10 +78,16 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         });
         break;
       case MessageType.SESSION_EVENT: {
-        const event = msg.payload.event as string;
+        const event = msg.payload.event as string | undefined;
         // Skip non-display events (theme, connect, ready are infrastructure)
         if (event === "theme_css" || event === "connected" || event === "ready") break;
         flushChunks();
+        // Slash command results have a `text` field instead of event/player_name
+        const sysText = msg.payload.text as string | undefined;
+        if (sysText) {
+          segments.push({ kind: "system", text: sysText });
+          break;
+        }
         const playerName = msg.payload.player_name as string;
         const label =
           event === "join"
