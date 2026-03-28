@@ -55,7 +55,7 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   for (const msg of messages) {
     switch (msg.type) {
       case MessageType.NARRATION_CHUNK:
-        chunkBuffer += msg.payload.text as string;
+        chunkBuffer += (chunkBuffer ? " " : "") + (msg.payload.text as string);
         hasChunksForTurn = true;
         break;
       case MessageType.NARRATION_END:
