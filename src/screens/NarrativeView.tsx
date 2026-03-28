@@ -258,7 +258,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             return (
               <div
                 key={i}
-                className="prose dark:prose-invert text-xl leading-relaxed max-w-prose mx-auto"
+                className="prose dark:prose-invert text-xl leading-relaxed max-w-[65ch] mx-auto mb-6"
                 dangerouslySetInnerHTML={{ __html: seg.html! }}
               />
             );
