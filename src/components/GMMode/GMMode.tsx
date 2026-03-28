@@ -192,11 +192,26 @@ export default function GMMode({ state, onClose }: GMModeProps) {
         </div>
       </div>
 
-      <EventStream turns={state.turns} />
-      <SubsystemBars histogram={state.histogram} />
-      <TropeTimeline tropes={state.tropes} />
-      <StateInspector snapshot={state.latestSnapshot} />
-      <AlertList alerts={state.alerts} />
+      {state.turns.length === 0 && Object.keys(state.histogram).length === 0 && state.latestSnapshot === null ? (
+        <div
+          data-testid="gm-empty-state"
+          style={{ color: "#888", textAlign: "center", padding: "24px 0", lineHeight: 1.6 }}
+        >
+          Waiting for first turn...
+          <br />
+          <span style={{ fontSize: 11 }}>
+            Events, subsystem activity, and game state will appear here after the first player action.
+          </span>
+        </div>
+      ) : (
+        <>
+          <EventStream turns={state.turns} />
+          <SubsystemBars histogram={state.histogram} />
+          <TropeTimeline tropes={state.tropes} />
+          <StateInspector snapshot={state.latestSnapshot} />
+          <AlertList alerts={state.alerts} />
+        </>
+      )}
     </div>
   );
 }
