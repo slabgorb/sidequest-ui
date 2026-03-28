@@ -36,20 +36,30 @@ export function useAudioCue(
     processedCountRef.current = cues.length;
 
     for (const msg of newCues) {
-      const { mood, music_track, sfx_triggers } = msg.payload as {
+      const { mood, music_track, sfx_triggers, action } = msg.payload as {
         mood?: string;
         music_track?: string;
         sfx_triggers?: string[];
+        action?: string;
       };
 
-      // Music: play track if mood changed (avoid re-triggering same track)
-      if (music_track && mood && mood !== currentMoodRef.current) {
-        currentMoodRef.current = mood;
-        engine.playMusic(music_track, DEFAULT_FADE_MS);
+      // Route based on action field
+      if (action === "duck") {
+        engine.duckMusic();
+      } else if (action === "restore") {
+        engine.restoreMusic();
+      } else if (action === "fade_out" || action === "stop") {
+        engine.stopMusic(action === "fade_out" ? DEFAULT_FADE_MS : undefined);
+      } else {
+        // action is "play", "fade_in", or absent — play the track
+        if (music_track && mood && mood !== currentMoodRef.current) {
+          currentMoodRef.current = mood;
+          engine.playMusic(music_track, DEFAULT_FADE_MS);
 
-        // Extract filename for display
-        const title = music_track.split("/").pop()?.replace(/\.\w+$/, "").replace(/[_-]/g, " ") ?? mood;
-        setNowPlaying({ title, mood });
+          // Extract filename for display
+          const title = music_track.split("/").pop()?.replace(/\.\w+$/, "").replace(/[_-]/g, " ") ?? mood;
+          setNowPlaying({ title, mood });
+        }
       }
 
       // SFX: fire each trigger

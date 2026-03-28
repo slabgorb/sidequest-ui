@@ -142,6 +142,14 @@ export class AudioEngine {
     );
   }
 
+  duckMusic(): void {
+    this.ducker.duck();
+  }
+
+  restoreMusic(): void {
+    this.ducker.unduck();
+  }
+
   stopMusic(fadeMs?: number): void {
     if (fadeMs) {
       const now = this.ctx.currentTime;
