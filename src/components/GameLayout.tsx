@@ -194,7 +194,7 @@ export function GameLayout({
             {characters.length > 0 && characters.length <= 1 && (
               <div
                 data-testid="character-hud"
-                className="flex items-center gap-4 px-6 py-1.5 border-t border-border/30 bg-card/30 text-xs text-muted-foreground/70 shrink-0"
+                className="flex items-center gap-4 px-6 py-2 border-t border-border/30 bg-card/30 text-sm text-muted-foreground/70 shrink-0"
               >
                 {characters.map((c) => (
                   <div key={c.player_id} className="flex items-center gap-3">

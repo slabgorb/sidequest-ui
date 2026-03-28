@@ -24,6 +24,9 @@ interface NarrativeSegment {
  *  DOMPurify handles sanitization — we only convert markdown syntax to HTML. */
 function markdownToHtml(text: string): string {
   return text
+    // Strip leaked JSON footnote blocks (safety net — server should extract these)
+    .replace(/```json\s*\{[\s\S]*?\}\s*```/g, "")
+    .replace(/```json\s*\{[\s\S]*$/g, "")
     // Headers (### h3, ## h2, # h1) — must come before bold/italic
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
@@ -37,7 +40,9 @@ function markdownToHtml(text: string): string {
     // Paragraphs — double newline becomes paragraph break
     .replace(/\n\n/g, "</p><p>")
     // Single newlines become line breaks
-    .replace(/\n/g, "<br>");
+    .replace(/\n/g, "<br>")
+    // Footnote markers [N] → subtle superscripts (pending full 9-12 implementation)
+    .replace(/\[(\d+)\]/g, '<sup class="text-[0.6em] opacity-40 ml-0.5">$1</sup>');
 }
 
 function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
