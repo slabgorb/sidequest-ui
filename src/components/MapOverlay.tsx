@@ -19,7 +19,7 @@ export interface MapOverlayProps {
 }
 
 export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
-  const explored = explored ?? [];
+  const explored = mapData.explored ?? [];
   const fogBounds = mapData.fog_bounds ?? { width: 10, height: 10 };
   const connections = getUniqueConnections(explored);
 

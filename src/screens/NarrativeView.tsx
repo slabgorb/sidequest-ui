@@ -8,6 +8,13 @@ export interface NarrativeViewProps {
   thinking?: boolean;
 }
 
+interface FootnoteData {
+  marker?: number;
+  summary: string;
+  category?: string;
+  is_new?: boolean;
+}
+
 interface NarrativeSegment {
   kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group";
   html?: string;
@@ -18,6 +25,8 @@ interface NarrativeSegment {
   width?: number;
   height?: number;
   tier?: string;
+  /** Footnotes from NARRATION payload for knowledge display */
+  footnotes?: FootnoteData[];
   /** For portrait-group: the image segment */
   portraitImage?: NarrativeSegment;
   /** For portrait-group: the adjacent text segment */
@@ -87,7 +96,11 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       case MessageType.NARRATION_END:
         flushChunks();
-        segments.push({ kind: "separator" });
+        // Only add a separator if the previous segment isn't already one
+        // (avoids excessive dividers between consecutive narration blocks)
+        if (segments.length > 0 && segments[segments.length - 1].kind !== "separator") {
+          segments.push({ kind: "separator" });
+        }
         hasChunksForTurn = false;
         break;
       case MessageType.NARRATION:
@@ -96,10 +109,14 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         // NARRATION in the direct response before TTS streams chunks).
         if (hasChunksForTurn || skipNarrationAt.has(i)) break;
         flushChunks();
-        segments.push({
-          kind: "text",
-          html: DOMPurify.sanitize(markdownToHtml(msg.payload.text as string)),
-        });
+        {
+          const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
+          segments.push({
+            kind: "text",
+            html: DOMPurify.sanitize(markdownToHtml(msg.payload.text as string)),
+            footnotes: footnotes.length > 0 ? footnotes : undefined,
+          });
+        }
         break;
       case MessageType.IMAGE:
         flushChunks();
@@ -189,6 +206,14 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
 
   // Flush any remaining chunks
   flushChunks();
+
+  // Strip leading and trailing separators (they look orphaned)
+  while (segments.length > 0 && segments[0].kind === "separator") {
+    segments.shift();
+  }
+  while (segments.length > 0 && segments[segments.length - 1].kind === "separator") {
+    segments.pop();
+  }
 
   return segments;
 }
@@ -363,29 +388,68 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         switch (seg.kind) {
           case "text":
             return (
-              <div
-                key={i}
-                className="prose dark:prose-invert text-xl leading-relaxed max-w-[65ch] mx-auto mb-6"
-                dangerouslySetInnerHTML={{ __html: seg.html! }}
-              />
+              <div key={i} className="max-w-[65ch] mx-auto mb-6">
+                <div
+                  className="prose dark:prose-invert text-xl leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: seg.html! }}
+                />
+                {seg.footnotes && seg.footnotes.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
+                    {seg.footnotes.map((fn, fi) => (
+                      <div
+                        key={fi}
+                        className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                      >
+                        {fn.marker != null && (
+                          <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
+                        )}
+                        <span>{fn.summary}</span>
+                        {fn.is_new && (
+                          <span className="text-accent-foreground/40 italic shrink-0">new</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             );
           case "portrait-group": {
             const img = seg.portraitImage!;
             const txt = seg.adjacentText!;
             return (
-              <div key={i} className="flex gap-4 max-w-[65ch] mx-auto my-4">
-                <div
-                  className="prose dark:prose-invert text-xl leading-relaxed flex-1 min-w-0"
-                  dangerouslySetInnerHTML={{ __html: txt.html! }}
-                />
-                <figure className="w-48 shrink-0">
-                  <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
-                  {img.caption && (
-                    <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
-                      {img.caption}
-                    </figcaption>
-                  )}
-                </figure>
+              <div key={i} className="max-w-[65ch] mx-auto my-4">
+                <div className="flex gap-4">
+                  <div
+                    className="prose dark:prose-invert text-xl leading-relaxed flex-1 min-w-0"
+                    dangerouslySetInnerHTML={{ __html: txt.html! }}
+                  />
+                  <figure className="w-48 shrink-0">
+                    <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
+                    {img.caption && (
+                      <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
+                        {img.caption}
+                      </figcaption>
+                    )}
+                  </figure>
+                </div>
+                {txt.footnotes && txt.footnotes.length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
+                    {txt.footnotes.map((fn, fi) => (
+                      <div
+                        key={fi}
+                        className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                      >
+                        {fn.marker != null && (
+                          <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
+                        )}
+                        <span>{fn.summary}</span>
+                        {fn.is_new && (
+                          <span className="text-accent-foreground/40 italic shrink-0">new</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           }

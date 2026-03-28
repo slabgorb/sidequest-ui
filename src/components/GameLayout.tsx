@@ -59,6 +59,7 @@ export function GameLayout({
   const watcherState = useWatcherSocket(gmEnabled);
 
   const [overlayOpen, setOverlayOpen] = useState(false);
+  const [partyVisible, setPartyVisible] = useState(true);
 
   // Audio state — tracked locally, synced to AudioEngine
   const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5, voice: 0.5 });
@@ -94,29 +95,33 @@ export function GameLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micEnabled]);
 
-  // P key and Escape handlers for mobile overlay
+  // P key handler — toggles party panel on all breakpoints
   useEffect(() => {
-    if (!isMobile) return;
-
     const handler = (e: KeyboardEvent) => {
-      // Escape closes overlay
-      if (e.key === "Escape") {
-        setOverlayOpen(false);
-        return;
-      }
-
-      // P toggles overlay (skip when in input fields)
-      if (e.key === "p") {
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        if (tag === "input" || tag === "textarea" || tag === "select") return;
-        if ((e.target as HTMLElement)?.isContentEditable) return;
-        e.stopImmediatePropagation(); // prevent PartyPanel's own handler
+      if (e.key !== "p") return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      e.stopImmediatePropagation(); // prevent PartyPanel's own handler
+      if (isMobile) {
         setOverlayOpen((prev) => !prev);
+      } else {
+        setPartyVisible((prev) => !prev);
+      }
+    };
+    // Escape closes mobile overlay
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMobile) {
+        setOverlayOpen(false);
       }
     };
     // Use capture phase to fire before PartyPanel's handler
     document.addEventListener("keydown", handler, true);
-    return () => document.removeEventListener("keydown", handler, true);
+    document.addEventListener("keydown", escHandler);
+    return () => {
+      document.removeEventListener("keydown", handler, true);
+      document.removeEventListener("keydown", escHandler);
+    };
   }, [isMobile]);
 
   // Close overlay when leaving mobile breakpoint
@@ -126,8 +131,8 @@ export function GameLayout({
     }
   }, [isMobile]);
 
-  // No-op toggle for non-mobile (PartyPanel requires onToggle prop)
-  const noopToggle = useCallback(() => {}, []);
+  // Toggle party sidebar visibility (desktop/tablet)
+  const toggleParty = useCallback(() => setPartyVisible((prev) => !prev), []);
 
   const handleVolumeChange = useCallback(
     (channel: string, value: number) => {
@@ -166,11 +171,11 @@ export function GameLayout({
       >
         <div className="flex flex-1 min-h-0">
           {/* Sidebar — only in multiplayer, visible on desktop (expanded) and tablet (collapsed) */}
-          {!isMobile && characters.length > 1 && (
+          {!isMobile && characters.length > 1 && partyVisible && (
             <PartyPanel
               characters={characters}
               collapsed={isTablet}
-              onToggle={noopToggle}
+              onToggle={toggleParty}
             />
           )}
 
@@ -292,7 +297,7 @@ export function GameLayout({
               <PartyPanel
                 characters={characters}
                 collapsed={false}
-                onToggle={noopToggle}
+                onToggle={toggleParty}
               />
             </div>
           )
