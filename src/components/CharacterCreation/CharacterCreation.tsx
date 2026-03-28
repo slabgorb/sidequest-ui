@@ -27,6 +27,7 @@ export interface CharacterCreationProps {
 
 export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
   const [inputValue, setInputValue] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   if (loading) {
     return (
@@ -46,7 +47,12 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
   }
 
   const handleChoice = (index: number) => {
-    onRespond({ phase: "scene", choice: String(index + 1) });
+    setSelectedIndex(index);
+    // Brief highlight before submitting so the player sees their selection
+    setTimeout(() => {
+      onRespond({ phase: "scene", choice: String(index + 1) });
+      setSelectedIndex(null);
+    }, 200);
   };
 
   const handleFreeform = () => {
@@ -121,10 +127,13 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
               tabIndex={0}
               onClick={() => handleChoice(i)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleChoice(i); }}
-              className="cursor-pointer rounded-lg border border-border/40 bg-card/50 px-4 py-3
-                         text-foreground/70 hover:text-foreground hover:border-border hover:bg-card/80
+              className={`cursor-pointer rounded-lg border px-4 py-3
                          focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                         transition-colors"
+                         transition-all duration-150 ${
+                           selectedIndex === i
+                             ? "border-primary bg-primary/10 text-foreground ring-2 ring-primary/50 scale-[0.98]"
+                             : "border-border/40 bg-card/50 text-foreground/70 hover:text-foreground hover:border-border hover:bg-card/80"
+                         }`}
             >
               <span className="font-medium text-lg">{choice.label}</span>
               {choice.description && (
