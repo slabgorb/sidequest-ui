@@ -9,7 +9,7 @@ export interface NarrativeViewProps {
 }
 
 interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group";
   html?: string;
   url?: string;
   alt?: string;
@@ -18,6 +18,10 @@ interface NarrativeSegment {
   width?: number;
   height?: number;
   tier?: string;
+  /** For portrait-group: the image segment */
+  portraitImage?: NarrativeSegment;
+  /** For portrait-group: the adjacent text segment */
+  adjacentText?: NarrativeSegment;
 }
 
 /** Lightweight markdown→HTML for narrator prose. No external dependency.
@@ -50,6 +54,23 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   let chunkBuffer = "";
   let hasChunksForTurn = false;
 
+  // Pre-scan: find NARRATION messages that have corresponding NARRATION_CHUNKs
+  // anywhere after them. This handles the case where the server sends full
+  // NARRATION before TTS chunk streaming begins (message ordering from server
+  // returns NARRATION in the direct response, then TTS streams chunks async).
+  const skipNarrationAt = new Set<number>();
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].type !== MessageType.NARRATION) continue;
+    for (let j = i + 1; j < messages.length; j++) {
+      if (messages[j].type === MessageType.NARRATION_CHUNK) {
+        skipNarrationAt.add(i);
+        break;
+      }
+      // Stop scanning at a new player action (next turn boundary)
+      if (messages[j].type === MessageType.PLAYER_ACTION) break;
+    }
+  }
+
   const flushChunks = () => {
     if (chunkBuffer) {
       segments.push({ kind: "text", html: DOMPurify.sanitize(markdownToHtml(chunkBuffer)) });
@@ -57,7 +78,8 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
     }
   };
 
-  for (const msg of messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
     switch (msg.type) {
       case MessageType.NARRATION_CHUNK:
         chunkBuffer += (chunkBuffer ? " " : "") + (msg.payload.text as string);
@@ -69,10 +91,10 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         hasChunksForTurn = false;
         break;
       case MessageType.NARRATION:
-        // When TTS is streaming, text arrives via NARRATION_CHUNK messages.
-        // Skip the full NARRATION text to avoid duplication — chunks already
-        // delivered the same content sentence-by-sentence.
-        if (hasChunksForTurn) break;
+        // Skip when chunks already delivered this turn's text (backwards compat)
+        // or when look-ahead finds chunks will deliver it (server sends
+        // NARRATION in the direct response before TTS streams chunks).
+        if (hasChunksForTurn || skipNarrationAt.has(i)) break;
         flushChunks();
         segments.push({
           kind: "text",
@@ -171,6 +193,77 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   return segments;
 }
 
+/** Group portrait images with their adjacent text into flex-row pairs.
+ *  Portrait images need to sit beside text, but the narrative container
+ *  uses flex-col (where float is ignored). This merges them into a
+ *  composite segment rendered as a flex-row wrapper. */
+function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[] {
+  const result: NarrativeSegment[] = [];
+  let i = 0;
+  while (i < segments.length) {
+    const seg = segments[i];
+    if (seg.kind === "image" && seg.tier === "portrait") {
+      // Look for adjacent text segment (next)
+      const next = segments[i + 1];
+      if (next && next.kind === "text") {
+        result.push({
+          kind: "portrait-group",
+          portraitImage: seg,
+          adjacentText: next,
+        });
+        i += 2;
+        continue;
+      }
+    }
+    result.push(seg);
+    i++;
+  }
+  return result;
+}
+
+/** Image component with skeleton loading and error fallback. */
+function NarrativeImage({
+  seg,
+  onLightbox,
+}: {
+  seg: NarrativeSegment;
+  onLightbox: (url: string) => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+  const aspectRatio = seg.width && seg.height
+    ? `${seg.width} / ${seg.height}`
+    : undefined;
+
+  return (
+    <div
+      className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative"
+      style={aspectRatio ? { aspectRatio } : undefined}
+      onClick={() => !errored && onLightbox(seg.url!)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox(seg.url!); }}
+    >
+      {!loaded && !errored && (
+        <div className="absolute inset-0 bg-muted/20 animate-pulse rounded" />
+      )}
+      {errored ? (
+        <div className="flex items-center justify-center h-full min-h-[4rem] bg-muted/10 rounded text-muted-foreground/40 text-xs italic">
+          Image unavailable
+        </div>
+      ) : (
+        <img
+          src={seg.url}
+          alt={seg.alt ?? ""}
+          className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setErrored(true)}
+        />
+      )}
+    </div>
+  );
+}
+
 function useDinkusGlyph(messages: GameMessage[]): string {
   const [glyph, setGlyph] = useState("◇");
   // Re-read when messages change — theme_css arrives as a message
@@ -206,7 +299,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
   const dinkusGlyph = useDinkusGlyph(messages);
   const { chapterTitle, turnCount } = useRunningHeader(messages);
 
-  const segments = useMemo(() => buildSegments(messages), [messages]);
+  const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -276,12 +369,29 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                 dangerouslySetInnerHTML={{ __html: seg.html! }}
               />
             );
+          case "portrait-group": {
+            const img = seg.portraitImage!;
+            const txt = seg.adjacentText!;
+            return (
+              <div key={i} className="flex gap-4 max-w-[65ch] mx-auto my-4">
+                <div
+                  className="prose dark:prose-invert text-xl leading-relaxed flex-1 min-w-0"
+                  dangerouslySetInnerHTML={{ __html: txt.html! }}
+                />
+                <figure className="w-48 shrink-0">
+                  <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
+                  {img.caption && (
+                    <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
+                      {img.caption}
+                    </figcaption>
+                  )}
+                </figure>
+              </div>
+            );
+          }
           case "image": {
-            const aspectRatio = seg.width && seg.height
-              ? `${seg.width} / ${seg.height}`
-              : undefined;
             const tierClass = seg.tier === "portrait"
-              ? "my-4 max-w-[12rem] float-right ml-4 mb-2"
+              ? "my-4 max-w-[12rem] mx-auto"
               : seg.tier === "landscape"
               ? "my-8 max-w-2xl mx-auto"
               : seg.tier === "scene"
@@ -289,20 +399,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               : "my-8 max-w-prose mx-auto";
             return (
               <figure key={i} className={tierClass}>
-                <div
-                  className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90"
-                  style={aspectRatio ? { aspectRatio } : undefined}
-                  onClick={() => setLightboxUrl(seg.url ?? null)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter") setLightboxUrl(seg.url ?? null); }}
-                >
-                  <img
-                    src={seg.url}
-                    alt={seg.alt ?? ""}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
                 {seg.caption && (
                   <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
                     {seg.caption}

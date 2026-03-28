@@ -147,7 +147,45 @@ function AppInner() {
   // Audio engine — unified mixer for TTS, music, SFX
   const audio = useAudio();
 
-  // Route binary WebSocket frames (TTS voice) through AudioEngine
+  // Narration buffer — holds NARRATION, NARRATION_END, and NARRATION_CHUNK messages
+  // so text reveals sentence-by-sentence in sync with TTS audio playback.
+  // Without this, the server sends full NARRATION text before TTS starts streaming,
+  // and prefetch causes multiple chunks to arrive before the first audio finishes.
+  const narrationBufferRef = useRef<{
+    narration: GameMessage | null;
+    narrationEnd: GameMessage | null;
+    chunks: GameMessage[];
+    flushTimer: ReturnType<typeof setTimeout> | null;
+  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null });
+
+  const flushNarrationBuffer = useCallback(() => {
+    const buf = narrationBufferRef.current;
+    if (buf.flushTimer) {
+      clearTimeout(buf.flushTimer);
+      buf.flushTimer = null;
+    }
+
+    const toFlush: GameMessage[] = [];
+    // Chunks first so buildSegments sets hasChunksForTurn before seeing NARRATION
+    toFlush.push(...buf.chunks);
+    buf.chunks = [];
+    if (buf.narration) {
+      toFlush.push(buf.narration);
+      buf.narration = null;
+    }
+    if (buf.narrationEnd) {
+      toFlush.push(buf.narrationEnd);
+      buf.narrationEnd = null;
+    }
+
+    if (toFlush.length > 0) {
+      setThinking(false);
+      setMessages(prev => [...prev, ...toFlush]);
+    }
+  }, []);
+
+  // Route binary WebSocket frames (TTS voice) through AudioEngine,
+  // synchronized with narration text reveal.
   const handleBinaryMessage = useCallback(
     (data: ArrayBuffer) => {
       if (!audio.engine) return;
@@ -156,15 +194,31 @@ function AppInner() {
       const { header, audioData } = decodeVoiceFrame(data);
       if (audioData.byteLength === 0) return;
 
+      // Pop the next buffered narration chunk — reveal its text when this
+      // audio segment actually starts playing (not when it's queued).
+      const buf = narrationBufferRef.current;
+      const nextChunk = buf.chunks.shift();
+
+      const onStart = () => {
+        if (nextChunk) {
+          setThinking(false);
+          setMessages(prev => [...prev, nextChunk]);
+        }
+      };
+
       if (header.format === 'pcm_s16le') {
-        // Route raw PCM s16le through AudioEngine voice channel with ducking
-        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000);
+        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000, onStart);
       } else {
-        // WAV or other format — use Web Audio decodeAudioData
-        audio.engine.playVoice(audioData);
+        audio.engine.playVoice(audioData, onStart);
+      }
+
+      // When all chunks have been revealed and NARRATION is waiting, flush it
+      // (adds state_delta to messages; buildSegments skips its text via dedup)
+      if (buf.chunks.length === 0 && buf.narration) {
+        setTimeout(flushNarrationBuffer, 100);
       }
     },
-    [audio.engine],
+    [audio.engine, flushNarrationBuffer],
   );
 
   // Genre theme CSS must process in ALL phases, not just game view
@@ -188,9 +242,35 @@ function AppInner() {
       setThinking(true);
       return;
     }
-    if (msg.type === MessageType.NARRATION_CHUNK || msg.type === MessageType.NARRATION || msg.type === MessageType.NARRATION_END) {
-      setThinking(false);
+
+    // --- Narration buffer: hold messages for TTS-synchronized reveal ---
+    if (msg.type === MessageType.NARRATION) {
+      const buf = narrationBufferRef.current;
+      buf.narration = msg;
+      // Fallback: if no NARRATION_CHUNK arrives within 500ms, flush immediately.
+      // This handles the no-TTS case where only NARRATION + NARRATION_END are sent.
+      if (!buf.flushTimer && buf.chunks.length === 0) {
+        buf.flushTimer = setTimeout(flushNarrationBuffer, 500);
+      }
+      return;
     }
+    if (msg.type === MessageType.NARRATION_END) {
+      narrationBufferRef.current.narrationEnd = msg;
+      // If no chunks were buffered, the flush timer (from NARRATION) will fire.
+      // If chunks were handled via audio sync, this gets flushed in handleBinaryMessage.
+      return;
+    }
+    if (msg.type === MessageType.NARRATION_CHUNK) {
+      const buf = narrationBufferRef.current;
+      // Cancel no-TTS flush timer — chunks confirm TTS is active
+      if (buf.flushTimer) {
+        clearTimeout(buf.flushTimer);
+        buf.flushTimer = null;
+      }
+      buf.chunks.push(msg);
+      return;
+    }
+    // --- End narration buffer ---
 
     if (msg.type === MessageType.SESSION_EVENT) {
       const event = msg.payload.event as string;
@@ -210,6 +290,13 @@ function AppInner() {
         setMessages((prev) =>
           prev.filter((m) => m.type === MessageType.SESSION_EVENT),
         );
+        // Clear narration buffer to avoid stale chunks leaking into new session
+        const buf = narrationBufferRef.current;
+        if (buf.flushTimer) clearTimeout(buf.flushTimer);
+        buf.narration = null;
+        buf.narrationEnd = null;
+        buf.chunks = [];
+        buf.flushTimer = null;
       }
       // Let theme_css events through to the messages array for useGenreTheme
       if (event !== "theme_css") return;
@@ -297,7 +384,7 @@ function AppInner() {
     }
 
     setMessages((prev) => [...prev, msg]);
-  }, []);
+  }, [flushNarrationBuffer]);
 
   const voiceHandleSignalRef = useRef<(peerId: string, signal: Record<string, unknown>) => void>(() => {});
   const sendRef = useRef<typeof send | null>(null);
@@ -390,6 +477,13 @@ function AppInner() {
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
+    // Clear narration buffer
+    const buf = narrationBufferRef.current;
+    if (buf.flushTimer) clearTimeout(buf.flushTimer);
+    buf.narration = null;
+    buf.narrationEnd = null;
+    buf.chunks = [];
+    buf.flushTimer = null;
   }, [disconnect]);
 
   // Unlock AudioContext on first user gesture (click or keypress).
