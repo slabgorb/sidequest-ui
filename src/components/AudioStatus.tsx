@@ -117,9 +117,9 @@ export function AudioStatus({
     >
       {nowPlaying && (
         <div data-testid="now-playing" className="text-xs text-muted-foreground/60 truncate mb-1">
-          ♪ {nowPlaying.title}{" "}
-          <span data-testid="mood-badge" className="text-muted-foreground/40">
-            {nowPlaying.mood}
+          ♪{" "}
+          <span data-testid="mood-badge" className="text-muted-foreground/40 capitalize">
+            {nowPlaying.mood.replace(/_/g, " ")}
           </span>
         </div>
       )}

@@ -28,7 +28,7 @@ export interface UsePushToTalkResult {
 }
 
 export function usePushToTalk(options: UsePushToTalkOptions): UsePushToTalkResult {
-  const { transcribe, onConfirm, pttKey = "Space", voiceChat, enabled = true } = options;
+  const { transcribe, onConfirm, pttKey = "ControlLeft", voiceChat, enabled = true } = options;
 
   // Fix 3: Stable refs for voiceChat methods to avoid effect re-registration
   const muteOutgoingRef = useRef(voiceChat?.muteOutgoing);
