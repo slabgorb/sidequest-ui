@@ -17,6 +17,7 @@ interface NarrativeSegment {
   text?: string;
   width?: number;
   height?: number;
+  tier?: string;
 }
 
 /** Lightweight markdown→HTML for narrator prose. No external dependency.
@@ -42,6 +43,7 @@ function markdownToHtml(text: string): string {
 function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   const segments: NarrativeSegment[] = [];
   let chunkBuffer = "";
+  let hasChunksForTurn = false;
 
   const flushChunks = () => {
     if (chunkBuffer) {
@@ -54,12 +56,18 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
     switch (msg.type) {
       case MessageType.NARRATION_CHUNK:
         chunkBuffer += msg.payload.text as string;
+        hasChunksForTurn = true;
         break;
       case MessageType.NARRATION_END:
         flushChunks();
         segments.push({ kind: "separator" });
+        hasChunksForTurn = false;
         break;
       case MessageType.NARRATION:
+        // When TTS is streaming, text arrives via NARRATION_CHUNK messages.
+        // Skip the full NARRATION text to avoid duplication — chunks already
+        // delivered the same content sentence-by-sentence.
+        if (hasChunksForTurn) break;
         flushChunks();
         segments.push({
           kind: "text",
@@ -75,6 +83,7 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
           caption: (msg.payload.caption ?? msg.payload.description) as string | undefined,
           width: msg.payload.width as number | undefined,
           height: msg.payload.height as number | undefined,
+          tier: msg.payload.tier as string | undefined,
         });
         break;
       case MessageType.SESSION_EVENT: {
@@ -258,7 +267,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             return (
               <div
                 key={i}
-                className="prose dark:prose-invert text-xl leading-relaxed max-w-prose mx-auto"
+                className="prose dark:prose-invert text-xl leading-relaxed max-w-[65ch] mx-auto mb-6"
                 dangerouslySetInnerHTML={{ __html: seg.html! }}
               />
             );
@@ -266,8 +275,15 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             const aspectRatio = seg.width && seg.height
               ? `${seg.width} / ${seg.height}`
               : undefined;
+            const tierClass = seg.tier === "portrait"
+              ? "my-4 max-w-[12rem] float-right ml-4 mb-2"
+              : seg.tier === "landscape"
+              ? "my-8 max-w-2xl mx-auto"
+              : seg.tier === "scene"
+              ? "my-8 max-w-full mx-auto"
+              : "my-8 max-w-prose mx-auto";
             return (
-              <figure key={i} className="my-8 max-w-prose mx-auto">
+              <figure key={i} className={tierClass}>
                 <div
                   className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90"
                   style={aspectRatio ? { aspectRatio } : undefined}

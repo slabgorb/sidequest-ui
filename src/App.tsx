@@ -205,6 +205,11 @@ function AppInner() {
       } else if (event === "ready") {
         sessionPhaseRef.current = "game";
         setSessionPhase("game");
+        // Clear HMR-restored messages on reconnect — the server replays
+        // the last narration, so keeping old messages causes duplicates.
+        setMessages((prev) =>
+          prev.filter((m) => m.type === MessageType.SESSION_EVENT),
+        );
       }
       // Let theme_css events through to the messages array for useGenreTheme
       if (event !== "theme_css") return;

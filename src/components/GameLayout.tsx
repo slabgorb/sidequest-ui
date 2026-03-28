@@ -200,11 +200,23 @@ export function GameLayout({
                   <div key={c.player_id} className="flex items-center gap-3">
                     <span className="font-medium text-foreground/80">{c.name}</span>
                     <span>{c.class} Lv {c.level}</span>
-                    <span>
+                    <span className="flex items-center gap-1.5">
                       HP {c.hp}/{c.hp_max}
-                      {c.hp / c.hp_max < 0.3 && (
-                        <span className="text-destructive/80 ml-1">!</span>
-                      )}
+                      <span
+                        data-testid="hp-bar"
+                        className="inline-block w-16 h-1.5 rounded-full bg-muted/40 overflow-hidden"
+                      >
+                        <span
+                          className={`block h-full rounded-full transition-all ${
+                            c.hp / c.hp_max > 0.66
+                              ? "bg-emerald-500/80"
+                              : c.hp / c.hp_max > 0.33
+                                ? "bg-amber-500/80"
+                                : "bg-red-500/80"
+                          }`}
+                          style={{ width: `${Math.max(0, Math.min(100, (c.hp / c.hp_max) * 100))}%` }}
+                        />
+                      </span>
                     </span>
                     {c.status_effects.length > 0 && (
                       <span className="text-accent-foreground/60">

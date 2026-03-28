@@ -12,6 +12,16 @@ export class LocalTranscriber {
 
   async initialize(onProgress?: (progress: number) => void): Promise<void> {
     this.status = "loading";
+
+    // Suppress ONNX runtime WASM warnings during initialization — these are
+    // informational messages about operator support that clutter the console.
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      const msg = String(args[0] ?? "");
+      if (msg.includes("onnx") || msg.includes("ONNX") || msg.includes("ort-wasm")) return;
+      originalWarn.apply(console, args);
+    };
+
     try {
       this.device = navigator.gpu ? "webgpu" : "wasm";
 
@@ -30,6 +40,8 @@ export class LocalTranscriber {
     } catch (err) {
       this.status = "error";
       throw err;
+    } finally {
+      console.warn = originalWarn;
     }
   }
 

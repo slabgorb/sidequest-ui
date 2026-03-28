@@ -137,6 +137,7 @@ export function ConnectScreen({
           <p className="text-base italic text-muted-foreground/60 mb-3">
             In which world do you seek passage?
           </p>
+          <div className="relative w-full mb-4">
           <select
             id="genre-select"
             value={genre}
@@ -144,7 +145,8 @@ export function ConnectScreen({
             className="w-full bg-transparent border-0 border-b border-muted-foreground/20
                        text-center text-base text-foreground/90 appearance-none
                        focus:outline-none focus:border-muted-foreground/50
-                       cursor-pointer mb-4"
+                       hover:border-muted-foreground/40
+                       cursor-pointer pr-6"
             disabled={isConnecting}
             aria-label="Genre"
           >
@@ -153,8 +155,11 @@ export function ConnectScreen({
               <option key={g} value={g}>{g.replace(/_/g, " ")}</option>
             ))}
           </select>
+          <span className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none text-xs">▾</span>
+          </div>
 
           {genre && !loadingWorlds && worlds.length > 0 && (
+            <div className="relative w-full">
             <select
               id="world-select"
               value={world}
@@ -162,7 +167,8 @@ export function ConnectScreen({
               className="w-full bg-transparent border-0 border-b border-muted-foreground/20
                          text-center text-base text-foreground/90 appearance-none
                          focus:outline-none focus:border-muted-foreground/50
-                         cursor-pointer"
+                         hover:border-muted-foreground/40
+                         cursor-pointer pr-6"
               disabled={isConnecting}
               aria-label="World"
             >
@@ -171,6 +177,8 @@ export function ConnectScreen({
                 <option key={w} value={w}>{w.replace(/_/g, " ")}</option>
               ))}
             </select>
+            <span className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground/40 pointer-events-none text-xs">▾</span>
+            </div>
           )}
 
           {genre && loadingWorlds && (
@@ -222,7 +230,8 @@ export function ConnectScreen({
             disabled={!canSubmit || isConnecting}
             className="text-base italic text-foreground/70 hover:text-foreground
                        disabled:text-muted-foreground/30 disabled:cursor-default
-                       transition-colors bg-transparent border-0 cursor-pointer"
+                       transition-all bg-transparent border border-muted-foreground/20
+                       hover:border-muted-foreground/50 rounded px-8 py-2 cursor-pointer"
           >
             Begin
           </button>
