@@ -3,6 +3,7 @@ const DEFAULT_FADE_MS = 3000;
 export class Crossfader {
   private currentSource: AudioBufferSourceNode | null = null;
   private currentGain: GainNode | null = null;
+  private fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
   async crossfade(
     ctx: AudioContext,
@@ -20,7 +21,6 @@ export class Crossfader {
       oldGain.gain.setValueAtTime(oldGain.gain.value, now);
       oldGain.gain.linearRampToValueAtTime(0, now + fadeSec);
 
-      // Clean up old source after fade
       oldSource.onended = () => {
         oldSource.disconnect();
         oldGain.disconnect();
@@ -33,7 +33,12 @@ export class Crossfader {
       }
     }
 
-    // Create new source with its own gain node for crossfade
+    if (this.fadeTimer) {
+      clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
+
+    // Create new source — fade in, play once, fade out at the end
     const newGain = ctx.createGain();
     newGain.gain.setValueAtTime(0, now);
     newGain.gain.linearRampToValueAtTime(1, now + fadeSec);
@@ -41,15 +46,40 @@ export class Crossfader {
 
     const source = ctx.createBufferSource();
     source.buffer = newBuffer;
-    source.loop = true;
     source.connect(newGain);
     source.start();
 
     this.currentSource = source;
     this.currentGain = newGain;
+
+    // Schedule fade-out before the track ends naturally
+    const trackDurationMs = newBuffer.duration * 1000;
+    if (trackDurationMs > fadeMs) {
+      this.fadeTimer = setTimeout(() => {
+        if (this.currentSource === source && this.currentGain === newGain) {
+          const t = ctx.currentTime;
+          newGain.gain.setValueAtTime(newGain.gain.value, t);
+          newGain.gain.linearRampToValueAtTime(0, t + fadeSec);
+        }
+      }, trackDurationMs - fadeMs);
+    }
+
+    // Clean up when track ends
+    source.onended = () => {
+      source.disconnect();
+      newGain.disconnect();
+      if (this.currentSource === source) {
+        this.currentSource = null;
+        this.currentGain = null;
+      }
+    };
   }
 
   stop(): void {
+    if (this.fadeTimer) {
+      clearTimeout(this.fadeTimer);
+      this.fadeTimer = null;
+    }
     if (this.currentSource) {
       try {
         this.currentSource.stop();
