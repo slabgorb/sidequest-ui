@@ -71,6 +71,7 @@ export class AudioEngine {
   private volumes: VolumeState;
   private preMuteVolumes: Partial<Record<ChannelName, number>> = {};
   private activeSources: AudioBufferSourceNode[] = [];
+  private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
 
   constructor() {
@@ -197,18 +198,25 @@ export class AudioEngine {
   }
 
   private playVoiceBuffer(audioBuffer: AudioBuffer): void {
-    this.ducker.duck();
+    // Queue segments so they play sequentially, not all at once.
+    this.voiceChain = this.voiceChain.then(
+      () =>
+        new Promise<void>((resolve) => {
+          this.ducker.duck();
 
-    const source = this.ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.channels.voice);
-    source.onended = () => {
-      this.ducker.unduck();
-      source.disconnect();
-      this.activeSources = this.activeSources.filter((s) => s !== source);
-    };
-    source.start();
-    this.activeSources.push(source);
+          const source = this.ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(this.channels.voice);
+          source.onended = () => {
+            this.ducker.unduck();
+            source.disconnect();
+            this.activeSources = this.activeSources.filter((s) => s !== source);
+            resolve();
+          };
+          source.start();
+          this.activeSources.push(source);
+        }),
+    );
   }
 
   setVolume(channel: VolumeTarget, value: number): void {
