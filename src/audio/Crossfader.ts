@@ -41,6 +41,7 @@ export class Crossfader {
 
     const source = ctx.createBufferSource();
     source.buffer = newBuffer;
+    source.loop = true;
     source.connect(newGain);
     source.start();
 
