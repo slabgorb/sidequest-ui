@@ -19,7 +19,9 @@ export interface MapOverlayProps {
 }
 
 export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
-  const connections = getUniqueConnections(mapData.explored);
+  const explored = explored ?? [];
+  const fogBounds = mapData.fog_bounds ?? { width: 10, height: 10 };
+  const connections = getUniqueConnections(explored);
 
   return (
     <div data-testid="map-overlay" className="p-6 space-y-4 relative">
@@ -31,21 +33,21 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
       </div>
 
       <svg
-        viewBox={`0 0 ${mapData.fog_bounds.width} ${mapData.fog_bounds.height}`}
+        viewBox={`0 0 ${fogBounds.width} ${fogBounds.height}`}
         className="w-full h-64 bg-[var(--surface)] rounded"
       >
         <rect
           data-testid="map-fog"
           x="0"
           y="0"
-          width={mapData.fog_bounds.width}
-          height={mapData.fog_bounds.height}
+          width={fogBounds.width}
+          height={fogBounds.height}
           fill="rgba(0,0,0,0.6)"
         />
 
         {connections.map(([from, to]) => {
-          const a = mapData.explored.find((l) => l.name === from);
-          const b = mapData.explored.find((l) => l.name === to);
+          const a = explored.find((l) => l.name === from);
+          const b = explored.find((l) => l.name === to);
           if (!a || !b) return null;
           return (
             <line
@@ -61,7 +63,7 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
           );
         })}
 
-        {mapData.explored.map((loc) => (
+        {explored.map((loc) => (
           <g
             key={loc.name}
             data-testid={`map-node-${loc.name}`}
