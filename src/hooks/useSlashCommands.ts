@@ -42,9 +42,21 @@ export function useSlashCommands() {
           if (!char) {
             return { handled: true, messages: [sysMsg('No character data available.')] };
           }
-          const parts = [`${char.name}`, `HP: ${char.hp} / ${char.max_hp}`];
+          const header = char.class
+            ? `${char.name} — Level ${char.level ?? 1} ${char.class}`
+            : char.name;
+          const parts = [
+            header,
+            `HP: ${char.hp} / ${char.max_hp}`,
+          ];
           if (char.statuses.length > 0) {
             parts.push(`Statuses: ${char.statuses.join(', ')}`);
+          }
+          if (char.inventory.length > 0) {
+            parts.push(`Inventory (${char.inventory.length}): ${char.inventory.join(', ')}`);
+          }
+          if (state.location) {
+            parts.push(`Location: ${state.location}`);
           }
           return { handled: true, messages: [sysMsg(parts.join('\n'))] };
         }

@@ -4,6 +4,8 @@ export interface CharacterState {
   name: string;
   hp: number;
   max_hp: number;
+  level?: number;
+  class?: string;
   statuses: string[];
   inventory: string[];
 }

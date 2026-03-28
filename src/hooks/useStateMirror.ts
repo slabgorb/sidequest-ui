@@ -78,6 +78,8 @@ function normalizeCharacter(c: CharacterState): CharacterState {
     name: c.name,
     hp: c.hp,
     max_hp: c.max_hp,
+    level: c.level,
+    class: c.class,
     statuses: [...(c.statuses ?? [])],
     inventory: [...(c.inventory ?? [])],
   };
