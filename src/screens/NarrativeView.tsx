@@ -173,11 +173,21 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         flushChunks();
         const charName = msg.payload.name as string;
         const charClass = msg.payload.class as string | undefined;
+        const race = msg.payload.race as string | undefined;
         const level = msg.payload.level as number | undefined;
-        const parts = [charName, charClass, level != null ? `Lv ${level}` : null]
+        const personality = msg.payload.personality as string | undefined;
+        const pronouns = msg.payload.pronouns as string | undefined;
+        const equipment = (msg.payload.equipment as string[] | undefined) ?? [];
+        const header = [charName, race, charClass, level != null ? `Lv ${level}` : null]
           .filter(Boolean)
           .join(" — ");
-        segments.push({ kind: "system", text: parts });
+        const details = [
+          personality ? `Personality: ${personality}` : null,
+          pronouns ? `Pronouns: ${pronouns}` : null,
+          equipment.length > 0 ? `Equipment: ${equipment.join(", ")}` : null,
+        ].filter(Boolean).join(" | ");
+        const text = details ? `${header}\n${details}` : header;
+        segments.push({ kind: "system", text });
         break;
       }
       case MessageType.PLAYER_ACTION: {
