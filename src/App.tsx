@@ -330,8 +330,9 @@ function AppInner() {
         buf.flushTimer = null;
         buf.watchdogTimer = null;
       }
-      // Let theme_css events through to the messages array for useGenreTheme
-      if (event !== "theme_css") return;
+      // Let theme_css and ready events through to the messages array.
+      // ready carries turn_count so NarrativeView can restore the turn counter.
+      if (event !== "theme_css" && event !== "ready") return;
     }
 
     if (msg.type === MessageType.CHARACTER_CREATION) {
