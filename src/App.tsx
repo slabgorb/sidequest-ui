@@ -202,6 +202,11 @@ function AppInner() {
       // Pop the next buffered narration chunk — reveal its text when this
       // audio segment actually starts playing (not when it's queued).
       const buf = narrationBufferRef.current;
+      // Reset watchdog — audio is arriving, TTS pipeline is healthy
+      if (buf.watchdogTimer) {
+        clearTimeout(buf.watchdogTimer);
+        buf.watchdogTimer = null;
+      }
       const nextChunk = buf.chunks.shift();
 
       const onStart = () => {
@@ -221,6 +226,9 @@ function AppInner() {
       // (adds state_delta to messages; buildSegments skips its text via dedup)
       if (buf.chunks.length === 0 && buf.narration) {
         setTimeout(flushNarrationBuffer, 100);
+      } else if (buf.chunks.length > 0) {
+        // Re-arm watchdog for remaining chunks
+        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
       }
     },
     [audio.engine, flushNarrationBuffer],
@@ -260,9 +268,15 @@ function AppInner() {
       return;
     }
     if (msg.type === MessageType.NARRATION_END) {
-      narrationBufferRef.current.narrationEnd = msg;
-      // If no chunks were buffered, the flush timer (from NARRATION) will fire.
-      // If chunks were handled via audio sync, this gets flushed in handleBinaryMessage.
+      const buf = narrationBufferRef.current;
+      buf.narrationEnd = msg;
+      // Belt-and-suspenders: if buffer still has unflushed content, schedule a 1s flush.
+      // This catches edge cases where audio sync and watchdog both miss.
+      if (buf.chunks.length > 0 || buf.narration) {
+        if (!buf.watchdogTimer) {
+          buf.watchdogTimer = setTimeout(flushNarrationBuffer, 1000);
+        }
+      }
       return;
     }
     if (msg.type === MessageType.NARRATION_CHUNK) {
@@ -273,6 +287,11 @@ function AppInner() {
         buf.flushTimer = null;
       }
       buf.chunks.push(msg);
+      // Watchdog: if TTS audio never arrives after chunks, flush after 2s.
+      // Started on first chunk; reset on each audio frame in handleBinaryMessage.
+      if (buf.chunks.length === 1 && !buf.watchdogTimer) {
+        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
+      }
       return;
     }
     // --- End narration buffer ---
@@ -298,10 +317,12 @@ function AppInner() {
         // Clear narration buffer to avoid stale chunks leaking into new session
         const buf = narrationBufferRef.current;
         if (buf.flushTimer) clearTimeout(buf.flushTimer);
+        if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
         buf.narration = null;
         buf.narrationEnd = null;
         buf.chunks = [];
         buf.flushTimer = null;
+        buf.watchdogTimer = null;
       }
       // Let theme_css events through to the messages array for useGenreTheme
       if (event !== "theme_css") return;
@@ -485,10 +506,12 @@ function AppInner() {
     // Clear narration buffer
     const buf = narrationBufferRef.current;
     if (buf.flushTimer) clearTimeout(buf.flushTimer);
+    if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
     buf.narration = null;
     buf.narrationEnd = null;
     buf.chunks = [];
     buf.flushTimer = null;
+    buf.watchdogTimer = null;
   }, [disconnect]);
 
   // Unlock AudioContext on first user gesture (click or keypress).
