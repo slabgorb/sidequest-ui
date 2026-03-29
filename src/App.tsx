@@ -591,8 +591,10 @@ function AppInner() {
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
   );
-  const isMyTurn = !activePlayerName || activePlayerName === connectedPlayerName;
-  const waitingForPlayer = characters.length > 1 && !isMyTurn ? (activePlayerName ?? undefined) : undefined;
+  // isMyTurn only meaningful in multiplayer — single-player always has input
+  const isMultiplayer = partyMembers.length > 1;
+  const isMyTurn = !isMultiplayer || !activePlayerName || activePlayerName === connectedPlayerName;
+  const waitingForPlayer = isMultiplayer && !isMyTurn ? (activePlayerName ?? undefined) : undefined;
 
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
@@ -625,7 +627,7 @@ function AppInner() {
               characters={characters}
               onSend={handleSend}
               onLeave={handleLeave}
-              disabled={readyState !== WebSocket.OPEN || thinking || (characters.length > 1 && !isMyTurn)}
+              disabled={readyState !== WebSocket.OPEN || thinking || (isMultiplayer && !isMyTurn)}
               thinking={thinking}
               characterSheet={characterSheet}
               inventoryData={inventoryData}
