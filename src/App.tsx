@@ -580,6 +580,28 @@ function AppInner() {
     handleConnect(saved.playerName, saved.genre, saved.world);
   }, [handleConnect]);
 
+  // WebSocket reconnect handler: when the socket transitions to OPEN after
+  // being previously connected, clear stale state and re-handshake.
+  // Without this, `thinking` gets stuck true after a server crash (the server
+  // never sent the narration response that would clear it), and the connect
+  // handshake is never re-sent so the server stays in AwaitingConnect.
+  const prevReadyState = useRef(readyState);
+  useEffect(() => {
+    const wasDisconnected = prevReadyState.current !== WebSocket.OPEN;
+    prevReadyState.current = readyState;
+    if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
+      setThinking(false);
+      const saved = loadSession();
+      if (saved) {
+        send({
+          type: MessageType.SESSION_EVENT,
+          payload: { event: "connect", player_name: saved.playerName, genre: saved.genre, world: saved.world },
+          player_id: "",
+        });
+      }
+    }
+  }, [readyState, connected, send]);
+
   // If connection fails, clear saved session so we don't loop
   useEffect(() => {
     if (error) {
