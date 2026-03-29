@@ -607,7 +607,10 @@ function AppInner() {
   );
 
   // Turn gating — only meaningful in multiplayer (partyMembers only populated from PARTY_STATUS)
-  const isMultiplayer = partyMembers.length > 1;
+  // isMultiplayer: true if party has 2+ members OR if we've received a TURN_STATUS
+  // (which only fires in multiplayer). This handles the race condition where
+  // TURN_STATUS arrives before PARTY_STATUS populates partyMembers.
+  const isMultiplayer = partyMembers.length > 1 || activePlayerName !== null;
   const currentPlayerId = useMemo(
     () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
     [partyMembers, connectedPlayerName],
