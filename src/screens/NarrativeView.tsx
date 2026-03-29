@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { toRoman } from "@/lib/utils";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export interface NarrativeViewProps {
   messages: GameMessage[];
@@ -36,7 +37,7 @@ interface NarrativeSegment {
 /** Lightweight markdown→HTML for narrator prose. No external dependency.
  *  DOMPurify handles sanitization — we only convert markdown syntax to HTML. */
 function markdownToHtml(text: string): string {
-  return text
+  const result = text
     // Strip leaked JSON footnote blocks (safety net — server should extract these)
     .replace(/```json\s*\{[\s\S]*?\}\s*```/g, "")
     .replace(/```json\s*\{[\s\S]*$/g, "")
@@ -257,6 +258,30 @@ function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[]
   return result;
 }
 
+/** Split segments into history (left column) and current (right column).
+ *  The last separator marks the boundary — everything after it is "current". */
+function splitSegments(segments: NarrativeSegment[]): {
+  history: NarrativeSegment[];
+  current: NarrativeSegment[];
+} {
+  let splitIndex = -1;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (segments[i].kind === "separator") {
+      splitIndex = i;
+      break;
+    }
+  }
+
+  if (splitIndex <= 0) {
+    return { history: [], current: segments };
+  }
+
+  return {
+    history: segments.slice(0, splitIndex + 1),
+    current: segments.slice(splitIndex + 1),
+  };
+}
+
 /** Image component with skeleton loading and error fallback. */
 function NarrativeImage({
   seg,
@@ -328,14 +353,187 @@ function useRunningHeader(messages: GameMessage[]) {
   }, [messages]);
 }
 
-export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
+/** Render a single narrative segment. Shared by both columns and single-column mode. */
+function renderSegment(
+  seg: NarrativeSegment,
+  i: number,
+  opts: {
+    maxTextWidth: string;
+    chapterTitle: string | null;
+    dinkusGlyph: string;
+    setLightboxUrl: (url: string | null) => void;
+  },
+) {
+  const { maxTextWidth, chapterTitle, dinkusGlyph, setLightboxUrl } = opts;
+  switch (seg.kind) {
+    case "text":
+      return (
+        <div key={i} className={`${maxTextWidth} mx-auto mb-6`}>
+          <div
+            className="prose dark:prose-invert text-xl leading-[1.45]"
+            dangerouslySetInnerHTML={{ __html: seg.html! }}
+          />
+          {seg.footnotes && seg.footnotes.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
+              {seg.footnotes.map((fn, fi) => (
+                <div
+                  key={fi}
+                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                >
+                  {fn.marker != null && (
+                    <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
+                  )}
+                  <span>{fn.summary}</span>
+                  {fn.is_new && (
+                    <span className="text-accent-foreground/40 italic shrink-0">new</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    case "portrait-group": {
+      const img = seg.portraitImage!;
+      const txt = seg.adjacentText!;
+      return (
+        <div key={i} className={`${maxTextWidth} mx-auto my-4`}>
+          <div className="flex gap-4">
+            <div
+              className="prose dark:prose-invert text-xl leading-[1.45] flex-1 min-w-0"
+              dangerouslySetInnerHTML={{ __html: txt.html! }}
+            />
+            <figure className="w-48 shrink-0">
+              <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
+              {img.caption && (
+                <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
+                  {img.caption}
+                </figcaption>
+              )}
+            </figure>
+          </div>
+          {txt.footnotes && txt.footnotes.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
+              {txt.footnotes.map((fn, fi) => (
+                <div
+                  key={fi}
+                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                >
+                  {fn.marker != null && (
+                    <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
+                  )}
+                  <span>{fn.summary}</span>
+                  {fn.is_new && (
+                    <span className="text-accent-foreground/40 italic shrink-0">new</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "image": {
+      const tierClass = seg.tier === "portrait"
+        ? "my-4 max-w-[12rem] mx-auto"
+        : seg.tier === "landscape"
+        ? "my-8 max-w-2xl mx-auto"
+        : seg.tier === "scene"
+        ? "my-8 max-w-full mx-auto"
+        : "my-8 max-w-prose mx-auto";
+      return (
+        <figure key={i} className={tierClass}>
+          <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
+          {seg.caption && (
+            <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
+              {seg.caption}
+            </figcaption>
+          )}
+        </figure>
+      );
+    }
+    case "separator":
+      return (
+        <hr
+          key={i}
+          data-testid="segment-separator"
+          className="border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
+        />
+      );
+    case "system":
+      return (
+        <div
+          key={i}
+          data-testid="system-message"
+          className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-prose mx-auto"
+        >
+          {seg.text}
+        </div>
+      );
+    case "turn-status":
+      return (
+        <div
+          key={i}
+          data-testid="turn-status"
+          className="text-sm font-semibold text-accent-foreground py-1"
+        >
+          {seg.text}
+        </div>
+      );
+    case "error":
+      return (
+        <div
+          key={i}
+          role="alert"
+          className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-prose mx-auto border border-destructive/10"
+        >
+          {seg.text}
+        </div>
+      );
+    case "player-action":
+      return (
+        <div
+          key={i}
+          data-testid="player-action"
+          className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-1"
+        >
+          {seg.text}
+        </div>
+      );
+    case "player-aside":
+      return (
+        <div
+          key={i}
+          data-testid="player-aside"
+          className="text-sm text-muted-foreground/50 italic max-w-prose mx-auto my-1"
+        >
+          {seg.text}
+        </div>
+      );
+    case "chapter-marker":
+      // Skip rendering inline if the running header already shows this location
+      if (chapterTitle === seg.text) return null;
+      return (
+        <div
+          key={i}
+          data-testid="chapter-marker"
+          className="my-12 max-w-prose mx-auto text-center"
+        >
+          <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">
+            {dinkusGlyph} {dinkusGlyph} {dinkusGlyph}
+          </div>
+          <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">
+            {seg.text}
+          </span>
+        </div>
+      );
+  }
+}
+
+/** Hook for independent scroll tracking on a column. */
+function useColumnScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const dinkusGlyph = useDinkusGlyph(messages);
-  const { chapterTitle, turnCount } = useRunningHeader(messages);
-
-  const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -344,12 +542,44 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     autoScrollRef.current = atBottom;
   }, []);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
     if (el && autoScrollRef.current) {
       el.scrollTop = el.scrollHeight - el.clientHeight;
     }
-  }, [segments, thinking, messages.length]);
+  }, []);
+
+  return { scrollRef, handleScroll, scrollToBottom };
+}
+
+export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
+  const breakpoint = useBreakpoint();
+  const isSpread = breakpoint === "desktop";
+
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const dinkusGlyph = useDinkusGlyph(messages);
+  const { chapterTitle, turnCount } = useRunningHeader(messages);
+
+  const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
+
+  // Split into history (left) and current (right) for spread layout
+  const { history, current } = useMemo(() => splitSegments(segments), [segments]);
+
+  // Independent scroll tracking for each column (spread mode)
+  const historyScroll = useColumnScroll();
+  const currentScroll = useColumnScroll();
+  // Single scroll ref for mobile/tablet
+  const singleScroll = useColumnScroll();
+
+  // Auto-scroll triggers
+  useEffect(() => {
+    if (isSpread) {
+      currentScroll.scrollToBottom();
+      historyScroll.scrollToBottom();
+    } else {
+      singleScroll.scrollToBottom();
+    }
+  }, [segments, thinking, messages.length, isSpread]);
 
   // Escape closes lightbox
   useEffect(() => {
@@ -361,9 +591,34 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [lightboxUrl]);
 
+  const segmentOpts = {
+    chapterTitle,
+    dinkusGlyph,
+    setLightboxUrl,
+  };
+
+  const thinkingIndicator = thinking && (
+    <div
+      data-testid="thinking-indicator"
+      className="flex items-center justify-center gap-3 py-2 text-muted-foreground/30"
+    >
+      <span className="text-sm animate-pulse [animation-delay:0ms]">{dinkusGlyph}</span>
+      <span className="text-sm animate-pulse [animation-delay:200ms]">{dinkusGlyph}</span>
+      <span className="text-sm animate-pulse [animation-delay:400ms]">{dinkusGlyph}</span>
+    </div>
+  );
+
+  const emptyState = segments.length === 0 && (
+    <div className="flex items-end justify-center pb-8">
+      <p className="text-sm italic text-muted-foreground/50 animate-pulse">
+        The narrator gathers their thoughts...
+      </p>
+    </div>
+  );
+
   return (
     <div className="flex flex-col flex-1 min-h-0 relative">
-      {/* Running header — book page top */}
+      {/* Running header */}
       {chapterTitle && (
         <div
           data-testid="running-header"
@@ -372,208 +627,94 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                      bg-gradient-to-b from-background via-background/95 to-transparent
                      pointer-events-none select-none"
         >
-          <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
-            ◇ {chapterTitle}
-          </span>
-          {turnCount > 0 && (
-            <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
-              {toRoman(turnCount)}
-            </span>
+          {isSpread ? (
+            <>
+              <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
+                {dinkusGlyph} {chapterTitle}
+              </span>
+              {turnCount > 0 && (
+                <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
+                  {toRoman(turnCount)} {dinkusGlyph}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
+                {dinkusGlyph} {chapterTitle}
+              </span>
+              {turnCount > 0 && (
+                <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
+                  {toRoman(turnCount)}
+                </span>
+              )}
+            </>
           )}
         </div>
       )}
-      <div
-        ref={scrollRef}
-        data-testid="narrative-view"
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto"
-      >
-      <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4">
-      {segments.length === 0 && (
-        <div className="flex items-end justify-center pb-8">
-          <p className="text-sm italic text-muted-foreground/50 animate-pulse">
-            The narrator gathers their thoughts...
-          </p>
-        </div>
-      )}
-      {segments.map((seg, i) => {
-        switch (seg.kind) {
-          case "text":
-            return (
-              <div key={i} className="max-w-[65ch] mx-auto mb-6">
-                <div
-                  className="prose dark:prose-invert text-xl leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: seg.html! }}
-                />
-                {seg.footnotes && seg.footnotes.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
-                    {seg.footnotes.map((fn, fi) => (
-                      <div
-                        key={fi}
-                        className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
-                      >
-                        {fn.marker != null && (
-                          <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
-                        )}
-                        <span>{fn.summary}</span>
-                        {fn.is_new && (
-                          <span className="text-accent-foreground/40 italic shrink-0">new</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          case "portrait-group": {
-            const img = seg.portraitImage!;
-            const txt = seg.adjacentText!;
-            return (
-              <div key={i} className="max-w-[65ch] mx-auto my-4">
-                <div className="flex gap-4">
-                  <div
-                    className="prose dark:prose-invert text-xl leading-relaxed flex-1 min-w-0"
-                    dangerouslySetInnerHTML={{ __html: txt.html! }}
-                  />
-                  <figure className="w-48 shrink-0">
-                    <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
-                    {img.caption && (
-                      <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
-                        {img.caption}
-                      </figcaption>
-                    )}
-                  </figure>
-                </div>
-                {txt.footnotes && txt.footnotes.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
-                    {txt.footnotes.map((fn, fi) => (
-                      <div
-                        key={fi}
-                        className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
-                      >
-                        {fn.marker != null && (
-                          <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
-                        )}
-                        <span>{fn.summary}</span>
-                        {fn.is_new && (
-                          <span className="text-accent-foreground/40 italic shrink-0">new</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          case "image": {
-            const tierClass = seg.tier === "portrait"
-              ? "my-4 max-w-[12rem] mx-auto"
-              : seg.tier === "landscape"
-              ? "my-8 max-w-2xl mx-auto"
-              : seg.tier === "scene"
-              ? "my-8 max-w-full mx-auto"
-              : "my-8 max-w-prose mx-auto";
-            return (
-              <figure key={i} className={tierClass}>
-                <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
-                {seg.caption && (
-                  <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
-                    {seg.caption}
-                  </figcaption>
-                )}
-              </figure>
-            );
-          }
-          case "separator":
-            return (
-              <hr
-                key={i}
-                data-testid="segment-separator"
-                className="border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
-              />
-            );
-          case "system":
-            return (
-              <div
-                key={i}
-                data-testid="system-message"
-                className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-prose mx-auto"
-              >
-                {seg.text}
-              </div>
-            );
-          case "turn-status":
-            return (
-              <div
-                key={i}
-                data-testid="turn-status"
-                className="text-sm font-semibold text-accent-foreground py-1"
-              >
-                {seg.text}
-              </div>
-            );
-          case "error":
-            return (
-              <div
-                key={i}
-                role="alert"
-                className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-prose mx-auto border border-destructive/10"
-              >
-                {seg.text}
-              </div>
-            );
-          case "player-action":
-            return (
-              <div
-                key={i}
-                data-testid="player-action"
-                className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-1"
-              >
-                {seg.text}
-              </div>
-            );
-          case "player-aside":
-            return (
-              <div
-                key={i}
-                data-testid="player-aside"
-                className="text-sm text-muted-foreground/50 italic max-w-prose mx-auto my-1"
-              >
-                {seg.text}
-              </div>
-            );
-          case "chapter-marker":
-            // Skip rendering inline if the running header already shows this location
-            if (chapterTitle === seg.text) return null;
-            return (
-              <div
-                key={i}
-                data-testid="chapter-marker"
-                className="my-12 max-w-prose mx-auto text-center"
-              >
-                <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">◇ ◇ ◇</div>
-                <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">
-                  {seg.text}
-                </span>
-              </div>
-            );
-        }
-      })}
 
-      {/* Thinking indicator */}
-      {thinking && (
+      {isSpread ? (
+        /* ── Two-column book spread (desktop ≥1200px) ── */
+        <div className="flex flex-1 min-h-0">
+          {/* Left column: history */}
+          <div
+            ref={historyScroll.scrollRef}
+            onScroll={historyScroll.handleScroll}
+            className="flex-1 overflow-y-auto"
+            role="log"
+            aria-label="Narrative history"
+          >
+            <div className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4">
+              {history.length === 0 && segments.length > 0 && (
+                <div className="flex-1" />
+              )}
+              {history.map((seg, i) =>
+                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[32ch]" })
+              )}
+            </div>
+          </div>
+
+          {/* Gutter — the spine */}
+          <div className="w-px bg-border/10 shrink-0" />
+
+          {/* Right column: current narration */}
+          <div
+            ref={currentScroll.scrollRef}
+            data-testid="narrative-view"
+            onScroll={currentScroll.handleScroll}
+            className="flex-1 overflow-y-auto"
+            role="log"
+            aria-label="Current narration"
+            aria-live="polite"
+          >
+            <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4">
+              {emptyState}
+              {current.map((seg, i) =>
+                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[32ch]" })
+              )}
+              {thinkingIndicator}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ── Single column (tablet + mobile) ── */
         <div
-          data-testid="thinking-indicator"
-          className="flex items-center justify-center gap-3 max-w-prose mx-auto py-2 text-muted-foreground/30"
+          ref={singleScroll.scrollRef}
+          data-testid="narrative-view"
+          onScroll={singleScroll.handleScroll}
+          className="flex-1 overflow-y-auto"
         >
-          <span className="text-sm animate-pulse [animation-delay:0ms]">{dinkusGlyph}</span>
-          <span className="text-sm animate-pulse [animation-delay:200ms]">{dinkusGlyph}</span>
-          <span className="text-sm animate-pulse [animation-delay:400ms]">{dinkusGlyph}</span>
+          <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4">
+            {emptyState}
+            {segments.map((seg, i) =>
+              renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
+            )}
+            {thinkingIndicator}
+          </div>
         </div>
       )}
-      </div>
 
-      {/* Lightbox overlay — fixed position, can live outside the inner flex div */}
+      {/* Lightbox overlay */}
       {lightboxUrl && (
         <div
           data-testid="image-lightbox"
@@ -589,7 +730,6 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
           />
         </div>
       )}
-      </div>
     </div>
   );
 }
