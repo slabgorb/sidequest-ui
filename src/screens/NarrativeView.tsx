@@ -298,7 +298,7 @@ function NarrativeImage({
 
   return (
     <div
-      className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative"
+      className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20"
       style={aspectRatio ? { aspectRatio } : undefined}
       onClick={() => !errored && onLightbox(seg.url!)}
       role="button"
@@ -495,7 +495,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="player-action"
-          className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-1"
+          className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-2 pl-6 border-l-2 border-primary/20"
         >
           {seg.text}
         </div>
@@ -627,28 +627,13 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                      bg-gradient-to-b from-background via-background/95 to-transparent
                      pointer-events-none select-none"
         >
-          {isSpread ? (
-            <>
-              <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
-                {dinkusGlyph} {chapterTitle}
-              </span>
-              {turnCount > 0 && (
-                <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
-                  {toRoman(turnCount)} {dinkusGlyph}
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
-                {dinkusGlyph} {chapterTitle}
-              </span>
-              {turnCount > 0 && (
-                <span className="text-xs tracking-widest text-muted-foreground/25 font-light">
-                  {toRoman(turnCount)}
-                </span>
-              )}
-            </>
+          <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
+            {chapterTitle}
+          </span>
+          {turnCount > 0 && (
+            <span className="text-xs tracking-widest text-muted-foreground/25 font-light tabular-nums">
+              {toRoman(turnCount)}
+            </span>
           )}
         </div>
       )}
@@ -669,13 +654,15 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                 <div className="flex-1" />
               )}
               {history.map((seg, i) =>
-                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[32ch]" })
+                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
               )}
             </div>
           </div>
 
           {/* Gutter — the spine */}
-          <div className="w-px bg-border/10 shrink-0" />
+          <div className="w-6 shrink-0 flex items-stretch justify-center">
+            <div className="w-px bg-border/15 bg-gradient-to-b from-transparent via-border/20 to-transparent" />
+          </div>
 
           {/* Right column: current narration */}
           <div
@@ -690,7 +677,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4">
               {emptyState}
               {current.map((seg, i) =>
-                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[32ch]" })
+                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
               )}
               {thinkingIndicator}
             </div>
