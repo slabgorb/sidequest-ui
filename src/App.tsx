@@ -156,13 +156,18 @@ function AppInner() {
     narrationEnd: GameMessage | null;
     chunks: GameMessage[];
     flushTimer: ReturnType<typeof setTimeout> | null;
-  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null });
+    watchdogTimer: ReturnType<typeof setTimeout> | null;
+  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null, watchdogTimer: null });
 
   const flushNarrationBuffer = useCallback(() => {
     const buf = narrationBufferRef.current;
     if (buf.flushTimer) {
       clearTimeout(buf.flushTimer);
       buf.flushTimer = null;
+    }
+    if (buf.watchdogTimer) {
+      clearTimeout(buf.watchdogTimer);
+      buf.watchdogTimer = null;
     }
 
     const toFlush: GameMessage[] = [];
