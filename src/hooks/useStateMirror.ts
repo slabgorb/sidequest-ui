@@ -8,7 +8,7 @@ import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterSta
  * initial_state from SESSION_EVENT join messages.
  */
 export function useStateMirror(messages: GameMessage[]): void {
-  const { setState } = useGameState();
+  const { setState, setLocalPlayerId } = useGameState();
   const prevLengthRef = useRef(0);
 
   useEffect(() => {
@@ -18,6 +18,7 @@ export function useStateMirror(messages: GameMessage[]): void {
     let current: ClientGameState = { ...EMPTY_GAME_STATE, characters: [], quests: {} };
     const journal: JournalEntry[] = [];
     const seenRenderIds = new Set<string>();
+    let myPlayerId = '';
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -37,6 +38,11 @@ export function useStateMirror(messages: GameMessage[]): void {
       }
 
       if (msg.type === MessageType.SESSION_EVENT) {
+        // Capture local player_id from the connected event
+        const event = msg.payload.event as string | undefined;
+        if ((event === 'connected' || event === 'ready') && msg.player_id) {
+          myPlayerId = msg.player_id;
+        }
         const initialState = msg.payload.initial_state as ClientGameState | undefined;
         if (initialState) {
           current = {
@@ -52,10 +58,21 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // In multiplayer, only apply state_delta from our own narrations
+      // (other players' character state comes via PARTY_STATUS, not state_delta)
+      if (myPlayerId && msg.player_id && msg.player_id !== myPlayerId) {
+        continue;
+      }
+
       const delta = msg.payload.state_delta as Record<string, unknown> | undefined;
       if (!delta || Object.keys(delta).length === 0) continue;
 
       current = applyDelta(current, delta);
+    }
+
+    // Store local player ID in context for other hooks
+    if (myPlayerId) {
+      setLocalPlayerId(myPlayerId);
     }
 
     // Merge journal entries (preserve existing from localStorage, add new)
