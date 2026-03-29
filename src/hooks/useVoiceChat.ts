@@ -27,8 +27,10 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
   const onSignalRef = useRef(onSignal);
   onSignalRef.current = onSignal;
 
-  // Capture local audio
+  // Capture local audio — gracefully degrade if mediaDevices unavailable
+  // (insecure HTTP context: navigator.mediaDevices is undefined)
   useEffect(() => {
+    if (!navigator.mediaDevices?.getUserMedia) return;
     let cancelled = false;
     navigator.mediaDevices
       .getUserMedia({ audio: { echoCancellation: true } })
@@ -37,6 +39,9 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
           localStreamRef.current = stream;
           flushSync(() => setLocalStream(stream));
         }
+      })
+      .catch(() => {
+        // Permission denied or device unavailable — voice stays disabled
       });
     return () => {
       cancelled = true;
