@@ -28,7 +28,11 @@ export interface UsePushToTalkResult {
 }
 
 export function usePushToTalk(options: UsePushToTalkOptions): UsePushToTalkResult {
-  const { transcribe, onConfirm, pttKey = "ControlLeft", voiceChat, enabled = true } = options;
+  // DISABLED: Voice/mic functionality is off. Mic was capturing TTS audio
+  // and feeding it back as player input, causing narration fragmentation.
+  const _disabled = true;
+  const { transcribe, onConfirm, pttKey = "ControlLeft", voiceChat, enabled: _enabled = true } = options;
+  const enabled = false;
 
   // Fix 3: Stable refs for voiceChat methods to avoid effect re-registration
   const muteOutgoingRef = useRef(voiceChat?.muteOutgoing);

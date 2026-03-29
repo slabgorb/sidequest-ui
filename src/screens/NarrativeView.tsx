@@ -54,8 +54,8 @@ function markdownToHtml(text: string): string {
     .replace(/\n\n/g, "</p><p>")
     // Single newlines become line breaks
     .replace(/\n/g, "<br>")
-    // Footnote markers [N] → subtle superscripts (pending full 9-12 implementation)
-    .replace(/\[(\d+)\]/g, '<sup class="text-[0.6em] opacity-40 ml-0.5">$1</sup>');
+    // Strip footnote markers [N] and [^N] from prose — structured footnote data comes in payload
+    .replace(/\[\^?\d+\]/g, "");
   return `<p>${result}</p>`;
 }
 
@@ -173,11 +173,21 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         flushChunks();
         const charName = msg.payload.name as string;
         const charClass = msg.payload.class as string | undefined;
+        const race = msg.payload.race as string | undefined;
         const level = msg.payload.level as number | undefined;
-        const parts = [charName, charClass, level != null ? `Lv ${level}` : null]
+        const personality = msg.payload.personality as string | undefined;
+        const pronouns = msg.payload.pronouns as string | undefined;
+        const equipment = (msg.payload.equipment as string[] | undefined) ?? [];
+        const header = [charName, race, charClass, level != null ? `Lv ${level}` : null]
           .filter(Boolean)
           .join(" — ");
-        segments.push({ kind: "system", text: parts });
+        const details = [
+          personality ? `Personality: ${personality}` : null,
+          pronouns ? `Pronouns: ${pronouns}` : null,
+          equipment.length > 0 ? `Equipment: ${equipment.join(", ")}` : null,
+        ].filter(Boolean).join(" | ");
+        const text = details ? `${header}\n${details}` : header;
+        segments.push({ kind: "system", text });
         break;
       }
       case MessageType.PLAYER_ACTION: {

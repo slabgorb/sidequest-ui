@@ -3,6 +3,7 @@ import { useEffect } from "react";
 export interface CharacterSummary {
   player_id: string;
   name: string;
+  character_name: string;
   portrait_url?: string;
   hp: number;
   hp_max: number;
@@ -74,14 +75,14 @@ export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, a
             ].filter(Boolean).join(" ")}
           >
             {c.portrait_url ? (
-              <img src={c.portrait_url} alt={c.name} />
+              <img src={c.portrait_url} alt={c.character_name} />
             ) : (
-              <span>{getInitials(c.name)}</span>
+              <span>{getInitials(c.character_name)}</span>
             )}
 
             <div style={{ visibility: collapsed ? "hidden" : "visible" }}>
               <span>
-                {c.name}
+                {c.character_name}
                 {isSelf && (
                   <span data-testid="you-badge" className="ml-1 text-xs text-muted-foreground/50 font-normal">YOU</span>
                 )}
