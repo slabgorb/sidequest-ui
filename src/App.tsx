@@ -32,7 +32,7 @@ interface SavedSession {
 
 function loadSession(): SavedSession | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as SavedSession;
     if (data.playerName && data.genre && data.world) return data;
@@ -44,7 +44,7 @@ function loadSession(): SavedSession | null {
 
 function saveSession(playerName: string, genre: string, world: string) {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ playerName, genre, world }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ playerName, genre, world }));
   } catch {
     // non-critical
   }
@@ -52,7 +52,7 @@ function saveSession(playerName: string, genre: string, world: string) {
 
 function clearSession() {
   try {
-    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
   } catch {
     // non-critical
   }
