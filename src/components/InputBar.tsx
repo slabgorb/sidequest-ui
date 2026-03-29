@@ -18,6 +18,7 @@ export interface InputBarProps {
   onTranscriptConfirm: () => void;
   onTranscriptDiscard: () => void;
   duration: number;
+  waitingForPlayer?: string;
 }
 
 function RecordingIndicator({ duration }: { duration: number }) {
@@ -132,6 +133,7 @@ export default function InputBar({
   onTranscriptConfirm,
   onTranscriptDiscard,
   duration,
+  waitingForPlayer,
 }: InputBarProps) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
@@ -169,6 +171,7 @@ export default function InputBar({
   );
 
   const placeholder =
+    waitingForPlayer ? `Waiting for ${waitingForPlayer}…` :
     pttState === "recording" ? "Listening..." :
     pttState === "transcribing" ? "Transcribing..." :
     isPreview ? "" :

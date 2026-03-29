@@ -116,6 +116,12 @@ function AppInner() {
   // Combat state from COMBAT_EVENT messages
   const [combatState, setCombatState] = useState<CombatState | null>(null);
 
+  // Multiplayer identity — who am I, and whose turn is it?
+  const [connectedPlayerName, setConnectedPlayerName] = useState<string>(
+    () => loadSession()?.playerName ?? ""
+  );
+  const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
+
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
     saveHmrState({ messages, sessionPhase, character });
@@ -363,6 +369,18 @@ function AppInner() {
       return;
     }
 
+    // Track whose turn it is for multiplayer turn gating
+    if (msg.type === MessageType.TURN_STATUS) {
+      const name = msg.payload.player_name as string | undefined;
+      const status = msg.payload.status as string | undefined;
+      if (name && status === "active") {
+        setActivePlayerName(name);
+      } else if (status === "resolved") {
+        setActivePlayerName(null);
+      }
+      // Fall through — NarrativeView renders TURN_STATUS as a turn indicator
+    }
+
     // Server says the session is gone — re-send the connect handshake so the
     // server can restore (or start fresh).  This happens after a server restart
     // when the client's WebSocket auto-reconnects but never re-sent the connect.
@@ -419,6 +437,7 @@ function AppInner() {
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
       saveSession(playerName, genre, world);
+      setConnectedPlayerName(playerName);
       connect();
       setConnected(true);
       setTimeout(() => {
@@ -479,6 +498,8 @@ function AppInner() {
     setMapData(null);
     setPartyMembers([]);
     setCombatState(null);
+    setConnectedPlayerName("");
+    setActivePlayerName(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
@@ -561,6 +582,18 @@ function AppInner() {
     [partyMembers, gameState.characters],
   );
 
+  // Multiplayer identity — derive player IDs from party roster by name
+  const currentPlayerId = useMemo(
+    () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? "",
+    [partyMembers, connectedPlayerName],
+  );
+  const activePlayerId = useMemo(
+    () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
+    [partyMembers, activePlayerName],
+  );
+  const isMyTurn = !activePlayerName || activePlayerName === connectedPlayerName;
+  const waitingForPlayer = characters.length > 1 && !isMyTurn ? (activePlayerName ?? undefined) : undefined;
+
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <main className="flex flex-col flex-1 min-h-0">
@@ -592,7 +625,7 @@ function AppInner() {
               characters={characters}
               onSend={handleSend}
               onLeave={handleLeave}
-              disabled={readyState !== WebSocket.OPEN || thinking}
+              disabled={readyState !== WebSocket.OPEN || thinking || (characters.length > 1 && !isMyTurn)}
               thinking={thinking}
               characterSheet={characterSheet}
               inventoryData={inventoryData}
@@ -601,6 +634,10 @@ function AppInner() {
               nowPlaying={nowPlaying}
               journalEntries={gameState.journal}
               combatState={combatState}
+              currentPlayerId={currentPlayerId}
+              activePlayerId={activePlayerId}
+              activePlayerName={activePlayerName}
+              waitingForPlayer={waitingForPlayer}
             />
           </ErrorBoundary>
         )}

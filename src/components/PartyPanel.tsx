@@ -15,6 +15,8 @@ interface PartyPanelProps {
   characters: CharacterSummary[];
   collapsed: boolean;
   onToggle: () => void;
+  currentPlayerId?: string;
+  activePlayerId?: string | null;
 }
 
 function getHpLevel(hp: number, hpMax: number): "healthy" | "warning" | "critical" {
@@ -32,7 +34,7 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-export function PartyPanel({ characters, collapsed, onToggle }: PartyPanelProps) {
+export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, activePlayerId }: PartyPanelProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "p") return;
@@ -58,8 +60,19 @@ export function PartyPanel({ characters, collapsed, onToggle }: PartyPanelProps)
 
       {characters.map((c) => {
         const hpPct = Math.min(100, c.hp_max > 0 ? (c.hp / c.hp_max) * 100 : 0);
+        const isSelf = currentPlayerId !== undefined && c.player_id === currentPlayerId;
+        const isActing = activePlayerId !== undefined && activePlayerId !== null && c.player_id === activePlayerId;
+        const isWaiting = activePlayerId !== undefined && activePlayerId !== null && c.player_id !== activePlayerId;
         return (
-          <div key={c.player_id} data-testid={`character-card-${c.player_id}`}>
+          <div
+            key={c.player_id}
+            data-testid={`character-card-${c.player_id}`}
+            className={[
+              "transition-all duration-300",
+              isActing ? "ring-2 ring-primary" : "",
+              isWaiting ? "opacity-65" : "",
+            ].filter(Boolean).join(" ")}
+          >
             {c.portrait_url ? (
               <img src={c.portrait_url} alt={c.name} />
             ) : (
@@ -67,8 +80,16 @@ export function PartyPanel({ characters, collapsed, onToggle }: PartyPanelProps)
             )}
 
             <div style={{ visibility: collapsed ? "hidden" : "visible" }}>
-              <span>{c.name}</span>
-              <span>{c.class} Lv.{c.level} — {c.hp}/{c.hp_max}</span>
+              <span>
+                {c.name}
+                {isSelf && (
+                  <span data-testid="you-badge" className="ml-1 text-xs text-muted-foreground/50 font-normal">YOU</span>
+                )}
+                {isActing && (
+                  <span data-testid="acting-badge" className="ml-1 text-xs text-primary font-semibold uppercase tracking-wide">ACTING</span>
+                )}
+              </span>
+              <span>{[c.class, `Lv.${c.level}`].filter(Boolean).join(" ")} — {c.hp}/{c.hp_max}</span>
               <div
                 data-testid={`hp-bar-${c.player_id}`}
                 data-hp-level={getHpLevel(c.hp, c.hp_max)}

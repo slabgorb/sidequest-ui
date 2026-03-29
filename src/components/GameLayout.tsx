@@ -34,6 +34,10 @@ export interface GameLayoutProps {
   nowPlaying?: NowPlaying | null;
   journalEntries?: JournalEntry[];
   combatState?: CombatState | null;
+  currentPlayerId?: string;
+  activePlayerId?: string | null;
+  activePlayerName?: string | null;
+  waitingForPlayer?: string;
 }
 
 export function GameLayout({
@@ -50,6 +54,10 @@ export function GameLayout({
   nowPlaying = null,
   journalEntries,
   combatState = null,
+  currentPlayerId,
+  activePlayerId,
+  activePlayerName,
+  waitingForPlayer,
 }: GameLayoutProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -176,6 +184,8 @@ export function GameLayout({
               characters={characters}
               collapsed={isTablet}
               onToggle={toggleParty}
+              currentPlayerId={currentPlayerId}
+              activePlayerId={activePlayerId}
             />
           )}
 
@@ -233,6 +243,16 @@ export function GameLayout({
               </div>
             )}
 
+            {characters.length > 1 && activePlayerName && (
+              <div
+                data-testid="turn-indicator"
+                className="px-4 py-1.5 text-xs text-center text-muted-foreground/60 border-t border-border/30 bg-card/20 shrink-0 tracking-wide"
+              >
+                {waitingForPlayer
+                  ? `[ ${activePlayerName}'s turn ]`
+                  : "[ Your turn ]"}
+              </div>
+            )}
             <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0">
               <InputBar
                 onSend={onSend}
@@ -249,6 +269,7 @@ export function GameLayout({
                 onTranscriptConfirm={ptt.confirm}
                 onTranscriptDiscard={ptt.discard}
                 duration={ptt.duration}
+                waitingForPlayer={waitingForPlayer}
               />
             </div>
           </div>
@@ -289,6 +310,8 @@ export function GameLayout({
                   characters={characters}
                   collapsed={false}
                   onToggle={() => setOverlayOpen(false)}
+                  currentPlayerId={currentPlayerId}
+                  activePlayerId={activePlayerId}
                 />
               </div>
             </div>
@@ -298,6 +321,8 @@ export function GameLayout({
                 characters={characters}
                 collapsed={false}
                 onToggle={toggleParty}
+                currentPlayerId={currentPlayerId}
+                activePlayerId={activePlayerId}
               />
             </div>
           )
