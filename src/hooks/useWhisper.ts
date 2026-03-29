@@ -13,38 +13,18 @@ export interface UseWhisperResult {
 
 /**
  * React hook wrapping LocalTranscriber — initializes on mount, exposes transcribe().
+ *
+ * DISABLED: Voice/mic functionality is off until rethought. No mic access,
+ * no transcriber initialization, no getUserMedia. The mic was capturing TTS
+ * audio and feeding it back as player input, causing narration fragmentation.
  */
 export function useWhisper(): UseWhisperResult {
-  const transcriberRef = useRef<LocalTranscriber | null>(null);
-  const [status, setStatus] = useState<TranscriberStatus>("unloaded");
-  const [loadProgress, setLoadProgress] = useState(0);
-  const [isWebGPU, setIsWebGPU] = useState(false);
-
-  useEffect(() => {
-    const t = new LocalTranscriber();
-    transcriberRef.current = t;
-
-    t.initialize((progress) => {
-      setLoadProgress(progress);
-    })
-      .then(() => {
-        setStatus(t.status);
-        setIsWebGPU(t.isWebGPU);
-      })
-      .catch(() => {
-        setStatus("error");
-      });
-  }, []);
-
-  const transcribe = useCallback(async (audio: Float32Array) => {
-    if (!transcriberRef.current) {
-      throw new Error("Transcriber not initialized");
-    }
-    return transcriberRef.current.transcribe(audio);
+  const transcribe = useCallback(async (_audio: Float32Array) => {
+    return "";
   }, []);
 
   return useMemo(
-    () => ({ transcribe, status, loadProgress, isWebGPU }),
-    [transcribe, status, loadProgress, isWebGPU],
+    () => ({ transcribe, status: "unloaded" as TranscriberStatus, loadProgress: 0, isWebGPU: false }),
+    [transcribe],
   );
 }
