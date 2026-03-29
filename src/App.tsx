@@ -353,7 +353,9 @@ function AppInner() {
       return;
     }
 
-    // Track whose turn it is — gates input in multiplayer
+    // Track whose turn it is — gates input in multiplayer.
+    // TURN_STATUS is state-only, not rendered in narration feed.
+    // The turn strip in GameLayout shows whose turn it is.
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
@@ -362,25 +364,31 @@ function AppInner() {
       } else if (status === "resolved") {
         setActivePlayerName(null);
       }
-      // fall-through: TURN_STATUS may also carry state we want in messages
+      return;
     }
 
     // Capture party status — richer data with portrait_url for PartyPanel
     if (msg.type === MessageType.PARTY_STATUS) {
       const members = (msg.payload.members as Array<Record<string, unknown>>) ?? [];
-      setPartyMembers(
-        members.map((m) => ({
-          player_id: (m.player_id as string) ?? "",
-          name: (m.name as string) ?? "",
-          character_name: (m.character_name as string) ?? (m.name as string) ?? "",
-          hp: (m.current_hp as number) ?? 0,
-          hp_max: (m.max_hp as number) ?? 0,
-          status_effects: (m.statuses as string[]) ?? [],
-          class: (m.class as string) ?? "",
-          level: (m.level as number) ?? 1,
-          portrait_url: (m.portrait_url as string) || undefined,
-        })),
-      );
+      const mapped = members.map((m) => ({
+        player_id: (m.player_id as string) ?? "",
+        name: (m.name as string) ?? "",
+        character_name: (m.character_name as string) ?? (m.name as string) ?? "",
+        hp: (m.current_hp as number) ?? 0,
+        hp_max: (m.max_hp as number) ?? 0,
+        status_effects: (m.statuses as string[]) ?? [],
+        class: (m.class as string) ?? "",
+        level: (m.level as number) ?? 1,
+        portrait_url: (m.portrait_url as string) || undefined,
+      }));
+      // Deduplicate by player_id (HMR/reconnect can re-register players)
+      const seen = new Set<string>();
+      const deduped = mapped.filter((m) => {
+        if (seen.has(m.player_id)) return false;
+        seen.add(m.player_id);
+        return true;
+      });
+      setPartyMembers(deduped);
       return;
     }
 
