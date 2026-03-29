@@ -71,14 +71,35 @@ export function useGenreTheme(messages: GameMessage[]): void {
     // Tailwind reads --foreground, --background, --card, --accent, etc.
     const root = document.documentElement;
     const computed = getComputedStyle(root);
+
+    const text = computed.getPropertyValue("--text").trim();
+    const bg = computed.getPropertyValue("--background").trim();
+    const surface = computed.getPropertyValue("--surface").trim();
+    const primary = computed.getPropertyValue("--primary").trim();
+    const secondary = computed.getPropertyValue("--secondary").trim();
+    const accent = computed.getPropertyValue("--accent").trim();
+
+    // Derive border from surface (slightly lighter/darker)
+    const border = surface || bg;
+
     const bridge: Record<string, string> = {
-      "--foreground": computed.getPropertyValue("--text").trim(),
-      "--card-foreground": computed.getPropertyValue("--text").trim(),
-      "--popover-foreground": computed.getPropertyValue("--text").trim(),
-      "--background": computed.getPropertyValue("--background").trim(),
-      "--card": computed.getPropertyValue("--surface").trim(),
-      "--popover": computed.getPropertyValue("--surface").trim(),
-      "--muted-foreground": computed.getPropertyValue("--text").trim(),
+      "--foreground": text,
+      "--card-foreground": text,
+      "--popover-foreground": text,
+      "--muted-foreground": text,
+      "--background": bg,
+      "--card": surface,
+      "--popover": surface,
+      "--primary": primary,
+      "--primary-foreground": text,
+      "--secondary": secondary,
+      "--secondary-foreground": text,
+      "--accent": accent,
+      "--accent-foreground": text,
+      "--border": border,
+      "--input": border,
+      "--ring": accent,
+      "--muted": surface,
     };
     for (const [twVar, genreVal] of Object.entries(bridge)) {
       if (genreVal) {
@@ -86,9 +107,26 @@ export function useGenreTheme(messages: GameMessage[]): void {
       }
     }
 
+    // Dynamic Google Font loading from genre CSS.
+    // Extract font-family from the :root block or @font-face declarations.
+    const fontMatch = css.match(/font-family:\s*'([^']+)'/);
+    if (fontMatch) {
+      const fontName = fontMatch[1];
+      const fontId = fontName.replace(/\s+/g, "+");
+      const linkId = "genre-google-font";
+      let linkEl = document.getElementById(linkId) as HTMLLinkElement | null;
+      if (!linkEl) {
+        linkEl = document.createElement("link");
+        linkEl.id = linkId;
+        linkEl.rel = "stylesheet";
+        document.head.appendChild(linkEl);
+      }
+      linkEl.href = `https://fonts.googleapis.com/css2?family=${fontId}:wght@400;700&display=swap`;
+      root.style.setProperty("font-family", `'${fontName}', var(--font-sans)`);
+    }
+
     // Check background luminance to decide dark/light mode.
     // Only remove "dark" class if the genre background is actually light.
-    const bg = computed.getPropertyValue("--background").trim();
     if (bg) {
       const isLight = getLuminance(bg) > 0.5;
       if (isLight) {
