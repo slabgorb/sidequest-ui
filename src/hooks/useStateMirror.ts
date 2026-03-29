@@ -1,11 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
-import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry } from '../providers/GameStateProvider';
+import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory } from '../providers/GameStateProvider';
+
+interface FootnoteData {
+  marker?: number;
+  summary: string;
+  category?: string;
+  is_new?: boolean;
+}
 
 /**
  * Applies state deltas from game messages to the GameState context.
  * Extracts state_delta from NARRATION/TURN_STATUS payloads and
  * initial_state from SESSION_EVENT join messages.
+ * Accumulates footnotes into knowledge entries.
  */
 export function useStateMirror(messages: GameMessage[]): void {
   const { setState, setLocalPlayerId } = useGameState();
@@ -15,10 +23,13 @@ export function useStateMirror(messages: GameMessage[]): void {
     if (messages.length === 0) return;
 
     // Replay all messages to compute current state (idempotent)
-    let current: ClientGameState = { ...EMPTY_GAME_STATE, characters: [], quests: {} };
+    let current: ClientGameState = { ...EMPTY_GAME_STATE, characters: [], quests: {}, knowledge: [] };
     const journal: JournalEntry[] = [];
+    const knowledge: KnowledgeEntry[] = [];
     const seenRenderIds = new Set<string>();
+    const seenFactIds = new Set<string>();
     let myPlayerId = '';
+    let turnCounter = 0;
 
     for (const msg of messages) {
       // Detect handout IMAGE messages
@@ -49,13 +60,40 @@ export function useStateMirror(messages: GameMessage[]): void {
             characters: (initialState.characters ?? []).map(normalizeCharacter),
             location: initialState.location ?? '',
             quests: { ...initialState.quests },
+            knowledge: [],
           };
         }
         continue;
       }
 
+      // Track turns for knowledge entry timestamps
+      if (msg.type === MessageType.PLAYER_ACTION) {
+        turnCounter++;
+        continue;
+      }
+
       if (msg.type !== MessageType.NARRATION && msg.type !== MessageType.TURN_STATUS) {
         continue;
+      }
+
+      // Accumulate footnotes into knowledge entries from NARRATION messages
+      if (msg.type === MessageType.NARRATION) {
+        const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
+        for (const fn of footnotes) {
+          if (!fn.summary) continue;
+          const factId = `${turnCounter}-${fn.marker ?? knowledge.length}`;
+          if (seenFactIds.has(factId)) continue;
+          seenFactIds.add(factId);
+          const validCategories = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
+          const category = (validCategories.includes(fn.category ?? '') ? fn.category : 'Lore') as FactCategory;
+          knowledge.push({
+            fact_id: factId,
+            content: fn.summary,
+            category,
+            is_new: fn.is_new ?? true,
+            learned_turn: turnCounter,
+          });
+        }
       }
 
       // In multiplayer, only apply state_delta from our own narrations
@@ -81,6 +119,11 @@ export function useStateMirror(messages: GameMessage[]): void {
       const existingIds = new Set(existingJournal.map(e => e.render_id));
       const newEntries = journal.filter(e => !existingIds.has(e.render_id));
       current = { ...current, journal: [...existingJournal, ...newEntries] };
+    }
+
+    // Merge accumulated knowledge
+    if (knowledge.length > 0) {
+      current = { ...current, knowledge };
     }
 
     if (messages.length !== prevLengthRef.current) {

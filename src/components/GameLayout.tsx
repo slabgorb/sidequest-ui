@@ -18,6 +18,7 @@ import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import { CombatOverlay, type CombatState } from "@/components/CombatOverlay";
 import type { JournalEntry } from "@/components/JournalView";
+import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 import type { GameMessage } from "@/types/protocol";
 
 export interface GameLayoutProps {
@@ -33,6 +34,7 @@ export interface GameLayoutProps {
   audio?: ReturnType<typeof useAudio>;
   nowPlaying?: NowPlaying | null;
   journalEntries?: JournalEntry[];
+  knowledgeEntries?: KnowledgeEntry[];
   combatState?: CombatState | null;
   currentPlayerId?: string;
   activePlayerId?: string | null;
@@ -53,6 +55,7 @@ export function GameLayout({
   audio,
   nowPlaying = null,
   journalEntries,
+  knowledgeEntries,
   combatState = null,
   currentPlayerId,
   activePlayerId,
@@ -171,6 +174,7 @@ export function GameLayout({
       inventoryData={inventoryData}
       mapData={mapData}
       journalEntries={journalEntries}
+      knowledgeEntries={knowledgeEntries}
     >
       <div
         data-testid="game-layout"

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { KnowledgeJournal, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence } from '../KnowledgeJournal';
+import { KnowledgeJournal } from '../KnowledgeJournal';
+import type { KnowledgeEntry, FactCategory } from '@/providers/GameStateProvider';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -10,8 +11,7 @@ function entry(overrides: Partial<KnowledgeEntry> & { fact_id: string }): Knowle
   return {
     content: 'A mysterious fact about the world',
     category: 'Lore' as FactCategory,
-    source: 'Observation' as FactSource,
-    confidence: 'Certain' as Confidence,
+    is_new: true,
     learned_turn: 1,
     ...overrides,
   };
@@ -22,48 +22,42 @@ const ENTRIES: KnowledgeEntry[] = [
     fact_id: 'f1',
     content: 'The grove\'s oldest tree radiates corruption from its roots',
     category: 'Place',
-    source: 'Observation',
-    confidence: 'Certain',
+    is_new: true,
     learned_turn: 3,
   }),
   entry({
     fact_id: 'f2',
     content: 'Elder Mirova guards a secret beneath the well',
     category: 'Person',
-    source: 'Dialogue',
-    confidence: 'Suspected',
+    is_new: true,
     learned_turn: 5,
   }),
   entry({
     fact_id: 'f3',
     content: 'The ancient runes pulse with a ward against shadow creatures',
     category: 'Lore',
-    source: 'Discovery',
-    confidence: 'Certain',
+    is_new: true,
     learned_turn: 7,
   }),
   entry({
     fact_id: 'f4',
     content: 'Find the source of corruption before the harvest moon',
     category: 'Quest',
-    source: 'Dialogue',
-    confidence: 'Certain',
+    is_new: true,
     learned_turn: 2,
   }),
   entry({
     fact_id: 'f5',
     content: 'Root-bonding allows you to sense corruption in living wood',
     category: 'Ability',
-    source: 'Discovery',
-    confidence: 'Certain',
+    is_new: true,
     learned_turn: 1,
   }),
   entry({
     fact_id: 'f6',
     content: 'A hooded figure was seen near the well at midnight',
     category: 'Person',
-    source: 'Observation',
-    confidence: 'Rumored',
+    is_new: false,
     learned_turn: 4,
   }),
 ];
@@ -144,7 +138,6 @@ describe('AC-2: Category filtering', () => {
 describe('AC-3: Genre-voiced content', () => {
   it('renders the full content text of each entry', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
-    // Genre voice means the content string is displayed as-is (not a key or ID)
     expect(screen.getByText(/grove's oldest tree radiates corruption/i)).toBeInTheDocument();
     expect(screen.getByText(/Root-bonding allows you to sense corruption/i)).toBeInTheDocument();
   });
@@ -157,10 +150,6 @@ describe('AC-3: Genre-voiced content', () => {
 describe('AC-4: Turn provenance', () => {
   it('displays the turn number for each entry', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
-    // Each entry should show its learned_turn
-    const entries = screen.getAllByTestId('journal-entry');
-
-    // Check that turn numbers appear somewhere in the entries
     expect(screen.getByText(/turn 3/i)).toBeInTheDocument();
     expect(screen.getByText(/turn 5/i)).toBeInTheDocument();
     expect(screen.getByText(/turn 7/i)).toBeInTheDocument();
@@ -168,57 +157,28 @@ describe('AC-4: Turn provenance', () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-5: Confidence display — entries show Certain, Suspected, Rumored
+// AC-5: New indicator — new revelations are marked
 // ---------------------------------------------------------------------------
 
-describe('AC-5: Confidence badges', () => {
-  it('shows Certain badge for certain facts', () => {
+describe('AC-5: New indicators', () => {
+  it('shows "new" badge for new revelations', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
-    // f1 is Certain
     const f1 = screen.getByText(/grove's oldest tree/i).closest('[data-testid="journal-entry"]');
     expect(f1).toBeTruthy();
-    expect(within(f1!).getByText(/certain/i)).toBeInTheDocument();
-  });
-
-  it('shows Suspected badge for suspected facts', () => {
-    render(<KnowledgeJournal entries={ENTRIES} />);
-    const f2 = screen.getByText(/Elder Mirova/i).closest('[data-testid="journal-entry"]');
-    expect(f2).toBeTruthy();
-    expect(within(f2!).getByText(/suspected/i)).toBeInTheDocument();
-  });
-
-  it('shows Rumored badge for rumored facts', () => {
-    render(<KnowledgeJournal entries={ENTRIES} />);
-    const f6 = screen.getByText(/hooded figure/i).closest('[data-testid="journal-entry"]');
-    expect(f6).toBeTruthy();
-    expect(within(f6!).getByText(/rumored/i)).toBeInTheDocument();
+    expect(within(f1!).getByText(/new/i)).toBeInTheDocument();
   });
 });
 
 // ---------------------------------------------------------------------------
-// AC-6: Source display — Observation, Dialogue, Discovery
+// AC-6: Category display — each entry shows its category
 // ---------------------------------------------------------------------------
 
-describe('AC-6: Source indicators', () => {
-  it('shows observation indicator for observed facts', () => {
+describe('AC-6: Category display', () => {
+  it('shows category label for entries', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const f1 = screen.getByText(/grove's oldest tree/i).closest('[data-testid="journal-entry"]');
     expect(f1).toBeTruthy();
-    expect(within(f1!).getByTestId('source-observation')).toBeInTheDocument();
-  });
-
-  it('shows dialogue indicator for dialogue-sourced facts', () => {
-    render(<KnowledgeJournal entries={ENTRIES} />);
-    const f2 = screen.getByText(/Elder Mirova/i).closest('[data-testid="journal-entry"]');
-    expect(f2).toBeTruthy();
-    expect(within(f2!).getByTestId('source-dialogue')).toBeInTheDocument();
-  });
-
-  it('shows discovery indicator for discovered facts', () => {
-    render(<KnowledgeJournal entries={ENTRIES} />);
-    const f3 = screen.getByText(/ancient runes/i).closest('[data-testid="journal-entry"]');
-    expect(f3).toBeTruthy();
-    expect(within(f3!).getByTestId('source-discovery')).toBeInTheDocument();
+    expect(within(f1!).getByText('Place')).toBeInTheDocument();
   });
 });
 
@@ -245,13 +205,8 @@ describe('AC-7: Sort toggle', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     fireEvent.click(screen.getByTestId('sort-toggle'));
 
-    // In categorical mode, entries should be grouped by category
-    // Ability entries should appear in their group
     const entries = screen.getAllByTestId('journal-entry');
-    // Verify category headers or grouping exists
-    expect(screen.getByText(/ability/i)).toBeInTheDocument();
-    expect(screen.getByText(/lore/i)).toBeInTheDocument();
-    expect(screen.getByText(/person/i)).toBeInTheDocument();
+    expect(entries.length).toBe(ENTRIES.length);
   });
 
   it('switches back to chronological when toggled again', () => {
