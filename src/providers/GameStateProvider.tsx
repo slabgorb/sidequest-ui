@@ -28,6 +28,8 @@ export interface ClientGameState {
 export interface GameStateContextValue {
   state: ClientGameState;
   setState: (state: ClientGameState) => void;
+  localPlayerId: string;
+  setLocalPlayerId: (id: string) => void;
 }
 
 export const EMPTY_GAME_STATE: ClientGameState = {
@@ -39,6 +41,8 @@ export const EMPTY_GAME_STATE: ClientGameState = {
 const GameStateContext = createContext<GameStateContextValue>({
   state: EMPTY_GAME_STATE,
   setState: () => {},
+  localPlayerId: '',
+  setLocalPlayerId: () => {},
 });
 
 export interface GameStateProviderProps {
@@ -101,6 +105,7 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
       : EMPTY_GAME_STATE;
   });
   const setState = useCallback((s: ClientGameState) => setStateRaw(s), []);
+  const [localPlayerId, setLocalPlayerId] = useState('');
 
   // Persist full game state to sessionStorage for HMR survival
   useEffect(() => {
@@ -115,7 +120,7 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   }, [state.journal]);
 
   return (
-    <GameStateContext.Provider value={{ state, setState }}>
+    <GameStateContext.Provider value={{ state, setState, localPlayerId, setLocalPlayerId }}>
       {children}
     </GameStateContext.Provider>
   );
