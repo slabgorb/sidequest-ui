@@ -1,25 +1,7 @@
 import { useState, useMemo } from 'react';
-
-export type FactCategory = 'Lore' | 'Place' | 'Person' | 'Quest' | 'Ability';
-export type FactSource = 'Observation' | 'Dialogue' | 'Discovery';
-export type Confidence = 'Certain' | 'Suspected' | 'Rumored';
-
-export interface KnowledgeEntry {
-  fact_id: string;
-  content: string;
-  category: FactCategory;
-  source: FactSource;
-  confidence: Confidence;
-  learned_turn: number;
-}
+import type { KnowledgeEntry, FactCategory } from '@/providers/GameStateProvider';
 
 const CATEGORIES: FactCategory[] = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
-
-const SOURCE_ICONS: Record<FactSource, { testId: string; label: string }> = {
-  Observation: { testId: 'source-observation', label: '👁' },
-  Dialogue: { testId: 'source-dialogue', label: '💬' },
-  Discovery: { testId: 'source-discovery', label: '⭐' },
-};
 
 type SortMode = 'chronological' | 'categorical';
 
@@ -41,8 +23,8 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
 
   if (entries.length === 0) {
     return (
-      <div data-testid="knowledge-journal">
-        <p>Your journal is empty. Explore the world to fill its pages.</p>
+      <div data-testid="knowledge-journal" className="p-6">
+        <p className="text-muted-foreground/60 italic">Your journal is empty. Explore the world to fill its pages.</p>
       </div>
     );
   }
@@ -64,12 +46,13 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
   }
 
   return (
-    <div data-testid="knowledge-journal">
-      <div role="tablist">
+    <div data-testid="knowledge-journal" className="p-4">
+      <div role="tablist" className="flex gap-1 mb-3 flex-wrap">
         <button
           role="tab"
           aria-selected={activeCategory === 'All'}
           onClick={() => setActiveCategory('All')}
+          className={`text-xs px-2 py-1 rounded ${activeCategory === 'All' ? 'bg-primary/20 text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground'}`}
         >
           All
         </button>
@@ -79,8 +62,9 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
             role="tab"
             aria-selected={activeCategory === cat}
             onClick={() => setActiveCategory(cat)}
+            className={`text-xs px-2 py-1 rounded ${activeCategory === cat ? 'bg-primary/20 text-foreground' : 'text-muted-foreground/60 hover:text-muted-foreground'}`}
           >
-            {cat} {categoryCounts[cat]}
+            {cat} {categoryCounts[cat] > 0 && <span className="opacity-50">{categoryCounts[cat]}</span>}
           </button>
         ))}
       </div>
@@ -90,20 +74,23 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
         onClick={() =>
           setSortMode((m) => (m === 'chronological' ? 'categorical' : 'chronological'))
         }
+        className="text-xs text-muted-foreground/50 hover:text-muted-foreground mb-3"
       >
         {sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}
       </button>
 
-      {sorted.map((entry) => (
-        <div key={entry.fact_id} data-testid="journal-entry">
-          <span data-testid={SOURCE_ICONS[entry.source].testId}>
-            {SOURCE_ICONS[entry.source].label}
-          </span>
-          <p>{entry.content}</p>
-          <span>{entry.confidence}</span>
-          <span>Turn {entry.learned_turn}</span>
-        </div>
-      ))}
+      <div className="space-y-2">
+        {sorted.map((entry) => (
+          <div key={entry.fact_id} data-testid="journal-entry" className="text-sm border-l-2 border-border/30 pl-3 py-1">
+            <p className="text-foreground/80">{entry.content}</p>
+            <div className="flex gap-2 text-xs text-muted-foreground/50 mt-0.5">
+              <span>{entry.category}</span>
+              <span>Turn {entry.learned_turn}</span>
+              {entry.is_new && <span className="text-accent-foreground/40 italic">new</span>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

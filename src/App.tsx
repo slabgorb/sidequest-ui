@@ -691,6 +691,7 @@ function AppInner() {
               audio={audio}
               nowPlaying={nowPlaying}
               journalEntries={gameState.journal}
+              knowledgeEntries={gameState.knowledge}
               combatState={combatState}
               currentPlayerId={currentPlayerId ?? undefined}
               activePlayerId={activePlayerId}

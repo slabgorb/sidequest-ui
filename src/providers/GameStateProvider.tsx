@@ -18,11 +18,22 @@ export interface JournalEntry {
   render_id: string;
 }
 
+export type FactCategory = 'Lore' | 'Place' | 'Person' | 'Quest' | 'Ability';
+
+export interface KnowledgeEntry {
+  fact_id: string;
+  content: string;
+  category: FactCategory;
+  is_new: boolean;
+  learned_turn: number;
+}
+
 export interface ClientGameState {
   characters: CharacterState[];
   location: string;
   quests: Record<string, string>;
   journal?: JournalEntry[];
+  knowledge: KnowledgeEntry[];
 }
 
 export interface GameStateContextValue {
@@ -36,6 +47,7 @@ export const EMPTY_GAME_STATE: ClientGameState = {
   characters: [],
   location: '',
   quests: {},
+  knowledge: [],
 };
 
 const GameStateContext = createContext<GameStateContextValue>({

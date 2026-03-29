@@ -3,14 +3,17 @@ import { CharacterSheet, type CharacterSheetData } from './CharacterSheet';
 import { InventoryPanel, type InventoryData } from './InventoryPanel';
 import { MapOverlay, type MapState } from './MapOverlay';
 import { JournalView, type JournalEntry } from './JournalView';
+import { KnowledgeJournal } from './KnowledgeJournal';
+import type { KnowledgeEntry } from '@/providers/GameStateProvider';
 
-type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | null;
+type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | null;
 
 export interface OverlayManagerProps {
   characterData: CharacterSheetData | null;
   inventoryData: InventoryData | null;
   mapData: MapState | null;
   journalEntries?: JournalEntry[];
+  knowledgeEntries?: KnowledgeEntry[];
   children: ReactNode;
 }
 
@@ -22,7 +25,7 @@ function isTextInput(el: Element | null): boolean {
   return false;
 }
 
-export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, children }: OverlayManagerProps) {
+export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, children }: OverlayManagerProps) {
   const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
 
   const handleKeyDown = useCallback(
@@ -57,9 +60,14 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
 
       if (key === 'j' && journalEntries && journalEntries.length > 0) {
         toggle('journal');
+        return;
+      }
+
+      if (key === 'k' && knowledgeEntries && knowledgeEntries.length > 0) {
+        toggle('knowledge');
       }
     },
-    [characterData, inventoryData, mapData, journalEntries],
+    [characterData, inventoryData, mapData, journalEntries, knowledgeEntries],
   );
 
   useEffect(() => {
@@ -93,6 +101,9 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
             )}
             {activeOverlay === 'journal' && journalEntries && (
               <JournalView entries={journalEntries} />
+            )}
+            {activeOverlay === 'knowledge' && knowledgeEntries && (
+              <KnowledgeJournal entries={knowledgeEntries} />
             )}
           </div>
         </div>
