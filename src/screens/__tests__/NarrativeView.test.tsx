@@ -73,9 +73,11 @@ describe("NarrativeView", () => {
         ]}
       />,
     );
-    // NARRATION_END should produce a visual separator between segments
-    const separators = document.querySelectorAll("[data-testid='segment-separator']");
-    expect(separators.length).toBeGreaterThanOrEqual(1);
+    // NARRATION_END creates a page boundary — the two chunks should be
+    // in separate snap-start page containers (separators are consumed
+    // as page breaks, not rendered as <hr> elements).
+    const pages = document.querySelectorAll(".snap-start");
+    expect(pages.length).toBeGreaterThanOrEqual(2);
   });
 
   // -- inline images ---------------------------------------------------------

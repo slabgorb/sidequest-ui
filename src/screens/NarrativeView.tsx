@@ -530,6 +530,29 @@ function renderSegment(
   }
 }
 
+/** Group segments into "pages" split at separators.
+ *  Each page becomes a scroll-snap target for the book feel. */
+function groupIntoPages(segments: NarrativeSegment[]): NarrativeSegment[][] {
+  const pages: NarrativeSegment[][] = [];
+  let current: NarrativeSegment[] = [];
+
+  for (const seg of segments) {
+    if (seg.kind === "separator") {
+      if (current.length > 0) {
+        pages.push(current);
+        current = [];
+      }
+    } else {
+      current.push(seg);
+    }
+  }
+  if (current.length > 0) {
+    pages.push(current);
+  }
+
+  return pages;
+}
+
 /** Hook for independent scroll tracking on a column. */
 function useColumnScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -645,18 +668,26 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
           <div
             ref={historyScroll.scrollRef}
             onScroll={historyScroll.handleScroll}
-            className="flex-1 overflow-y-auto"
+            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
             role="log"
             aria-label="Narrative history"
           >
-            <div className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4">
-              {history.length === 0 && segments.length > 0 && (
-                <div className="flex-1" />
-              )}
-              {history.map((seg, i) =>
-                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
-              )}
-            </div>
+            {(() => {
+              const pages = groupIntoPages(history);
+              if (pages.length === 0 && segments.length > 0) {
+                return <div className="min-h-full" />;
+              }
+              return pages.map((page, pi) => (
+                <div
+                  key={pi}
+                  className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4 snap-start"
+                >
+                  {page.map((seg, si) =>
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
+                  )}
+                </div>
+              ));
+            })()}
           </div>
 
           {/* Gutter — the spine */}
@@ -669,18 +700,33 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             ref={currentScroll.scrollRef}
             data-testid="narrative-view"
             onScroll={currentScroll.handleScroll}
-            className="flex-1 overflow-y-auto"
+            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
             role="log"
             aria-label="Current narration"
             aria-live="polite"
           >
-            <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4">
-              {emptyState}
-              {current.map((seg, i) =>
-                renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
-              )}
-              {thinkingIndicator}
-            </div>
+            {(() => {
+              const pages = groupIntoPages(current);
+              if (pages.length === 0) {
+                return (
+                  <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start">
+                    {emptyState}
+                    {thinkingIndicator}
+                  </div>
+                );
+              }
+              return pages.map((page, pi) => (
+                <div
+                  key={pi}
+                  className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start"
+                >
+                  {page.map((seg, si) =>
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
+                  )}
+                  {pi === pages.length - 1 && thinkingIndicator}
+                </div>
+              ));
+            })()}
           </div>
         </div>
       ) : (
@@ -689,15 +735,30 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
           ref={singleScroll.scrollRef}
           data-testid="narrative-view"
           onScroll={singleScroll.handleScroll}
-          className="flex-1 overflow-y-auto"
+          className="flex-1 overflow-y-auto scroll-snap-y-proximity"
         >
-          <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4">
-            {emptyState}
-            {segments.map((seg, i) =>
-              renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
-            )}
-            {thinkingIndicator}
-          </div>
+          {(() => {
+            const pages = groupIntoPages(segments);
+            if (pages.length === 0) {
+              return (
+                <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start">
+                  {emptyState}
+                  {thinkingIndicator}
+                </div>
+              );
+            }
+            return pages.map((page, pi) => (
+              <div
+                key={pi}
+                className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start"
+              >
+                {page.map((seg, si) =>
+                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
+                )}
+                {pi === pages.length - 1 && thinkingIndicator}
+              </div>
+            ));
+          })()}
         </div>
       )}
 
