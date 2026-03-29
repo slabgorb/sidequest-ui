@@ -205,8 +205,13 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
       case MessageType.CHAPTER_MARKER: {
         flushChunks();
         const location = msg.payload.location as string;
+        // Deduplicate consecutive chapter markers for the same location
+        // (server may send via direct channel AND session broadcast)
         if (location) {
-          segments.push({ kind: "chapter-marker", text: location });
+          const prev = segments[segments.length - 1];
+          if (!(prev && prev.kind === "chapter-marker" && prev.text === location)) {
+            segments.push({ kind: "chapter-marker", text: location });
+          }
         }
         break;
       }
@@ -316,6 +321,12 @@ function useRunningHeader(messages: GameMessage[]) {
     let chapterTitle: string | null = null;
     let turnCount = 0;
     for (const msg of messages) {
+      // SESSION_EVENT "ready" carries the server's persisted turn_count,
+      // which acts as a baseline when reconnecting (no PLAYER_ACTION history).
+      if (msg.type === MessageType.SESSION_EVENT) {
+        const tc = msg.payload.turn_count as number | undefined;
+        if (tc) turnCount = tc;
+      }
       if (msg.type === MessageType.CHAPTER_MARKER) {
         const loc = msg.payload.location as string;
         if (loc) chapterTitle = loc;
