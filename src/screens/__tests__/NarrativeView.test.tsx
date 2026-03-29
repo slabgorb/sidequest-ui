@@ -319,7 +319,7 @@ describe("NarrativeView", () => {
     expect(screen.getByText("Before unknown.")).toBeInTheDocument();
     expect(screen.getByText("After unknown.")).toBeInTheDocument();
     // Should not render any content for the unknown message
-    expect(container.querySelectorAll("[data-testid='narrative-view'] > *").length).toBe(2);
+    expect(container.querySelectorAll("[data-testid='narrative-view'] > div > *").length).toBe(2);
   });
 
   // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
