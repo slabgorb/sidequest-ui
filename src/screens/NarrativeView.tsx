@@ -54,8 +54,8 @@ function markdownToHtml(text: string): string {
     .replace(/\n\n/g, "</p><p>")
     // Single newlines become line breaks
     .replace(/\n/g, "<br>")
-    // Footnote markers [N] → subtle superscripts (pending full 9-12 implementation)
-    .replace(/\[(\d+)\]/g, '<sup class="text-[0.6em] opacity-40 ml-0.5">$1</sup>');
+    // Strip footnote markers [N] and [^N] from prose — structured footnote data comes in payload
+    .replace(/\[\^?\d+\]/g, "");
   return `<p>${result}</p>`;
 }
 
