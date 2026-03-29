@@ -372,6 +372,7 @@ function AppInner() {
         members.map((m) => ({
           player_id: (m.player_id as string) ?? "",
           name: (m.name as string) ?? "",
+          character_name: (m.character_name as string) ?? (m.name as string) ?? "",
           hp: (m.current_hp as number) ?? 0,
           hp_max: (m.max_hp as number) ?? 0,
           status_effects: (m.statuses as string[]) ?? [],
