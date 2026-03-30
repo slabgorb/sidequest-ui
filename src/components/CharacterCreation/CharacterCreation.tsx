@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toRoman } from "@/lib/utils";
 
 export interface CreationChoice {
@@ -17,6 +17,8 @@ export interface CreationScene {
   allows_freeform?: boolean;
   input_type?: string;
   character_preview?: Record<string, unknown>;
+  previous_choice?: number;
+  previous_input?: string;
 }
 
 export interface CharacterCreationProps {
@@ -26,8 +28,13 @@ export interface CharacterCreationProps {
 }
 
 export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
-  const [inputValue, setInputValue] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [inputValue, setInputValue] = useState(scene?.previous_input ?? "");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(scene?.previous_choice ?? null);
+
+  useEffect(() => {
+    setInputValue(scene?.previous_input ?? "");
+    setSelectedIndex(scene?.previous_choice ?? null);
+  }, [scene?.scene_index, scene?.phase]);
 
   if (loading) {
     return (
@@ -48,11 +55,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
 
   const handleChoice = (index: number) => {
     setSelectedIndex(index);
-    // Brief highlight before submitting so the player sees their selection
-    setTimeout(() => {
-      onRespond({ phase: "scene", choice: String(index + 1) });
-      setSelectedIndex(null);
-    }, 200);
+    onRespond({ phase: "scene", choice: String(index + 1) });
   };
 
   const handleFreeform = () => {
@@ -69,6 +72,10 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
     onRespond({ phase: "confirmation", choice: "1" });
   };
 
+  const handleBack = () => {
+    onRespond({ action: "back" });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (scene.input_type === "name") handleName();
@@ -76,12 +83,38 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
   };
 
   if (scene.phase === "confirmation") {
+    const previewEntries = scene.character_preview
+      ? Object.entries(scene.character_preview)
+      : [];
+
     return (
       <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto">
         <h2 className="text-lg font-semibold tracking-tight">Your Character</h2>
-        <div className="bg-card/80 border border-border/50 rounded-lg p-6 w-full max-w-lg space-y-1">
+        <div data-testid="character-review" className="bg-card/80 border border-border/50 rounded-lg p-6 w-full max-w-lg space-y-3">
           <div className="text-xs tracking-widest uppercase text-muted-foreground/60 mb-4">Character Sheet</div>
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground font-sans">{scene.summary}</div>
+          {previewEntries.length > 0 ? (
+            previewEntries.map(([key, value], index) => (
+              <div
+                key={key}
+                data-testid={`review-section-${key}`}
+                className="flex items-center justify-between py-2 border-b border-border/20 last:border-0"
+              >
+                <div>
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{key}</span>
+                  <p className="text-sm text-card-foreground">{String(value)}</p>
+                </div>
+                <button
+                  onClick={() => onRespond({ action: "edit", targetStep: index })}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                  aria-label={`Edit ${key}`}
+                >
+                  Edit
+                </button>
+              </div>
+            ))
+          ) : (
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground font-sans">{scene.summary}</div>
+          )}
         </div>
         <p className="text-base italic text-foreground/80 max-w-prose">{scene.message}</p>
         <div className="flex gap-3">
@@ -89,10 +122,10 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             onClick={handleConfirm}
             className="inline-flex items-center justify-center rounded-lg text-sm font-semibold h-11 px-8 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Confirm
+            Create Character
           </button>
           <button
-            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
+            onClick={handleBack}
             className="inline-flex items-center justify-center rounded-lg text-sm font-medium h-11 px-6 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
@@ -101,6 +134,8 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
       </div>
     );
   }
+
+  const showBack = scene.scene_index != null && scene.scene_index > 0 && scene.input_type !== "confirm";
 
   return (
     <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto relative">
@@ -125,6 +160,8 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
               key={i}
               role="button"
               tabIndex={0}
+              aria-selected={selectedIndex === i}
+              data-selected={selectedIndex === i}
               onClick={() => handleChoice(i)}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleChoice(i); }}
               className={`cursor-pointer rounded-lg border px-4 py-3
@@ -173,12 +210,21 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Confirm
           </button>
           <button
-            onClick={() => onRespond({ phase: "confirmation", choice: "2" })}
+            onClick={handleBack}
             className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Go Back
           </button>
         </div>
+      )}
+
+      {showBack && (
+        <button
+          onClick={handleBack}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-2"
+        >
+          ← Back
+        </button>
       )}
     </div>
   );
