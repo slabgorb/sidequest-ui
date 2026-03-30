@@ -155,19 +155,13 @@ function AlertList({ alerts }: { alerts: ValidationAlert[] }) {
 export default function GMMode({ state, onClose }: GMModeProps) {
   return (
     <div
+      className="w-[400px] shrink-0 h-full overflow-auto border-l border-border/30"
       style={{
-        position: "fixed",
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 400,
         background: "#1a1a2e",
         color: "#eee",
-        overflow: "auto",
         padding: 12,
         fontFamily: "monospace",
         fontSize: 12,
-        zIndex: 9999,
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
