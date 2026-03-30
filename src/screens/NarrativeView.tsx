@@ -560,7 +560,7 @@ function renderSegment(
           className="max-w-[85ch] mx-auto my-4 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 space-y-2"
         >
           {seg.actions?.map((entry, ai) => (
-            <div key={ai} className="flex gap-2 text-sm">
+            <div key={ai} className="flex gap-2 text-sm" data-auto-resolved="false">
               <span className="font-semibold text-primary/80 shrink-0">
                 {entry.character_name}:
               </span>
@@ -568,8 +568,10 @@ function renderSegment(
             </div>
           ))}
           {seg.autoResolved?.map((name, ri) => (
-            <div key={`auto-${ri}`} className="text-sm text-muted-foreground/60 italic">
-              {name} hesitated...
+            <div key={`auto-${ri}`} className="flex gap-2 text-sm text-muted-foreground/60 italic" data-auto-resolved="true">
+              <span className="font-semibold shrink-0">{name}</span>
+              <span>hesitated...</span>
+              <span className="text-amber-500 text-xs ml-1">timed out</span>
             </div>
           ))}
         </div>
