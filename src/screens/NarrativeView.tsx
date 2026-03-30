@@ -2,7 +2,6 @@ import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { toRoman } from "@/lib/utils";
-import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export interface NarrativeViewProps {
   messages: GameMessage[];
@@ -258,37 +257,13 @@ function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[]
   return result;
 }
 
-/** Split segments into history (left column) and current (right column).
- *  The last separator marks the boundary — everything after it is "current". */
-function splitSegments(segments: NarrativeSegment[]): {
-  history: NarrativeSegment[];
-  current: NarrativeSegment[];
-} {
-  let splitIndex = -1;
-  for (let i = segments.length - 1; i >= 0; i--) {
-    if (segments[i].kind === "separator") {
-      splitIndex = i;
-      break;
-    }
-  }
-
-  if (splitIndex <= 0) {
-    return { history: [], current: segments };
-  }
-
-  return {
-    history: segments.slice(0, splitIndex + 1),
-    current: segments.slice(splitIndex + 1),
-  };
-}
-
 /** Image component with skeleton loading and error fallback. */
 function NarrativeImage({
   seg,
   onLightbox,
 }: {
   seg: NarrativeSegment;
-  onLightbox: (url: string) => void;
+  onLightbox: (url: string, alt?: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -300,10 +275,10 @@ function NarrativeImage({
     <div
       className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20"
       style={aspectRatio ? { aspectRatio } : undefined}
-      onClick={() => !errored && onLightbox(seg.url!)}
+      onClick={() => !errored && onLightbox(seg.url!, seg.alt)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox(seg.url!); }}
+      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox(seg.url!, seg.alt); }}
     >
       {!loaded && !errored && (
         <div className="absolute inset-0 bg-muted/20 animate-pulse rounded" />
@@ -361,7 +336,7 @@ function renderSegment(
     maxTextWidth: string;
     chapterTitle: string | null;
     dinkusGlyph: string;
-    setLightboxUrl: (url: string | null) => void;
+    setLightboxUrl: (url: string | null, alt?: string) => void;
   },
 ) {
   const { maxTextWidth, chapterTitle, dinkusGlyph, setLightboxUrl } = opts;
@@ -404,7 +379,7 @@ function renderSegment(
               dangerouslySetInnerHTML={{ __html: txt.html! }}
             />
             <figure className="w-48 shrink-0">
-              <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
+              <NarrativeImage seg={img} onLightbox={(url, alt) => setLightboxUrl(url, alt)} />
               {img.caption && (
                 <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
                   {img.caption}
@@ -443,7 +418,7 @@ function renderSegment(
         : "my-8 max-w-prose mx-auto";
       return (
         <figure key={i} className={tierClass}>
-          <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
+          <NarrativeImage seg={seg} onLightbox={(url, alt) => setLightboxUrl(url, alt)} />
           {seg.caption && (
             <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
               {seg.caption}
@@ -530,30 +505,7 @@ function renderSegment(
   }
 }
 
-/** Group segments into "pages" split at separators.
- *  Each page becomes a scroll-snap target for the book feel. */
-function groupIntoPages(segments: NarrativeSegment[]): NarrativeSegment[][] {
-  const pages: NarrativeSegment[][] = [];
-  let current: NarrativeSegment[] = [];
-
-  for (const seg of segments) {
-    if (seg.kind === "separator") {
-      if (current.length > 0) {
-        pages.push(current);
-        current = [];
-      }
-    } else {
-      current.push(seg);
-    }
-  }
-  if (current.length > 0) {
-    pages.push(current);
-  }
-
-  return pages;
-}
-
-/** Hook for independent scroll tracking on a column. */
+/** Hook for independent scroll tracking. */
 function useColumnScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
@@ -576,33 +528,18 @@ function useColumnScroll() {
 }
 
 export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
-  const breakpoint = useBreakpoint();
-  const isSpread = breakpoint === "desktop";
-
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxAlt, setLightboxAlt] = useState<string>("");
   const dinkusGlyph = useDinkusGlyph(messages);
   const { chapterTitle, turnCount } = useRunningHeader(messages);
 
   const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
 
-  // Split into history (left) and current (right) for spread layout
-  const { history, current } = useMemo(() => splitSegments(segments), [segments]);
-
-  // Independent scroll tracking for each column (spread mode)
-  const historyScroll = useColumnScroll();
-  const currentScroll = useColumnScroll();
-  // Single scroll ref for mobile/tablet
   const singleScroll = useColumnScroll();
 
-  // Auto-scroll triggers
   useEffect(() => {
-    if (isSpread) {
-      currentScroll.scrollToBottom();
-      historyScroll.scrollToBottom();
-    } else {
-      singleScroll.scrollToBottom();
-    }
-  }, [segments, thinking, messages.length, isSpread]);
+    singleScroll.scrollToBottom();
+  }, [segments, thinking, messages.length]);
 
   // Escape closes lightbox
   useEffect(() => {
@@ -614,10 +551,15 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [lightboxUrl]);
 
+  const openLightbox = (url: string | null, alt?: string) => {
+    setLightboxUrl(url);
+    setLightboxAlt(alt ?? "");
+  };
+
   const segmentOpts = {
     chapterTitle,
     dinkusGlyph,
-    setLightboxUrl,
+    setLightboxUrl: openLightbox,
   };
 
   const thinkingIndicator = thinking && (
@@ -661,106 +603,19 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         </div>
       )}
 
-      {isSpread ? (
-        /* ── Two-column book spread (desktop ≥1200px) ── */
-        <div className="flex flex-1 min-h-0">
-          {/* Left column: history */}
-          <div
-            ref={historyScroll.scrollRef}
-            onScroll={historyScroll.handleScroll}
-            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
-            role="log"
-            aria-label="Narrative history"
-          >
-            {(() => {
-              const pages = groupIntoPages(history);
-              if (pages.length === 0 && segments.length > 0) {
-                return <div className="min-h-full" />;
-              }
-              return pages.map((page, pi) => (
-                <div
-                  key={pi}
-                  className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4 snap-start"
-                >
-                  {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
-                  )}
-                </div>
-              ));
-            })()}
-          </div>
-
-          {/* Gutter — the spine */}
-          <div className="w-6 shrink-0 flex items-stretch justify-center">
-            <div className="w-px bg-border/15 bg-gradient-to-b from-transparent via-border/20 to-transparent" />
-          </div>
-
-          {/* Right column: current narration */}
-          <div
-            ref={currentScroll.scrollRef}
-            data-testid="narrative-view"
-            onScroll={currentScroll.handleScroll}
-            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
-            role="log"
-            aria-label="Current narration"
-            aria-live="polite"
-          >
-            {(() => {
-              const pages = groupIntoPages(current);
-              if (pages.length === 0) {
-                return (
-                  <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start">
-                    {emptyState}
-                    {thinkingIndicator}
-                  </div>
-                );
-              }
-              return pages.map((page, pi) => (
-                <div
-                  key={pi}
-                  className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start"
-                >
-                  {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
-                  )}
-                  {pi === pages.length - 1 && thinkingIndicator}
-                </div>
-              ));
-            })()}
-          </div>
+      <div
+        ref={singleScroll.scrollRef}
+        data-testid="narrative-view"
+        onScroll={singleScroll.handleScroll}
+        className="flex-1 overflow-y-auto"
+      >
+        <div className="flex flex-col px-6 py-8 gap-4">
+          {segments.length === 0 ? emptyState : segments.map((seg, i) =>
+            renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
+          )}
+          {thinkingIndicator}
         </div>
-      ) : (
-        /* ── Single column (tablet + mobile) ── */
-        <div
-          ref={singleScroll.scrollRef}
-          data-testid="narrative-view"
-          onScroll={singleScroll.handleScroll}
-          className="flex-1 overflow-y-auto scroll-snap-y-proximity"
-        >
-          {(() => {
-            const pages = groupIntoPages(segments);
-            if (pages.length === 0) {
-              return (
-                <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start">
-                  {emptyState}
-                  {thinkingIndicator}
-                </div>
-              );
-            }
-            return pages.map((page, pi) => (
-              <div
-                key={pi}
-                className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start"
-              >
-                {page.map((seg, si) =>
-                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
-                )}
-                {pi === pages.length - 1 && thinkingIndicator}
-              </div>
-            ));
-          })()}
-        </div>
-      )}
+      </div>
 
       {/* Lightbox overlay */}
       {lightboxUrl && (
@@ -772,7 +627,8 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         >
           <img
             src={lightboxUrl}
-            alt=""
+            alt={lightboxAlt}
+            title={lightboxAlt}
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
