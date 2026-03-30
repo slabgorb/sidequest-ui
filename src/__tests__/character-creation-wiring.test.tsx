@@ -206,6 +206,8 @@ function sessionConnectedMessage(): GameMessage {
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
+  sessionStorage.clear();
+  localStorage.clear();
   AudioEngine.resetInstance();
   installWebAudioMock();
   installLocalStorageMock();
@@ -514,12 +516,13 @@ describe("AC-3: freeform and name input", () => {
     const nameMsg = ws.sent.find(
       (m) =>
         m.type === MessageType.CHARACTER_CREATION &&
-        (m.payload as Record<string, unknown>).action === "name",
+        (m.payload as Record<string, unknown>).phase === "scene" &&
+        (m.payload as Record<string, unknown>).choice === "Aldric Stormborn",
     );
     expect(nameMsg).toBeDefined();
     expect(nameMsg!.payload).toMatchObject({
-      action: "name",
-      name: "Aldric Stormborn",
+      phase: "scene",
+      choice: "Aldric Stormborn",
     });
   });
 });
@@ -562,7 +565,8 @@ describe("AC-4: complete transitions to game view", () => {
     const confirmMsg = ws.sent.find(
       (m) =>
         m.type === MessageType.CHARACTER_CREATION &&
-        (m.payload as Record<string, unknown>).action === "confirm",
+        (m.payload as Record<string, unknown>).phase === "confirmation" &&
+        (m.payload as Record<string, unknown>).choice === "1",
     );
     expect(confirmMsg).toBeDefined();
   });
@@ -639,6 +643,11 @@ describe("AC-4: complete transitions to game view", () => {
         },
         player_id: "test-player",
       });
+    });
+
+    // Advance past the 500ms narration buffer flush timer
+    await act(async () => {
+      vi.advanceTimersByTime(600);
     });
 
     // The character name should appear somewhere in the game view
