@@ -73,9 +73,11 @@ describe("NarrativeView", () => {
         ]}
       />,
     );
-    // NARRATION_END should produce a visual separator between segments
-    const separators = document.querySelectorAll("[data-testid='segment-separator']");
-    expect(separators.length).toBeGreaterThanOrEqual(1);
+    // NARRATION_END creates a page boundary — the two chunks should be
+    // in separate snap-start page containers (separators are consumed
+    // as page breaks, not rendered as <hr> elements).
+    const pages = document.querySelectorAll(".snap-start");
+    expect(pages.length).toBeGreaterThanOrEqual(2);
   });
 
   // -- inline images ---------------------------------------------------------
@@ -319,7 +321,105 @@ describe("NarrativeView", () => {
     expect(screen.getByText("Before unknown.")).toBeInTheDocument();
     expect(screen.getByText("After unknown.")).toBeInTheDocument();
     // Should not render any content for the unknown message
-    expect(container.querySelectorAll("[data-testid='narrative-view'] > *").length).toBe(2);
+    expect(container.querySelectorAll("[data-testid='narrative-view'] > div > *").length).toBe(2);
+  });
+
+  // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
+  it("skips NARRATION text when NARRATION_CHUNKs follow (TTS active)", () => {
+    render(
+      <NarrativeView
+        messages={[
+          narration("Full text arrives first."),
+          narrationEnd(),
+          narrationChunk("Full text "),
+          narrationChunk("arrives first."),
+        ]}
+      />,
+    );
+    // The NARRATION text should be deduplicated — only chunk text renders
+    const textElements = document.querySelectorAll(".prose");
+    // Should have exactly 1 text block (the accumulated chunks), not 2
+    expect(textElements.length).toBe(1);
+    expect(textElements[0].textContent).toMatch(/Full text\s*arrives first\./);
+  });
+
+  it("renders NARRATION normally when no chunks follow (TTS off)", () => {
+    render(
+      <NarrativeView
+        messages={[
+          narration("No TTS here, just text."),
+          narrationEnd(),
+        ]}
+      />,
+    );
+    expect(screen.getByText("No TTS here, just text.")).toBeInTheDocument();
+  });
+
+  it("deduplicates NARRATION before chunks from server reorder", () => {
+    // Server sends NARRATION first (direct), then chunks arrive (async TTS).
+    // After buffer flush, messages arrive as: chunks, NARRATION, NARRATION_END
+    render(
+      <NarrativeView
+        messages={[
+          narrationChunk("Sentence one."),
+          narrationChunk("Sentence two."),
+          narration("Sentence one. Sentence two."),
+          narrationEnd(),
+        ]}
+      />,
+    );
+    const textElements = document.querySelectorAll(".prose");
+    expect(textElements.length).toBe(1);
+    expect(textElements[0].textContent).toMatch(/Sentence one.*Sentence two/);
+  });
+
+  // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
+  it("skips NARRATION text when NARRATION_CHUNKs follow (TTS active)", () => {
+    render(
+      <NarrativeView
+        messages={[
+          narration("Full text arrives first."),
+          narrationEnd(),
+          narrationChunk("Full text "),
+          narrationChunk("arrives first."),
+        ]}
+      />,
+    );
+    // The NARRATION text should be deduplicated — only chunk text renders
+    const textElements = document.querySelectorAll(".prose");
+    // Should have exactly 1 text block (the accumulated chunks), not 2
+    expect(textElements.length).toBe(1);
+    expect(textElements[0].textContent).toMatch(/Full text\s*arrives first\./);
+  });
+
+  it("renders NARRATION normally when no chunks follow (TTS off)", () => {
+    render(
+      <NarrativeView
+        messages={[
+          narration("No TTS here, just text."),
+          narrationEnd(),
+        ]}
+      />,
+    );
+    expect(screen.getByText("No TTS here, just text.")).toBeInTheDocument();
+  });
+
+  it("deduplicates NARRATION before chunks from server reorder", () => {
+    // Server sends NARRATION first (direct), then chunks arrive (async TTS).
+    // After buffer flush, messages arrive as: chunks, NARRATION, NARRATION_END
+    render(
+      <NarrativeView
+        messages={[
+          narrationChunk("Sentence one."),
+          narrationChunk("Sentence two."),
+          narration("Sentence one. Sentence two."),
+          narrationEnd(),
+        ]}
+      />,
+    );
+    const textElements = document.querySelectorAll(".prose");
+    expect(textElements.length).toBe(1);
+    expect(textElements[0].textContent).toMatch(/Sentence one.*Sentence two/);
   });
 
   // -- mixed message types render in order -------------------------------------

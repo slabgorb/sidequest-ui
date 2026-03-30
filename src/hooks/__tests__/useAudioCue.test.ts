@@ -38,10 +38,11 @@ function makeAudioCue(
   mood: string | null,
   musicTrack: string | null = null,
   sfxTriggers: string[] = [],
+  action?: string,
 ): GameMessage {
   return {
     type: MessageType.AUDIO_CUE,
-    payload: { mood, music_track: musicTrack, sfx_triggers: sfxTriggers },
+    payload: { mood, music_track: musicTrack, sfx_triggers: sfxTriggers, action },
     player_id: "server",
   };
 }
@@ -200,6 +201,85 @@ describe("useAudioCue", () => {
     const { result } = renderHook(() => useAudioCue([], engine));
 
     expect(result.current).toBeNull();
+    engine.dispose();
+  });
+
+  it("ducks music on action=duck instead of playing new track", () => {
+    const engine = new AudioEngine();
+    const playMusicSpy = vi.spyOn(engine, "playMusic");
+    const duckSpy = vi.spyOn(engine, "duckMusic");
+
+    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "duck");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(duckSpy).toHaveBeenCalledTimes(1);
+    expect(playMusicSpy).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it("restores music on action=restore instead of playing new track", () => {
+    const engine = new AudioEngine();
+    const playMusicSpy = vi.spyOn(engine, "playMusic");
+    const restoreSpy = vi.spyOn(engine, "restoreMusic");
+
+    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "restore");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(restoreSpy).toHaveBeenCalledTimes(1);
+    expect(playMusicSpy).not.toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it("stops music on action=stop", () => {
+    const engine = new AudioEngine();
+    const stopSpy = vi.spyOn(engine, "stopMusic");
+
+    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "stop");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(stopSpy).toHaveBeenCalledWith(undefined);
+    engine.dispose();
+  });
+
+  it("fades out music on action=fade_out", () => {
+    const engine = new AudioEngine();
+    const stopSpy = vi.spyOn(engine, "stopMusic");
+
+    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "fade_out");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(stopSpy).toHaveBeenCalledWith(3000);
+    engine.dispose();
+  });
+
+  it("still fires SFX triggers on duck/restore actions", () => {
+    const engine = new AudioEngine();
+    const playSfxSpy = vi.spyOn(engine, "playSfx");
+
+    const msg = makeAudioCue(null, null, ["/genre/low_fantasy/audio/whoosh.mp3"], "duck");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(playSfxSpy).toHaveBeenCalledWith("/genre/low_fantasy/audio/whoosh.mp3");
+    engine.dispose();
+  });
+
+  it("plays music normally when action=play", () => {
+    const engine = new AudioEngine();
+    const playMusicSpy = vi.spyOn(engine, "playMusic");
+
+    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "play");
+
+    renderHook(() => useAudioCue([msg], engine));
+
+    expect(playMusicSpy).toHaveBeenCalledWith(
+      "/genre/low_fantasy/audio/tense.mp3",
+      expect.any(Number),
+    );
     engine.dispose();
   });
 });

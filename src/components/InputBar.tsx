@@ -18,6 +18,7 @@ export interface InputBarProps {
   onTranscriptConfirm: () => void;
   onTranscriptDiscard: () => void;
   duration: number;
+  waitingForPlayer?: string;
 }
 
 function RecordingIndicator({ duration }: { duration: number }) {
@@ -132,6 +133,7 @@ export default function InputBar({
   onTranscriptConfirm,
   onTranscriptDiscard,
   duration,
+  waitingForPlayer,
 }: InputBarProps) {
   const [text, setText] = useState("");
   const [aside, setAside] = useState(false);
@@ -169,6 +171,7 @@ export default function InputBar({
   );
 
   const placeholder =
+    waitingForPlayer ? `Waiting for ${waitingForPlayer}…` :
     pttState === "recording" ? "Listening..." :
     pttState === "transcribing" ? "Transcribing..." :
     isPreview ? "" :
@@ -178,7 +181,8 @@ export default function InputBar({
 
   return (
     <div data-testid="input-bar" className="flex items-center gap-2">
-      <VoiceOrnament
+      {/* DISABLED: Voice/mic off until rethought — mic captures TTS audio feedback */}
+      {false && <VoiceOrnament
         micEnabled={micEnabled}
         onMicToggle={onMicToggle}
         pttState={pttState}
@@ -186,7 +190,7 @@ export default function InputBar({
         onPttStop={onPttStop}
         duration={duration}
         mobile={mobile}
-      />
+      />}
       <div className="flex items-center flex-1">
         {aside && (
           <span className="text-muted-foreground/40 text-lg pl-1 select-none">(</span>

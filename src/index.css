@@ -129,6 +129,11 @@
     }
 }
 
+/* Scroll snap for book-like page turns */
+@utility scroll-snap-y-proximity {
+  scroll-snap-type: y proximity;
+}
+
 /* PTT recording indicator */
 .ptt-indicator {
   width: 12px;

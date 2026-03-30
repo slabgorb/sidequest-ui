@@ -1,4 +1,4 @@
-const DUCK_LEVEL = 0.3;
+const DUCK_LEVEL = 0.5;
 const DUCK_RAMP_MS = 200;
 const UNDUCK_RAMP_MS = 500;
 

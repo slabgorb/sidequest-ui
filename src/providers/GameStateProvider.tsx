@@ -4,6 +4,8 @@ export interface CharacterState {
   name: string;
   hp: number;
   max_hp: number;
+  level?: number;
+  class?: string;
   statuses: string[];
   inventory: string[];
 }
@@ -16,27 +18,43 @@ export interface JournalEntry {
   render_id: string;
 }
 
+export type FactCategory = 'Lore' | 'Place' | 'Person' | 'Quest' | 'Ability';
+
+export interface KnowledgeEntry {
+  fact_id: string;
+  content: string;
+  category: FactCategory;
+  is_new: boolean;
+  learned_turn: number;
+}
+
 export interface ClientGameState {
   characters: CharacterState[];
   location: string;
   quests: Record<string, string>;
   journal?: JournalEntry[];
+  knowledge: KnowledgeEntry[];
 }
 
 export interface GameStateContextValue {
   state: ClientGameState;
   setState: (state: ClientGameState) => void;
+  localPlayerId: string;
+  setLocalPlayerId: (id: string) => void;
 }
 
 export const EMPTY_GAME_STATE: ClientGameState = {
   characters: [],
   location: '',
   quests: {},
+  knowledge: [],
 };
 
 const GameStateContext = createContext<GameStateContextValue>({
   state: EMPTY_GAME_STATE,
   setState: () => {},
+  localPlayerId: '',
+  setLocalPlayerId: () => {},
 });
 
 export interface GameStateProviderProps {
@@ -44,6 +62,7 @@ export interface GameStateProviderProps {
 }
 
 const JOURNAL_STORAGE_KEY = 'sq_journal';
+const GAME_STATE_STORAGE_KEY = 'sq_game_state';
 
 function loadJournalFromStorage(): JournalEntry[] {
   try {
@@ -66,16 +85,46 @@ function saveJournalToStorage(journal: JournalEntry[]): void {
   }
 }
 
+function loadGameStateFromStorage(): ClientGameState | null {
+  try {
+    const raw = sessionStorage.getItem(GAME_STATE_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as ClientGameState;
+      if (parsed && typeof parsed.location === 'string') return parsed;
+    }
+  } catch {
+    // ignore corrupt sessionStorage
+  }
+  return null;
+}
+
+function saveGameStateToStorage(state: ClientGameState): void {
+  try {
+    sessionStorage.setItem(GAME_STATE_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function GameStateProvider({ children }: GameStateProviderProps) {
   const [state, setStateRaw] = useState<ClientGameState>(() => {
+    // Hydrate from sessionStorage first (HMR survival), then fall back to journal
+    const saved = loadGameStateFromStorage();
+    if (saved) return saved;
     const journal = loadJournalFromStorage();
     return journal.length > 0
       ? { ...EMPTY_GAME_STATE, journal }
       : EMPTY_GAME_STATE;
   });
   const setState = useCallback((s: ClientGameState) => setStateRaw(s), []);
+  const [localPlayerId, setLocalPlayerId] = useState('');
 
-  // Persist journal to localStorage whenever it changes
+  // Persist full game state to sessionStorage for HMR survival
+  useEffect(() => {
+    saveGameStateToStorage(state);
+  }, [state]);
+
+  // Persist journal to localStorage (survives full page reload)
   useEffect(() => {
     if (state.journal && state.journal.length > 0) {
       saveJournalToStorage(state.journal);
@@ -83,7 +132,7 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   }, [state.journal]);
 
   return (
-    <GameStateContext.Provider value={{ state, setState }}>
+    <GameStateContext.Provider value={{ state, setState, localPlayerId, setLocalPlayerId }}>
       {children}
     </GameStateContext.Provider>
   );

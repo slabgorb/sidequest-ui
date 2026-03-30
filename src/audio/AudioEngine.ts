@@ -52,7 +52,7 @@ export class AudioEngine {
   private static instance: AudioEngine | null = null;
 
   static getInstance(): AudioEngine {
-    if (!AudioEngine.instance) {
+    if (!AudioEngine.instance || AudioEngine.instance.ctx.state === "closed") {
       AudioEngine.instance = new AudioEngine();
     }
     return AudioEngine.instance;
@@ -71,6 +71,7 @@ export class AudioEngine {
   private volumes: VolumeState;
   private preMuteVolumes: Partial<Record<ChannelName, number>> = {};
   private activeSources: AudioBufferSourceNode[] = [];
+  private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
 
   constructor() {
@@ -141,6 +142,14 @@ export class AudioEngine {
     );
   }
 
+  duckMusic(): void {
+    this.ducker.duck();
+  }
+
+  restoreMusic(): void {
+    this.ducker.unduck();
+  }
+
   stopMusic(fadeMs?: number): void {
     if (fadeMs) {
       const now = this.ctx.currentTime;
@@ -170,9 +179,9 @@ export class AudioEngine {
     this.activeSources.push(source);
   }
 
-  async playVoice(audioData: ArrayBuffer): Promise<void> {
+  async playVoice(audioData: ArrayBuffer, onStart?: () => void): Promise<void> {
     const audioBuffer = await this.ctx.decodeAudioData(audioData);
-    this.playVoiceBuffer(audioBuffer);
+    this.playVoiceBuffer(audioBuffer, onStart);
   }
 
   /**
@@ -180,7 +189,7 @@ export class AudioEngine {
    * Converts PCM int16 samples to float32 and creates an AudioBuffer directly,
    * bypassing decodeAudioData (which can't decode raw PCM).
    */
-  playVoicePCM(pcmData: ArrayBuffer, sampleRate = 24000): void {
+  playVoicePCM(pcmData: ArrayBuffer, sampleRate = 24000, onStart?: () => void): void {
     // Ensure alignment
     const aligned = new ArrayBuffer(pcmData.byteLength);
     new Uint8Array(aligned).set(new Uint8Array(pcmData));
@@ -193,22 +202,35 @@ export class AudioEngine {
 
     const audioBuffer = this.ctx.createBuffer(1, float32.length, sampleRate);
     audioBuffer.getChannelData(0).set(float32);
-    this.playVoiceBuffer(audioBuffer);
+    this.playVoiceBuffer(audioBuffer, onStart);
   }
 
-  private playVoiceBuffer(audioBuffer: AudioBuffer): void {
-    this.ducker.duck();
+  /**
+   * Queue a voice segment for sequential playback with music ducking.
+   * Optional `onStart` fires just before audio begins — used to synchronize
+   * text reveal with TTS playback so narration text appears as the voice reads.
+   */
+  private playVoiceBuffer(audioBuffer: AudioBuffer, onStart?: () => void): void {
+    // Queue segments so they play sequentially, not all at once.
+    this.voiceChain = this.voiceChain.then(
+      () =>
+        new Promise<void>((resolve) => {
+          this.ducker.duck();
 
-    const source = this.ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.channels.voice);
-    source.onended = () => {
-      this.ducker.unduck();
-      source.disconnect();
-      this.activeSources = this.activeSources.filter((s) => s !== source);
-    };
-    source.start();
-    this.activeSources.push(source);
+          const source = this.ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(this.channels.voice);
+          source.onended = () => {
+            this.ducker.unduck();
+            source.disconnect();
+            this.activeSources = this.activeSources.filter((s) => s !== source);
+            resolve();
+          };
+          onStart?.();
+          source.start();
+          this.activeSources.push(source);
+        }),
+    );
   }
 
   setVolume(channel: VolumeTarget, value: number): void {

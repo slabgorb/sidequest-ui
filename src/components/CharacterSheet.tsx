@@ -12,6 +12,13 @@ export interface CharacterSheetProps {
   data: CharacterSheetData;
 }
 
+/** Convert snake_case or kebab-case identifiers to title case display names. */
+function toDisplayName(id: string): string {
+  return id
+    .replace(/[_-]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function CharacterSheet({ data }: CharacterSheetProps) {
   return (
     <div data-testid="character-sheet" className="p-6 space-y-4">
@@ -26,7 +33,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <div>
           <h2 className="text-2xl font-bold text-[var(--primary)]">{data.name}</h2>
           <p className="text-sm text-muted-foreground">
-            Level {data.level} {data.class}
+            Level {data.level} {toDisplayName(data.class)}
           </p>
         </div>
       </div>
@@ -35,7 +42,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
         <div className="grid grid-cols-2 gap-2">
           {Object.entries(data.stats).map(([stat, value]) => (
             <div key={stat} className="flex justify-between px-2 py-1 rounded bg-[var(--surface)]">
-              <span className="capitalize text-[var(--primary)]">{stat}</span>
+              <span className="text-[var(--primary)]">{toDisplayName(stat)}</span>
               <span className="font-mono">{value}</span>
             </div>
           ))}
@@ -47,7 +54,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           <h3 className="text-sm font-semibold mb-1">Abilities</h3>
           <ul className="list-disc list-inside text-sm">
             {data.abilities.map((ability) => (
-              <li key={ability}>{ability}</li>
+              <li key={ability}>{toDisplayName(ability)}</li>
             ))}
           </ul>
         </div>
