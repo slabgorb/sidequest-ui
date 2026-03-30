@@ -277,17 +277,17 @@ export function GameLayout({
               />
             </div>
           </div>
+
+          {/* GM Mode debug panel — toggled via Ctrl+Shift+G or ?gm=true */}
+          {gmEnabled && (
+            <Suspense fallback={null}>
+              <GMMode state={watcherState} onClose={toggleGM} />
+            </Suspense>
+          )}
         </div>
 
         {/* Combat overlay — visible only during combat */}
         {combatState && <CombatOverlay combat={combatState} />}
-
-        {/* GM Mode debug panel — toggled via Ctrl+Shift+G or ?gm=true */}
-        {gmEnabled && (
-          <Suspense fallback={null}>
-            <GMMode state={watcherState} onClose={toggleGM} />
-          </Suspense>
-        )}
 
         {/* AudioStatus — always visible */}
         <AudioStatus
