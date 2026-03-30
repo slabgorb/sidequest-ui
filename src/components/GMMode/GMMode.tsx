@@ -171,20 +171,6 @@ export default function GMMode({ state, onClose }: GMModeProps) {
             {state.connected ? "Connected" : "Disconnected"}
           </span>
           <button
-            onClick={() => window.open("/gm", "_blank")}
-            aria-label="Open Dashboard"
-            style={{
-              background: "none",
-              border: "1px solid #555",
-              color: "#eee",
-              cursor: "pointer",
-              padding: "2px 6px",
-              fontSize: 10,
-            }}
-          >
-            Dashboard
-          </button>
-          <button
             onClick={onClose}
             aria-label="Close"
             style={{

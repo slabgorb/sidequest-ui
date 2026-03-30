@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import { toRoman } from "@/lib/utils";
+import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export interface NarrativeViewProps {
   messages: GameMessage[];
@@ -15,8 +16,14 @@ interface FootnoteData {
   is_new?: boolean;
 }
 
+interface ActionRevealEntry {
+  character_name: string;
+  player_id: string;
+  action: string;
+}
+
 interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal";
   html?: string;
   url?: string;
   alt?: string;
@@ -31,6 +38,10 @@ interface NarrativeSegment {
   portraitImage?: NarrativeSegment;
   /** For portrait-group: the adjacent text segment */
   adjacentText?: NarrativeSegment;
+  /** For action-reveal: player actions */
+  actions?: ActionRevealEntry[];
+  /** For action-reveal: auto-resolved player names */
+  autoResolved?: string[];
 }
 
 /** Lightweight markdown→HTML for narrator prose. No external dependency.
@@ -76,10 +87,13 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         skipNarrationAt.add(i);
         break;
       }
-      // Stop scanning at a new player action (next turn boundary)
-      if (messages[j].type === MessageType.PLAYER_ACTION) break;
+      // Stop scanning at turn boundaries
+      if (messages[j].type === MessageType.PLAYER_ACTION || messages[j].type === MessageType.ACTION_REVEAL) break;
     }
   }
+
+  // Dedup ACTION_REVEAL by turn_number (prevents duplicates on WebSocket reconnect)
+  const seenRevealTurns = new Set<number>();
 
   const flushChunks = () => {
     if (chunkBuffer) {
@@ -210,6 +224,18 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         }
         break;
       }
+      case MessageType.ACTION_REVEAL: {
+        flushChunks();
+        const turnNumber = msg.payload.turn_number as number;
+        if (seenRevealTurns.has(turnNumber)) break;
+        seenRevealTurns.add(turnNumber);
+        const actions = (msg.payload.actions as ActionRevealEntry[] | undefined) ?? [];
+        const autoResolved = (msg.payload.auto_resolved as string[] | undefined) ?? [];
+        if (actions.length > 0 || autoResolved.length > 0) {
+          segments.push({ kind: "action-reveal", actions, autoResolved });
+        }
+        break;
+      }
       default:
         break;
     }
@@ -257,13 +283,37 @@ function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[]
   return result;
 }
 
+/** Split segments into history (left column) and current (right column).
+ *  The last separator marks the boundary — everything after it is "current". */
+function splitSegments(segments: NarrativeSegment[]): {
+  history: NarrativeSegment[];
+  current: NarrativeSegment[];
+} {
+  let splitIndex = -1;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (segments[i].kind === "separator") {
+      splitIndex = i;
+      break;
+    }
+  }
+
+  if (splitIndex <= 0) {
+    return { history: [], current: segments };
+  }
+
+  return {
+    history: segments.slice(0, splitIndex + 1),
+    current: segments.slice(splitIndex + 1),
+  };
+}
+
 /** Image component with skeleton loading and error fallback. */
 function NarrativeImage({
   seg,
   onLightbox,
 }: {
   seg: NarrativeSegment;
-  onLightbox: (url: string, alt?: string) => void;
+  onLightbox: (url: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -275,10 +325,10 @@ function NarrativeImage({
     <div
       className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20"
       style={aspectRatio ? { aspectRatio } : undefined}
-      onClick={() => !errored && onLightbox(seg.url!, seg.alt)}
+      onClick={() => !errored && onLightbox(seg.url!)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox(seg.url!, seg.alt); }}
+      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox(seg.url!); }}
     >
       {!loaded && !errored && (
         <div className="absolute inset-0 bg-muted/20 animate-pulse rounded" />
@@ -336,7 +386,7 @@ function renderSegment(
     maxTextWidth: string;
     chapterTitle: string | null;
     dinkusGlyph: string;
-    setLightboxUrl: (url: string | null, alt?: string) => void;
+    setLightboxUrl: (url: string | null) => void;
   },
 ) {
   const { maxTextWidth, chapterTitle, dinkusGlyph, setLightboxUrl } = opts;
@@ -379,7 +429,7 @@ function renderSegment(
               dangerouslySetInnerHTML={{ __html: txt.html! }}
             />
             <figure className="w-48 shrink-0">
-              <NarrativeImage seg={img} onLightbox={(url, alt) => setLightboxUrl(url, alt)} />
+              <NarrativeImage seg={img} onLightbox={(url) => setLightboxUrl(url)} />
               {img.caption && (
                 <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
                   {img.caption}
@@ -415,10 +465,10 @@ function renderSegment(
         ? "my-8 max-w-2xl mx-auto"
         : seg.tier === "scene"
         ? "my-8 max-w-full mx-auto"
-        : "my-8 max-w-prose mx-auto";
+        : "my-8 max-w-[85ch] mx-auto";
       return (
         <figure key={i} className={tierClass}>
-          <NarrativeImage seg={seg} onLightbox={(url, alt) => setLightboxUrl(url, alt)} />
+          <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
           {seg.caption && (
             <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
               {seg.caption}
@@ -440,7 +490,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="system-message"
-          className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-prose mx-auto"
+          className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-[85ch] mx-auto"
         >
           {seg.text}
         </div>
@@ -460,7 +510,7 @@ function renderSegment(
         <div
           key={i}
           role="alert"
-          className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-prose mx-auto border border-destructive/10"
+          className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-[85ch] mx-auto border border-destructive/10"
         >
           {seg.text}
         </div>
@@ -470,7 +520,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="player-action"
-          className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-2 pl-6 border-l-2 border-primary/20"
+          className="text-base text-muted-foreground/70 italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20"
         >
           {seg.text}
         </div>
@@ -480,7 +530,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="player-aside"
-          className="text-sm text-muted-foreground/50 italic max-w-prose mx-auto my-1"
+          className="text-sm text-muted-foreground/50 italic max-w-[85ch] mx-auto my-1"
         >
           {seg.text}
         </div>
@@ -492,7 +542,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="chapter-marker"
-          className="my-12 max-w-prose mx-auto text-center"
+          className="my-12 max-w-[85ch] mx-auto text-center"
         >
           <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">
             {dinkusGlyph} {dinkusGlyph} {dinkusGlyph}
@@ -502,10 +552,57 @@ function renderSegment(
           </span>
         </div>
       );
+    case "action-reveal":
+      return (
+        <div
+          key={i}
+          data-testid="action-reveal"
+          className="max-w-[85ch] mx-auto my-4 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 space-y-2"
+        >
+          {seg.actions?.map((entry, ai) => (
+            <div key={ai} className="flex gap-2 text-sm" data-auto-resolved="false">
+              <span className="font-semibold text-primary/80 shrink-0">
+                {entry.character_name}:
+              </span>
+              <span className="text-foreground/80 italic">{entry.action}</span>
+            </div>
+          ))}
+          {seg.autoResolved?.map((name, ri) => (
+            <div key={`auto-${ri}`} className="flex gap-2 text-sm text-muted-foreground/60 italic" data-auto-resolved="true">
+              <span className="font-semibold shrink-0">{name}</span>
+              <span>hesitated...</span>
+              <span className="text-amber-500 text-xs ml-1">timed out</span>
+            </div>
+          ))}
+        </div>
+      );
   }
 }
 
-/** Hook for independent scroll tracking. */
+/** Group segments into "pages" split at separators.
+ *  Each page becomes a scroll-snap target for the book feel. */
+function groupIntoPages(segments: NarrativeSegment[]): NarrativeSegment[][] {
+  const pages: NarrativeSegment[][] = [];
+  let current: NarrativeSegment[] = [];
+
+  for (const seg of segments) {
+    if (seg.kind === "separator") {
+      if (current.length > 0) {
+        pages.push(current);
+        current = [];
+      }
+    } else {
+      current.push(seg);
+    }
+  }
+  if (current.length > 0) {
+    pages.push(current);
+  }
+
+  return pages;
+}
+
+/** Hook for independent scroll tracking on a column. */
 function useColumnScroll() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
@@ -528,18 +625,33 @@ function useColumnScroll() {
 }
 
 export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
+  const breakpoint = useBreakpoint();
+  const isSpread = breakpoint === "desktop";
+
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
-  const [lightboxAlt, setLightboxAlt] = useState<string>("");
   const dinkusGlyph = useDinkusGlyph(messages);
   const { chapterTitle, turnCount } = useRunningHeader(messages);
 
   const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
 
+  // Split into history (left) and current (right) for spread layout
+  const { history, current } = useMemo(() => splitSegments(segments), [segments]);
+
+  // Independent scroll tracking for each column (spread mode)
+  const historyScroll = useColumnScroll();
+  const currentScroll = useColumnScroll();
+  // Single scroll ref for mobile/tablet
   const singleScroll = useColumnScroll();
 
+  // Auto-scroll triggers
   useEffect(() => {
-    singleScroll.scrollToBottom();
-  }, [segments, thinking, messages.length]);
+    if (isSpread) {
+      currentScroll.scrollToBottom();
+      historyScroll.scrollToBottom();
+    } else {
+      singleScroll.scrollToBottom();
+    }
+  }, [segments, thinking, messages.length, isSpread]);
 
   // Escape closes lightbox
   useEffect(() => {
@@ -551,15 +663,10 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [lightboxUrl]);
 
-  const openLightbox = (url: string | null, alt?: string) => {
-    setLightboxUrl(url);
-    setLightboxAlt(alt ?? "");
-  };
-
   const segmentOpts = {
     chapterTitle,
     dinkusGlyph,
-    setLightboxUrl: openLightbox,
+    setLightboxUrl,
   };
 
   const thinkingIndicator = thinking && (
@@ -603,19 +710,106 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         </div>
       )}
 
-      <div
-        ref={singleScroll.scrollRef}
-        data-testid="narrative-view"
-        onScroll={singleScroll.handleScroll}
-        className="flex-1 overflow-y-auto"
-      >
-        <div className="flex flex-col px-6 py-8 gap-4">
-          {segments.length === 0 ? emptyState : segments.map((seg, i) =>
-            renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
-          )}
-          {thinkingIndicator}
+      {isSpread ? (
+        /* ── Two-column book spread (desktop ≥1200px) ── */
+        <div className="flex flex-1 min-h-0">
+          {/* Left column: history */}
+          <div
+            ref={historyScroll.scrollRef}
+            onScroll={historyScroll.handleScroll}
+            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
+            role="log"
+            aria-label="Narrative history"
+          >
+            {(() => {
+              const pages = groupIntoPages(history);
+              if (pages.length === 0 && segments.length > 0) {
+                return <div className="min-h-full" />;
+              }
+              return pages.map((page, pi) => (
+                <div
+                  key={pi}
+                  className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4 snap-start"
+                >
+                  {page.map((seg, si) =>
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
+                  )}
+                </div>
+              ));
+            })()}
+          </div>
+
+          {/* Gutter — the spine */}
+          <div className="w-6 shrink-0 flex items-stretch justify-center">
+            <div className="w-px bg-border/15 bg-gradient-to-b from-transparent via-border/20 to-transparent" />
+          </div>
+
+          {/* Right column: current narration */}
+          <div
+            ref={currentScroll.scrollRef}
+            data-testid="narrative-view"
+            onScroll={currentScroll.handleScroll}
+            className="flex-1 overflow-y-auto scroll-snap-y-proximity"
+            role="log"
+            aria-label="Current narration"
+            aria-live="polite"
+          >
+            {(() => {
+              const pages = groupIntoPages(current);
+              if (pages.length === 0) {
+                return (
+                  <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start">
+                    {emptyState}
+                    {thinkingIndicator}
+                  </div>
+                );
+              }
+              return pages.map((page, pi) => (
+                <div
+                  key={pi}
+                  className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start"
+                >
+                  {page.map((seg, si) =>
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
+                  )}
+                  {pi === pages.length - 1 && thinkingIndicator}
+                </div>
+              ));
+            })()}
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ── Single column (tablet + mobile) ── */
+        <div
+          ref={singleScroll.scrollRef}
+          data-testid="narrative-view"
+          onScroll={singleScroll.handleScroll}
+          className="flex-1 overflow-y-auto scroll-snap-y-proximity"
+        >
+          {(() => {
+            const pages = groupIntoPages(segments);
+            if (pages.length === 0) {
+              return (
+                <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start">
+                  {emptyState}
+                  {thinkingIndicator}
+                </div>
+              );
+            }
+            return pages.map((page, pi) => (
+              <div
+                key={pi}
+                className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start"
+              >
+                {page.map((seg, si) =>
+                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[85ch]" })
+                )}
+                {pi === pages.length - 1 && thinkingIndicator}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
 
       {/* Lightbox overlay */}
       {lightboxUrl && (
@@ -627,8 +821,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
         >
           <img
             src={lightboxUrl}
-            alt={lightboxAlt}
-            title={lightboxAlt}
+            alt=""
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />

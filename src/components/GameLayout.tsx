@@ -257,7 +257,7 @@ export function GameLayout({
                   : "[ Your turn ]"}
               </div>
             )}
-            <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-3xl mx-auto w-full">
+            <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">
               <InputBar
                 onSend={onSend}
                 disabled={disabled}
