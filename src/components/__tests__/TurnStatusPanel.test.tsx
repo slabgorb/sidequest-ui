@@ -372,6 +372,11 @@ describe('TurnStatusPanel — edge cases', () => {
     // Should deduplicate — only one entry for p1
     const entries = screen.getAllByTestId(/^turn-entry-p1$/);
     expect(entries).toHaveLength(1);
+    // Second entry's status (submitted) wins over first (pending)
+    expect(within(entries[0]).getByTestId('status-indicator')).toHaveAttribute(
+      'data-status',
+      'submitted',
+    );
   });
 
   it('preserves entry order from entries array', () => {
@@ -403,5 +408,58 @@ describe('TurnStatusPanel — edge cases', () => {
     );
     // When all have submitted, should indicate turn is resolving
     expect(screen.getByText(/resolving|processing/i)).toBeInTheDocument();
+  });
+
+  it('treats auto_resolved as resolved for allSubmitted detection', () => {
+    const mixedResolved: TurnStatusEntry[] = [
+      { player_id: 'p1', character_name: 'Kael', status: 'submitted' },
+      { player_id: 'p2', character_name: 'Lyra Dawnforge', status: 'auto_resolved' },
+    ];
+    render(
+      <TurnStatusPanel
+        entries={mixedResolved}
+        localPlayerId="p1"
+      />,
+    );
+    // Both resolved (submitted + auto_resolved) → resolving message, not waiting
+    expect(screen.getByText(/resolving|processing/i)).toBeInTheDocument();
+    expect(screen.queryByText(/waiting for other players/i)).not.toBeInTheDocument();
+  });
+
+  it('does not fire onLocalStatusChange on same-status rerender', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <TurnStatusPanel
+        entries={[KAEL_PENDING]}
+        localPlayerId="p1"
+        onLocalStatusChange={onChange}
+      />,
+    );
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('pending');
+
+    onChange.mockClear();
+    // Rerender with same status — callback should NOT fire again
+    rerender(
+      <TurnStatusPanel
+        entries={[{ ...KAEL_PENDING }]}
+        localPlayerId="p1"
+        onLocalStatusChange={onChange}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onLocalStatusChange in freeplay mode', () => {
+    const onChange = vi.fn();
+    render(
+      <TurnStatusPanel
+        entries={[{ ...KAEL_PENDING, status: 'submitted' }]}
+        localPlayerId="p1"
+        gameMode="freeplay"
+        onLocalStatusChange={onChange}
+      />,
+    );
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

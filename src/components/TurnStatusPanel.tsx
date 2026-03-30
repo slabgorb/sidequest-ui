@@ -5,7 +5,7 @@
  * WebSocket integration lives in the parent (provider/hook layer).
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 export interface TurnStatusEntry {
   player_id: string;
@@ -20,6 +20,10 @@ export interface TurnStatusPanelProps {
   localPlayerId?: string;
   gameMode?: GameMode;
   onLocalStatusChange?: (status: TurnStatusEntry['status']) => void;
+}
+
+function isResolved(status: TurnStatusEntry['status']): boolean {
+  return status === 'submitted' || status === 'auto_resolved';
 }
 
 export function TurnStatusPanel({
@@ -42,15 +46,20 @@ export function TurnStatusPanel({
     : undefined;
 
   const localStatus = localEntry?.status;
-  const allSubmitted = deduped.length > 0 && deduped.every((e) => e.status === 'submitted');
-  const showWaiting = localStatus === 'submitted' && !allSubmitted;
+  const allResolved = deduped.length > 0 && deduped.every((e) => isResolved(e.status));
+  const showWaiting = localStatus !== undefined && isResolved(localStatus) && !allResolved;
 
-  // Notify parent of local player status changes
+  // Track previous status to deduplicate callback fires
+  const prevStatusRef = useRef<TurnStatusEntry['status'] | undefined>(undefined);
+
+  // Notify parent of local player status changes — gated by mode and deduped by ref
   useEffect(() => {
-    if (localStatus && onLocalStatusChange) {
+    if (gameMode === 'freeplay') return;
+    if (localStatus && localStatus !== prevStatusRef.current && onLocalStatusChange) {
       onLocalStatusChange(localStatus);
     }
-  }, [localStatus, onLocalStatusChange]);
+    prevStatusRef.current = localStatus;
+  }, [localStatus, onLocalStatusChange, gameMode]);
 
   // Mode-aware: hidden in freeplay (after hooks to satisfy Rules of Hooks)
   if (gameMode === 'freeplay') {
@@ -70,7 +79,7 @@ export function TurnStatusPanel({
         </div>
       ))}
       {showWaiting && <div>Waiting for other players...</div>}
-      {allSubmitted && <div>Resolving turn...</div>}
+      {allResolved && <div>Resolving turn...</div>}
     </div>
   );
 }
