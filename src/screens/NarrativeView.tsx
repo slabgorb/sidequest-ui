@@ -87,10 +87,13 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         skipNarrationAt.add(i);
         break;
       }
-      // Stop scanning at a new player action (next turn boundary)
-      if (messages[j].type === MessageType.PLAYER_ACTION) break;
+      // Stop scanning at turn boundaries
+      if (messages[j].type === MessageType.PLAYER_ACTION || messages[j].type === MessageType.ACTION_REVEAL) break;
     }
   }
+
+  // Dedup ACTION_REVEAL by turn_number (prevents duplicates on WebSocket reconnect)
+  const seenRevealTurns = new Set<number>();
 
   const flushChunks = () => {
     if (chunkBuffer) {
@@ -223,6 +226,9 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
       }
       case MessageType.ACTION_REVEAL: {
         flushChunks();
+        const turnNumber = msg.payload.turn_number as number;
+        if (seenRevealTurns.has(turnNumber)) break;
+        seenRevealTurns.add(turnNumber);
         const actions = (msg.payload.actions as ActionRevealEntry[] | undefined) ?? [];
         const autoResolved = (msg.payload.auto_resolved as string[] | undefined) ?? [];
         if (actions.length > 0 || autoResolved.length > 0) {

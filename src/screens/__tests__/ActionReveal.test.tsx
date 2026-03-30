@@ -98,6 +98,8 @@ describe('ActionReveal — AC-4: renders in narration sequence', () => {
     // action-reveal should be a distinct element, not merged into narration text
     const reveal = screen.getByTestId('action-reveal');
     expect(reveal).toBeInTheDocument();
+    // Visual distinction: action-reveal has a border or background class
+    expect(reveal.className).toMatch(/border|bg-/);
     // Narration text should also be present (not swallowed by reveal)
     expect(screen.getByText(/The party enters the dark hallway/)).toBeInTheDocument();
     expect(screen.getByText(/The trap triggers/)).toBeInTheDocument();
@@ -204,7 +206,9 @@ describe('ActionReveal — edge cases', () => {
     render(
       <NarrativeView messages={[actionReveal([])]} />,
     );
-    // Should not crash — may render empty or minimal element
+    // Empty actions + empty auto_resolved → no action-reveal element rendered
+    expect(screen.queryByTestId('action-reveal')).not.toBeInTheDocument();
+    // But the view itself should not crash
     const view = document.querySelector("[data-testid='narrative-view']");
     expect(view).toBeInTheDocument();
   });
