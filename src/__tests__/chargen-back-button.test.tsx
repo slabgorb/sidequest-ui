@@ -280,7 +280,7 @@ describe("AC-4: no accidental submission", () => {
 
     // The old "Go Back" sent { phase: "confirmation", choice: "2" } which ENDED chargen
     // The new behavior should navigate back without ending chargen
-    const goBackBtn = screen.getByRole("button", { name: /back|edit/i });
+    const goBackBtn = screen.getByRole("button", { name: /go back/i });
     await user.click(goBackBtn);
 
     // Should NOT have sent submission payload
@@ -302,6 +302,7 @@ describe("AC-5: choice state preservation on back navigation", () => {
     const props = defaultProps({
       scene: makeScene({
         scene_index: 0,
+        previous_choice: 1,
         choices: [
           { label: "Noble birth", description: "" },
           { label: "Street orphan", description: "" },
@@ -310,18 +311,10 @@ describe("AC-5: choice state preservation on back navigation", () => {
       }),
     });
 
-    // The component should accept or derive the previously selected choice
-    // We need a way to indicate "this scene was previously completed with choice index 1"
-    render(
-      <CharacterCreation
-        {...props}
-        // The component needs to know the previous selection for this step
-        // This could be via a prop, context, or internal state
-      />,
-    );
+    // previous_choice: 1 indicates "Street orphan" was selected previously
+    render(<CharacterCreation {...props} />);
 
     // The second choice (Street orphan, index 1) should be highlighted
-    // if the history says that was the previous selection
     const choices = screen.getAllByRole("button", {
       name: /noble|orphan|traveler/i,
     });
@@ -343,16 +336,16 @@ describe("AC-5: choice state preservation on back navigation", () => {
         input_type: "name",
         prompt: "What name do you carry?",
         choices: [],
+        previous_input: "Aldric Stormborn",
       }),
     });
 
-    // When returning to this step, the previously entered name should be pre-filled
+    // previous_input restores the name entered on a previous visit to this step
     render(<CharacterCreation {...props} />);
 
     const input = screen.getByRole("textbox");
     // If we navigated back to this step, the previous value should be restored
-    // This test will fail until the component tracks input history
-    expect(input).toHaveValue(expect.stringMatching(/.+/));
+    expect(input).toHaveValue("Aldric Stormborn");
   });
 });
 

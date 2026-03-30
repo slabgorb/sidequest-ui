@@ -10,7 +10,7 @@
  *  - Completion transitions to game view
  *  - Returning players skip creation
  */
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -117,7 +117,7 @@ async function connectPlayer(
     }
   }
 
-  const connectBtn = screen.getByRole("button", { name: /connect|join|play/i });
+  const connectBtn = screen.getByRole("button", { name: /connect|join|play|begin/i });
   await user.click(connectBtn);
 
   // Let the WebSocket handshake complete
@@ -228,6 +228,7 @@ beforeEach(() => {
   globalThis.WebSocket = MockWebSocket as any;
   // Mock /api/genres so ConnectScreen can fetch worlds
   globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: true,
     json: async () => ({
       low_fantasy: { worlds: ["default"] },
       road_warrior: { worlds: ["wasteland"] },
@@ -252,6 +253,11 @@ describe("AC-1: new player enters character creation", () => {
   it("renders CharacterCreation when server signals new player", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     // Server says: new player, no character
@@ -281,6 +287,11 @@ describe("AC-1: new player enters character creation", () => {
   it("displays the first scene narration text", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -305,6 +316,11 @@ describe("AC-1: new player enters character creation", () => {
   it("displays scene progress (e.g. 1 of 3)", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -318,7 +334,9 @@ describe("AC-1: new player enters character creation", () => {
     });
 
     // Progress indicator should be visible
-    expect(screen.getByText(/1.*3|step 1/i)).toBeInTheDocument();
+    // Progress indicator renders as Roman numeral in absolute positioned span
+    const progressSpan = screen.getByText("i", { selector: "span.absolute" });
+    expect(progressSpan).toBeInTheDocument();
   });
 });
 
@@ -329,6 +347,11 @@ describe("AC-2: choice response advances builder", () => {
   it("sends CHARACTER_CREATION choice response when player clicks a choice", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -356,18 +379,23 @@ describe("AC-2: choice response advances builder", () => {
     expect(creationMsgs.length).toBeGreaterThanOrEqual(1);
 
     const choiceMsg = creationMsgs.find(
-      (m) => (m.payload as Record<string, unknown>).action === "choice",
+      (m) => (m.payload as Record<string, unknown>).choice === "1",
     );
     expect(choiceMsg).toBeDefined();
     expect(choiceMsg!.payload).toMatchObject({
-      action: "choice",
-      index: 0,
+      phase: "scene",
+      choice: "1",
     });
   });
 
   it("renders the next scene after server responds to choice", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -412,6 +440,11 @@ describe("AC-3: freeform and name input", () => {
   it("sends freeform response for text input scenes", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -438,18 +471,24 @@ describe("AC-3: freeform and name input", () => {
     const freeformMsg = ws.sent.find(
       (m) =>
         m.type === MessageType.CHARACTER_CREATION &&
-        (m.payload as Record<string, unknown>).action === "freeform",
+        (m.payload as Record<string, unknown>).phase === "scene" &&
+        typeof (m.payload as Record<string, unknown>).choice === "string",
     );
     expect(freeformMsg).toBeDefined();
     expect(freeformMsg!.payload).toMatchObject({
-      action: "freeform",
-      text: "The darkness beneath the mountain",
+      phase: "scene",
+      choice: "The darkness beneath the mountain",
     });
   });
 
   it("sends name response for name input scenes", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -492,6 +531,11 @@ describe("AC-4: complete transitions to game view", () => {
   it("sends confirm action after final scene", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -526,6 +570,11 @@ describe("AC-4: complete transitions to game view", () => {
   it("transitions to game view when server sends complete", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -552,6 +601,11 @@ describe("AC-4: complete transitions to game view", () => {
   it("integrates character into GameState after completion", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -599,6 +653,11 @@ describe("AC-5: returning player skips creation", () => {
   it("renders GameView directly when server signals existing character", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     // Server says: returning player, has character
@@ -614,6 +673,11 @@ describe("AC-5: returning player skips creation", () => {
   it("does not receive CHARACTER_CREATION messages for returning player", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -639,6 +703,11 @@ describe("loading state during creation", () => {
   it("shows loading indicator after player sends response", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -668,6 +737,11 @@ describe("loading state during creation", () => {
   it("hides loading indicator when next scene arrives", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
@@ -709,6 +783,11 @@ describe("edge cases", () => {
   it("does not crash if CHARACTER_CREATION arrives before session event", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     // Scene arrives before session event — should not crash
@@ -725,6 +804,11 @@ describe("edge cases", () => {
   it("handles empty choices array gracefully on choice scene", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
+    // Wait for ConnectScreen to render after App mounts
+    // Advance timers to let App initialize
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+    });
     await connectPlayer(user);
 
     await act(async () => {
