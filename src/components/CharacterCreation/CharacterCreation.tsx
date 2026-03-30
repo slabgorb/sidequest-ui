@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toRoman } from "@/lib/utils";
 
 export interface CreationChoice {
@@ -30,6 +30,11 @@ export interface CharacterCreationProps {
 export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
   const [inputValue, setInputValue] = useState(scene?.previous_input ?? "");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(scene?.previous_choice ?? null);
+
+  useEffect(() => {
+    setInputValue(scene?.previous_input ?? "");
+    setSelectedIndex(scene?.previous_choice ?? null);
+  }, [scene?.scene_index, scene?.phase]);
 
   if (loading) {
     return (
@@ -130,7 +135,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
     );
   }
 
-  const showBack = scene.scene_index != null && scene.scene_index > 0;
+  const showBack = scene.scene_index != null && scene.scene_index > 0 && scene.input_type !== "confirm";
 
   return (
     <div data-testid="character-creation" className="flex flex-col items-center px-6 py-10 gap-6 max-w-2xl mx-auto relative">
