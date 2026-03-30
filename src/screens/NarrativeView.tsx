@@ -440,7 +440,7 @@ function renderSegment(
         ? "my-8 max-w-2xl mx-auto"
         : seg.tier === "scene"
         ? "my-8 max-w-full mx-auto"
-        : "my-8 max-w-prose mx-auto";
+        : "my-8 max-w-[85ch] mx-auto";
       return (
         <figure key={i} className={tierClass}>
           <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
@@ -465,7 +465,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="system-message"
-          className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-prose mx-auto"
+          className="text-xs text-muted-foreground/60 italic py-1 text-center max-w-[85ch] mx-auto"
         >
           {seg.text}
         </div>
@@ -485,7 +485,7 @@ function renderSegment(
         <div
           key={i}
           role="alert"
-          className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-prose mx-auto border border-destructive/10"
+          className="text-sm text-destructive/80 bg-destructive/5 rounded-md px-3 py-2 max-w-[85ch] mx-auto border border-destructive/10"
         >
           {seg.text}
         </div>
@@ -495,7 +495,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="player-action"
-          className="text-base text-muted-foreground/70 italic max-w-prose mx-auto my-2 pl-6 border-l-2 border-primary/20"
+          className="text-base text-muted-foreground/70 italic max-w-[85ch] mx-auto my-2 pl-6 border-l-2 border-primary/20"
         >
           {seg.text}
         </div>
@@ -505,7 +505,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="player-aside"
-          className="text-sm text-muted-foreground/50 italic max-w-prose mx-auto my-1"
+          className="text-sm text-muted-foreground/50 italic max-w-[85ch] mx-auto my-1"
         >
           {seg.text}
         </div>
@@ -517,7 +517,7 @@ function renderSegment(
         <div
           key={i}
           data-testid="chapter-marker"
-          className="my-12 max-w-prose mx-auto text-center"
+          className="my-12 max-w-[85ch] mx-auto text-center"
         >
           <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">
             {dinkusGlyph} {dinkusGlyph} {dinkusGlyph}
@@ -683,7 +683,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                   className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4 snap-start"
                 >
                   {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
                   )}
                 </div>
               ));
@@ -721,7 +721,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                   className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start"
                 >
                   {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[55ch]" })
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
                   )}
                   {pi === pages.length - 1 && thinkingIndicator}
                 </div>
@@ -753,7 +753,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
                 className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start"
               >
                 {page.map((seg, si) =>
-                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[65ch]" })
+                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[85ch]" })
                 )}
                 {pi === pages.length - 1 && thinkingIndicator}
               </div>
