@@ -66,6 +66,8 @@ export function TurnStatusPanel({
     return null;
   }
 
+  const localAutoResolved = localStatus === 'auto_resolved';
+
   return (
     <div data-testid="turn-status-panel">
       {deduped.map((entry) => (
@@ -75,9 +77,19 @@ export function TurnStatusPanel({
           data-local={localPlayerId ? String(entry.player_id === localPlayerId) : undefined}
         >
           <span>{entry.character_name}</span>
-          <span data-testid="status-indicator" data-status={entry.status} />
+          <span
+            data-testid="status-indicator"
+            data-status={entry.status}
+            data-timeout={entry.status === 'auto_resolved' ? 'true' : undefined}
+          />
+          {entry.status === 'auto_resolved' && (
+            <span className="text-amber-500 text-xs ml-1">timed out</span>
+          )}
         </div>
       ))}
+      {localAutoResolved && (
+        <div className="text-amber-500 text-sm">Your action timed out — a default action was taken.</div>
+      )}
       {showWaiting && <div>Waiting for other players...</div>}
       {allResolved && <div>Resolving turn...</div>}
     </div>
