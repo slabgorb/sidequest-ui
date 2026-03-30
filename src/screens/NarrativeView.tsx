@@ -16,8 +16,14 @@ interface FootnoteData {
   is_new?: boolean;
 }
 
+interface ActionRevealEntry {
+  character_name: string;
+  player_id: string;
+  action: string;
+}
+
 interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal";
   html?: string;
   url?: string;
   alt?: string;
@@ -32,6 +38,10 @@ interface NarrativeSegment {
   portraitImage?: NarrativeSegment;
   /** For portrait-group: the adjacent text segment */
   adjacentText?: NarrativeSegment;
+  /** For action-reveal: player actions */
+  actions?: ActionRevealEntry[];
+  /** For action-reveal: auto-resolved player names */
+  autoResolved?: string[];
 }
 
 /** Lightweight markdown→HTML for narrator prose. No external dependency.
@@ -77,10 +87,13 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         skipNarrationAt.add(i);
         break;
       }
-      // Stop scanning at a new player action (next turn boundary)
-      if (messages[j].type === MessageType.PLAYER_ACTION) break;
+      // Stop scanning at turn boundaries
+      if (messages[j].type === MessageType.PLAYER_ACTION || messages[j].type === MessageType.ACTION_REVEAL) break;
     }
   }
+
+  // Dedup ACTION_REVEAL by turn_number (prevents duplicates on WebSocket reconnect)
+  const seenRevealTurns = new Set<number>();
 
   const flushChunks = () => {
     if (chunkBuffer) {
@@ -208,6 +221,18 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         const location = msg.payload.location as string;
         if (location) {
           segments.push({ kind: "chapter-marker", text: location });
+        }
+        break;
+      }
+      case MessageType.ACTION_REVEAL: {
+        flushChunks();
+        const turnNumber = msg.payload.turn_number as number;
+        if (seenRevealTurns.has(turnNumber)) break;
+        seenRevealTurns.add(turnNumber);
+        const actions = (msg.payload.actions as ActionRevealEntry[] | undefined) ?? [];
+        const autoResolved = (msg.payload.auto_resolved as string[] | undefined) ?? [];
+        if (actions.length > 0 || autoResolved.length > 0) {
+          segments.push({ kind: "action-reveal", actions, autoResolved });
         }
         break;
       }
@@ -525,6 +550,28 @@ function renderSegment(
           <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">
             {seg.text}
           </span>
+        </div>
+      );
+    case "action-reveal":
+      return (
+        <div
+          key={i}
+          data-testid="action-reveal"
+          className="max-w-[85ch] mx-auto my-4 rounded-md border border-primary/20 bg-primary/5 px-4 py-3 space-y-2"
+        >
+          {seg.actions?.map((entry, ai) => (
+            <div key={ai} className="flex gap-2 text-sm">
+              <span className="font-semibold text-primary/80 shrink-0">
+                {entry.character_name}:
+              </span>
+              <span className="text-foreground/80 italic">{entry.action}</span>
+            </div>
+          ))}
+          {seg.autoResolved?.map((name, ri) => (
+            <div key={`auto-${ri}`} className="text-sm text-muted-foreground/60 italic">
+              {name} hesitated...
+            </div>
+          ))}
         </div>
       );
   }

@@ -24,6 +24,7 @@ export enum MessageType {
   CHAPTER_MARKER = "CHAPTER_MARKER",
   THINKING = "THINKING",
   COMBAT_EVENT = "COMBAT_EVENT",
+  ACTION_REVEAL = "ACTION_REVEAL",
 }
 
 export interface GameMessage {
