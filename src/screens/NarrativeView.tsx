@@ -784,30 +784,24 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
           ref={singleScroll.scrollRef}
           data-testid="narrative-view"
           onScroll={singleScroll.handleScroll}
-          className="flex-1 overflow-y-auto scroll-snap-y-proximity"
+          className="flex-1 overflow-y-auto flex flex-col"
         >
-          {(() => {
-            const pages = groupIntoPages(segments);
-            if (pages.length === 0) {
-              return (
-                <div className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start">
-                  {emptyState}
-                  {thinkingIndicator}
-                </div>
-              );
-            }
-            return pages.map((page, pi) => (
-              <div
-                key={pi}
-                className="min-h-full flex flex-col justify-end px-6 py-8 gap-4 snap-start"
-              >
-                {page.map((seg, si) =>
-                  renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[85ch]" })
+          <div className="flex-1" />
+          <div className="px-6 py-8 space-y-4">
+            {segments.length === 0 ? (
+              <>
+                {emptyState}
+                {thinkingIndicator}
+              </>
+            ) : (
+              <>
+                {segments.map((seg, i) =>
+                  renderSegment(seg, i, { ...segmentOpts, maxTextWidth: "max-w-[85ch]" })
                 )}
-                {pi === pages.length - 1 && thinkingIndicator}
-              </div>
-            ));
-          })()}
+                {thinkingIndicator}
+              </>
+            )}
+          </div>
         </div>
       )}
 
