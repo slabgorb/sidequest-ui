@@ -118,6 +118,8 @@ export function AudioStatus({
       {nowPlaying && (
         <div data-testid="now-playing" className="text-xs text-muted-foreground/60 truncate mb-1">
           ♪{" "}
+          <span className="font-semibold">{nowPlaying.title}</span>
+          {" — "}
           <span data-testid="mood-badge" className="text-muted-foreground/40 capitalize">
             {nowPlaying.mood.replace(/_/g, " ")}
           </span>
@@ -130,6 +132,7 @@ export function AudioStatus({
           data-testid={`volume-slider-${ch}`}
           className="flex items-center gap-2"
         >
+          <span className="text-[10px] text-muted-foreground/50 w-8 capitalize">{ch}</span>
           <input
             type="range"
             min="0"
