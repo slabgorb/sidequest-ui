@@ -380,6 +380,7 @@ function AppInner() {
         class: (m.class as string) ?? "",
         level: (m.level as number) ?? 1,
         portrait_url: (m.portrait_url as string) || undefined,
+        current_location: (m.current_location as string) ?? "",
       }));
       // Deduplicate by player_id (HMR/reconnect can re-register players)
       const seen = new Set<string>();
@@ -627,11 +628,13 @@ function AppInner() {
         : gameState.characters.map((c) => ({
             player_id: "",
             name: c.name,
+            character_name: c.name,
             hp: c.hp,
             hp_max: c.max_hp,
             status_effects: c.statuses,
             class: "",
             level: 1,
+            current_location: "",
           })),
     [partyMembers, gameState.characters],
   );

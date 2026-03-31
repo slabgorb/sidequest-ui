@@ -11,34 +11,40 @@ import type { CharacterSummary } from '../PartyPanel';
 const KAEL: CharacterSummary = {
   player_id: 'p1',
   name: 'Kael',
+  character_name: 'Kael',
   portrait_url: '/renders/kael_portrait.png',
   hp: 24,
   hp_max: 30,
   status_effects: ['poisoned', 'inspired'],
   class: 'Ranger',
   level: 3,
+  current_location: 'The Rusty Cantina',
 };
 
 const LYRA: CharacterSummary = {
   player_id: 'p2',
   name: 'Lyra Dawnforge',
+  character_name: 'Lyra Dawnforge',
   portrait_url: '/renders/lyra_portrait.png',
   hp: 8,
   hp_max: 40,
   status_effects: [],
   class: 'Cleric',
   level: 5,
+  current_location: 'The Rusty Cantina',
 };
 
 const THANE: CharacterSummary = {
   player_id: 'p3',
   name: 'Thane',
+  character_name: 'Thane',
   portrait_url: '',
   hp: 15,
   hp_max: 28,
   status_effects: ['stunned'],
   class: 'Fighter',
   level: 4,
+  current_location: 'Scrapyard Gate',
 };
 
 const THREE_CHARACTERS = [KAEL, LYRA, THANE];
@@ -385,5 +391,82 @@ describe('PartyPanel — edge cases', () => {
     );
     const toggle = screen.getByRole('button', { name: /toggle.*panel|collapse|expand/i });
     expect(toggle).not.toHaveAttribute('tabindex', '-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Story 14-2: Player location on character sheet
+// ---------------------------------------------------------------------------
+
+describe('PartyPanel — Story 14-2: player location display', () => {
+  it('renders current_location under each character name', () => {
+    render(
+      <PartyPanel characters={[KAEL]} collapsed={false} onToggle={vi.fn()} />,
+    );
+    const card = screen.getByTestId('character-card-p1');
+    expect(within(card).getByText('The Rusty Cantina')).toBeInTheDocument();
+  });
+
+  it('renders location for every party member', () => {
+    render(
+      <PartyPanel characters={THREE_CHARACTERS} collapsed={false} onToggle={vi.fn()} />,
+    );
+    // Kael and Lyra are at The Rusty Cantina
+    const kaelCard = screen.getByTestId('character-card-p1');
+    expect(within(kaelCard).getByText('The Rusty Cantina')).toBeInTheDocument();
+    const lyraCard = screen.getByTestId('character-card-p2');
+    expect(within(lyraCard).getByText('The Rusty Cantina')).toBeInTheDocument();
+    // Thane is at Scrapyard Gate
+    const thaneCard = screen.getByTestId('character-card-p3');
+    expect(within(thaneCard).getByText('Scrapyard Gate')).toBeInTheDocument();
+  });
+
+  it('hides location text when panel is collapsed', () => {
+    render(
+      <PartyPanel characters={[KAEL]} collapsed={true} onToggle={vi.fn()} />,
+    );
+    expect(screen.queryByText('The Rusty Cantina')).not.toBeVisible();
+  });
+});
+
+describe('PartyPanel — Story 14-2: multi-location visual grouping', () => {
+  it('applies location-group styling when party is split across locations', () => {
+    // When party members are in different locations, each card should have a
+    // data-location attribute so CSS can style location groups distinctly.
+    render(
+      <PartyPanel characters={THREE_CHARACTERS} collapsed={false} onToggle={vi.fn()} />,
+    );
+    const kaelCard = screen.getByTestId('character-card-p1');
+    const thaneCard = screen.getByTestId('character-card-p3');
+    // Cards should carry data-location for CSS grouping
+    expect(kaelCard).toHaveAttribute('data-location', 'The Rusty Cantina');
+    expect(thaneCard).toHaveAttribute('data-location', 'Scrapyard Gate');
+  });
+
+  it('marks cards as split-party when members are in different locations', () => {
+    // When party is split, the panel should signal it visually.
+    render(
+      <PartyPanel characters={THREE_CHARACTERS} collapsed={false} onToggle={vi.fn()} />,
+    );
+    const panel = screen.getByTestId('party-panel');
+    expect(panel).toHaveAttribute('data-split-party', 'true');
+  });
+
+  it('does NOT mark split-party when all members are co-located', () => {
+    const colocated = [KAEL, LYRA]; // Both at "The Rusty Cantina"
+    render(
+      <PartyPanel characters={colocated} collapsed={false} onToggle={vi.fn()} />,
+    );
+    const panel = screen.getByTestId('party-panel');
+    expect(panel).not.toHaveAttribute('data-split-party', 'true');
+  });
+
+  it('renders a location badge with distinct styling per location', () => {
+    render(
+      <PartyPanel characters={THREE_CHARACTERS} collapsed={false} onToggle={vi.fn()} />,
+    );
+    // Location badges should have data-testid for styling hooks
+    const locationBadges = screen.getAllByTestId('location-badge');
+    expect(locationBadges.length).toBeGreaterThanOrEqual(3); // One per character
   });
 });

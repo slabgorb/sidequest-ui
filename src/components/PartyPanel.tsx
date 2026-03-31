@@ -10,6 +10,7 @@ export interface CharacterSummary {
   status_effects: string[];
   class: string;
   level: number;
+  current_location: string;
 }
 
 interface PartyPanelProps {
@@ -39,6 +40,12 @@ function displayName(c: CharacterSummary): string {
   return c.character_name || c.name;
 }
 
+function isSplitParty(characters: CharacterSummary[]): boolean {
+  if (characters.length <= 1) return false;
+  const locations = new Set(characters.map((c) => c.current_location));
+  return locations.size > 1;
+}
+
 export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, activePlayerId }: PartyPanelProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -60,6 +67,7 @@ export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, a
         collapsed ? "w-14" : "w-64",
       ].join(" ")}
       {...(collapsed ? { "data-collapsed": "true" } : {})}
+      {...(isSplitParty(characters) ? { "data-split-party": "true" } : {})}
     >
       <button
         aria-label="Toggle panel"
@@ -79,6 +87,7 @@ export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, a
           <div
             key={c.player_id}
             data-testid={`character-card-${c.player_id}`}
+            data-location={c.current_location}
             className={[
               "flex items-center gap-2 p-2 rounded-md bg-card border border-border/50",
               "transition-all duration-300",
@@ -116,6 +125,11 @@ export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, a
                   <span data-testid="acting-badge" className="ml-1 text-xs text-primary font-semibold uppercase tracking-wide">ACTING</span>
                 )}
               </span>
+              {c.current_location && (
+                <span data-testid="location-badge" className="block text-[10px] text-muted-foreground/70 truncate">
+                  {c.current_location}
+                </span>
+              )}
               <span className="block text-xs text-muted-foreground">{[c.class, `Lv.${c.level}`].filter(Boolean).join(" ")} — {c.hp}/{c.hp_max}</span>
 
               {/* HP bar */}
