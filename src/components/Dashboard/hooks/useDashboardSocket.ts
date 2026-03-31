@@ -136,7 +136,7 @@ function processEvent(
   }
 
   // Extract snapshot from state transitions
-  if (event.event_type === "state_transition" && event.fields.snapshot) {
+  if (event.event_type === "game_state_snapshot" && event.fields.snapshot) {
     updatedTurn.snapshot = event.fields.snapshot as DashboardState["latestSnapshot"];
   }
 
