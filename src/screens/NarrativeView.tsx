@@ -65,8 +65,8 @@ function markdownToHtml(text: string): string {
     .replace(/\n\n/g, "</p><p>")
     // Single newlines become line breaks
     .replace(/\n/g, "<br>")
-    // Strip footnote markers [N] and [^N] from prose — structured footnote data comes in payload
-    .replace(/\[\^?\d+\]/g, "");
+    // Convert footnote markers [N] and [^N] to superscript links pointing to footnote anchors
+    .replace(/\[\^?(\d+)\]/g, '<sup><a href="#footnote-$1">$1</a></sup>');
   return `<p>${result}</p>`;
 }
 
@@ -403,7 +403,9 @@ function renderSegment(
               {seg.footnotes.map((fn, fi) => (
                 <div
                   key={fi}
-                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                  id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
+                  data-footnote-id={fn.marker != null ? fn.marker : undefined}
+                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 transition-colors"
                 >
                   {fn.marker != null && (
                     <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
@@ -442,7 +444,9 @@ function renderSegment(
               {txt.footnotes.map((fn, fi) => (
                 <div
                   key={fi}
-                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2"
+                  id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
+                  data-footnote-id={fn.marker != null ? fn.marker : undefined}
+                  className="text-xs text-muted-foreground/60 leading-snug flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 transition-colors"
                 >
                   {fn.marker != null && (
                     <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
