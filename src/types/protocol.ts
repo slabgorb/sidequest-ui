@@ -35,3 +35,6 @@ export interface GameMessage {
 
 /** Per-session narrator verbosity control (story 14-3). */
 export type NarratorVerbosity = 'concise' | 'standard' | 'verbose';
+
+/** Per-session narrator vocabulary/complexity control (story 14-4). */
+export type NarratorVocabulary = 'accessible' | 'literary' | 'epic';
