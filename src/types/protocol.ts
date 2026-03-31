@@ -32,3 +32,6 @@ export interface GameMessage {
   payload: Record<string, unknown>;
   player_id: string;
 }
+
+/** Per-session narrator verbosity control (story 14-3). */
+export type NarratorVerbosity = 'concise' | 'standard' | 'verbose';
