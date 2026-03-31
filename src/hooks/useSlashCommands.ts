@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { GameMessage } from '../types/protocol';
 
-export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | null;
+export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | 'settings' | null;
 
 export interface SlashCommandResult {
   handled: boolean;
@@ -32,6 +32,8 @@ export function useSlashCommands() {
         return { handled: true, messages: [], overlay: 'journal' };
       case '/knowledge':
         return { handled: true, messages: [], overlay: 'knowledge' };
+      case '/settings':
+        return { handled: true, messages: [], overlay: 'settings' };
       default:
         // Passthrough — let the backend handle it. Backend has /status, /save,
         // /help, /quests, /gm, /tone, and returns the response as NARRATION.
