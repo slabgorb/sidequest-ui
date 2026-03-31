@@ -6,6 +6,7 @@ export interface CharacterSheetData {
   abilities: string[];
   backstory: string;
   portrait_url?: string;
+  current_location?: string;
 }
 
 export interface CharacterSheetProps {
@@ -35,6 +36,11 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
           <p className="text-sm text-muted-foreground">
             Level {data.level} {toDisplayName(data.class)}
           </p>
+          {data.current_location && (
+            <p data-testid="character-location" className="text-sm text-muted-foreground/80 mt-1">
+              {data.current_location}
+            </p>
+          )}
         </div>
       </div>
 

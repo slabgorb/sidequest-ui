@@ -74,3 +74,33 @@ describe('CharacterSheet', () => {
     expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Story 14-2: Player location on character sheet
+// ---------------------------------------------------------------------------
+
+describe('CharacterSheet — Story 14-2: current location', () => {
+  const DATA_WITH_LOCATION = {
+    ...BASE_DATA,
+    current_location: 'The Rusty Cantina',
+  };
+
+  it('renders current_location when present', () => {
+    render(<CharacterSheet data={DATA_WITH_LOCATION} />);
+    expect(screen.getByText('The Rusty Cantina')).toBeInTheDocument();
+  });
+
+  it('renders location in a dedicated section or line', () => {
+    render(<CharacterSheet data={DATA_WITH_LOCATION} />);
+    // Location should have a testid for targeting
+    expect(screen.getByTestId('character-location')).toBeInTheDocument();
+    expect(screen.getByTestId('character-location')).toHaveTextContent('The Rusty Cantina');
+  });
+
+  it('renders gracefully when current_location is absent', () => {
+    render(<CharacterSheet data={BASE_DATA} />);
+    // Should not crash, and no location section shown
+    expect(screen.queryByTestId('character-location')).not.toBeInTheDocument();
+    expect(screen.getByText('Kael')).toBeInTheDocument();
+  });
+});
