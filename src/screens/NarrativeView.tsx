@@ -626,7 +626,7 @@ function useColumnScroll() {
 
 export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
   const breakpoint = useBreakpoint();
-  const isSpread = breakpoint === "desktop";
+  const isSpread = false; // single-column experiment — was: breakpoint === "desktop"
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const dinkusGlyph = useDinkusGlyph(messages);
@@ -729,10 +729,10 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               return pages.map((page, pi) => (
                 <div
                   key={pi}
-                  className="min-h-full flex flex-col justify-end pl-12 pr-6 pt-10 pb-16 gap-4 snap-start"
+                  className="min-h-full flex flex-col justify-end pl-8 pr-4 pt-10 pb-16 gap-4 snap-start"
                 >
                   {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "" })
                   )}
                 </div>
               ));
@@ -758,7 +758,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               const pages = groupIntoPages(current);
               if (pages.length === 0) {
                 return (
-                  <div className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start">
+                  <div className="min-h-full flex flex-col justify-end pl-4 pr-8 pt-10 pb-16 gap-4 snap-start">
                     {emptyState}
                     {thinkingIndicator}
                   </div>
@@ -767,10 +767,10 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
               return pages.map((page, pi) => (
                 <div
                   key={pi}
-                  className="min-h-full flex flex-col justify-end pl-6 pr-12 pt-10 pb-16 gap-4 snap-start"
+                  className="min-h-full flex flex-col justify-end pl-4 pr-8 pt-10 pb-16 gap-4 snap-start"
                 >
                   {page.map((seg, si) =>
-                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "max-w-[75ch]" })
+                    renderSegment(seg, pi * 1000 + si, { ...segmentOpts, maxTextWidth: "" })
                   )}
                   {pi === pages.length - 1 && thinkingIndicator}
                 </div>
