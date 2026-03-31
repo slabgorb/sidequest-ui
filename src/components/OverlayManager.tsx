@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 import { CharacterSheet, type CharacterSheetData } from './CharacterSheet';
 import { InventoryPanel, type InventoryData } from './InventoryPanel';
 import { MapOverlay, type MapState } from './MapOverlay';
@@ -6,7 +6,7 @@ import { JournalView, type JournalEntry } from './JournalView';
 import { KnowledgeJournal } from './KnowledgeJournal';
 import type { KnowledgeEntry } from '@/providers/GameStateProvider';
 
-type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | null;
+export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | null;
 
 export interface OverlayManagerProps {
   characterData: CharacterSheetData | null;
@@ -14,6 +14,8 @@ export interface OverlayManagerProps {
   mapData: MapState | null;
   journalEntries?: JournalEntry[];
   knowledgeEntries?: KnowledgeEntry[];
+  activeOverlay: OverlayType;
+  onOverlayChange: (overlay: OverlayType) => void;
   children: ReactNode;
 }
 
@@ -25,9 +27,7 @@ function isTextInput(el: Element | null): boolean {
   return false;
 }
 
-export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, children }: OverlayManagerProps) {
-  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
-
+export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, activeOverlay, onOverlayChange, children }: OverlayManagerProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -36,12 +36,12 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
       const key = e.key.toLowerCase();
 
       if (key === 'escape') {
-        setActiveOverlay(null);
+        onOverlayChange(null);
         return;
       }
 
       const toggle = (overlay: OverlayType) =>
-        setActiveOverlay((prev) => (prev === overlay ? null : overlay));
+        onOverlayChange(activeOverlay === overlay ? null : overlay);
 
       if (key === 'c' && characterData) {
         toggle('character');
@@ -67,7 +67,7 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
         toggle('knowledge');
       }
     },
-    [characterData, inventoryData, mapData, journalEntries, knowledgeEntries],
+    [characterData, inventoryData, mapData, journalEntries, knowledgeEntries, activeOverlay, onOverlayChange],
   );
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const closeOverlay = useCallback(() => setActiveOverlay(null), []);
+  const closeOverlay = useCallback(() => onOverlayChange(null), [onOverlayChange]);
 
   return (
     <>

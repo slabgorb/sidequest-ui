@@ -1,15 +1,12 @@
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NarrativeView } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 import { PartyPanel } from "@/components/PartyPanel";
 import { AudioStatus } from "@/components/AudioStatus";
-import { OverlayManager } from "@/components/OverlayManager";
-import GMMode from "@/components/GMMode";
+import { OverlayManager, type OverlayType } from "@/components/OverlayManager";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { useWhisper } from "@/hooks/useWhisper";
-import { useGMMode } from "@/hooks/useGMMode";
-import { useWatcherSocket } from "@/hooks/useWatcherSocket";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { CharacterSummary } from "@/components/PartyPanel";
@@ -40,6 +37,8 @@ export interface GameLayoutProps {
   activePlayerId?: string | null;
   activePlayerName?: string | null;
   waitingForPlayer?: string;
+  activeOverlay: OverlayType;
+  onOverlayChange: (overlay: OverlayType) => void;
 }
 
 export function GameLayout({
@@ -61,13 +60,12 @@ export function GameLayout({
   activePlayerId,
   activePlayerName,
   waitingForPlayer,
+  activeOverlay,
+  onOverlayChange,
 }: GameLayoutProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
   const isTablet = breakpoint === "tablet";
-
-  const [gmEnabled, toggleGM] = useGMMode();
-  const watcherState = useWatcherSocket(gmEnabled);
 
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [partyVisible, setPartyVisible] = useState(true);
@@ -175,6 +173,8 @@ export function GameLayout({
       mapData={mapData}
       journalEntries={journalEntries}
       knowledgeEntries={knowledgeEntries}
+      activeOverlay={activeOverlay}
+      onOverlayChange={onOverlayChange}
     >
       <div
         data-testid="game-layout"
@@ -278,12 +278,6 @@ export function GameLayout({
             </div>
           </div>
 
-          {/* GM Mode debug panel — toggled via Ctrl+Shift+G or ?gm=true */}
-          {gmEnabled && (
-            <Suspense fallback={null}>
-              <GMMode state={watcherState} onClose={toggleGM} />
-            </Suspense>
-          )}
         </div>
 
         {/* Combat overlay — visible only during combat */}

@@ -1,8 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { OverlayManager } from '../OverlayManager';
-import { MessageType, type GameMessage } from '@/types/protocol';
+import { describe, it, expect, vi } from 'vitest';
+import { useState } from 'react';
+import { OverlayManager, type OverlayType } from '../OverlayManager';
 
 // Mock data that would come from WebSocket messages
 const CHARACTER_DATA = {
@@ -23,34 +22,47 @@ const INVENTORY_DATA = {
   gold: 42,
 };
 
-function renderWithOverlay(
-  characterData: typeof CHARACTER_DATA | null = CHARACTER_DATA,
-  inventoryData: typeof INVENTORY_DATA | null = INVENTORY_DATA,
-) {
-  return render(
-    <OverlayManager characterData={characterData} inventoryData={inventoryData}>
-      <div data-testid="game-content">Game content here</div>
-    </OverlayManager>,
+/** Stateful wrapper that lifts overlay state the same way App.tsx does. */
+function StatefulOverlayManager({
+  characterData = CHARACTER_DATA,
+  inventoryData = INVENTORY_DATA,
+  children,
+}: {
+  characterData?: typeof CHARACTER_DATA | null;
+  inventoryData?: typeof INVENTORY_DATA | null;
+  children?: React.ReactNode;
+}) {
+  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
+  return (
+    <OverlayManager
+      characterData={characterData}
+      inventoryData={inventoryData}
+      mapData={null}
+      activeOverlay={activeOverlay}
+      onOverlayChange={setActiveOverlay}
+    >
+      {children ?? <div data-testid="game-content">Game content here</div>}
+    </OverlayManager>
   );
 }
 
 describe('OverlayManager', () => {
   // --- AC-1: Character sheet opens on 'C' key ---
   describe('AC-1: Character sheet toggle', () => {
-    it('opens character sheet when C key is pressed', async () => {
-      renderWithOverlay();
+    it('opens character sheet when C key is pressed', () => {
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
     });
 
-    it('displays character name in the overlay', async () => {
-      renderWithOverlay();
+    it('displays character name in the overlay', () => {
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByText('Kael')).toBeInTheDocument();
     });
 
     it('closes character sheet when C is pressed again (toggle)', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
 
@@ -59,7 +71,7 @@ describe('OverlayManager', () => {
     });
 
     it('handles uppercase C key the same as lowercase', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'C' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
     });
@@ -68,19 +80,19 @@ describe('OverlayManager', () => {
   // --- AC-2: Inventory opens on 'I' key ---
   describe('AC-2: Inventory toggle', () => {
     it('opens inventory when I key is pressed', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
     });
 
     it('displays items in the overlay', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.getByText('Elven Longbow')).toBeInTheDocument();
     });
 
     it('closes inventory when I is pressed again (toggle)', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
 
@@ -92,7 +104,7 @@ describe('OverlayManager', () => {
   // --- AC-3: Only one overlay at a time ---
   describe('AC-3: Single overlay policy', () => {
     it('closes character sheet when inventory is opened', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
 
@@ -102,7 +114,7 @@ describe('OverlayManager', () => {
     });
 
     it('closes inventory when character sheet is opened', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
 
@@ -115,7 +127,7 @@ describe('OverlayManager', () => {
   // --- AC-4: Escape and backdrop close overlays ---
   describe('AC-4: Escape and backdrop dismiss', () => {
     it('closes character sheet on Escape', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
 
@@ -124,7 +136,7 @@ describe('OverlayManager', () => {
     });
 
     it('closes inventory on Escape', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
 
@@ -133,7 +145,7 @@ describe('OverlayManager', () => {
     });
 
     it('closes overlay when backdrop is clicked', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('character-sheet')).toBeInTheDocument();
 
@@ -143,8 +155,7 @@ describe('OverlayManager', () => {
     });
 
     it('does nothing when Escape is pressed with no overlay open', () => {
-      renderWithOverlay();
-      // Should not throw or cause errors
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByTestId('character-sheet')).not.toBeInTheDocument();
       expect(screen.queryByTestId('inventory-panel')).not.toBeInTheDocument();
@@ -155,9 +166,9 @@ describe('OverlayManager', () => {
   describe('AC-5: Input focus suppression', () => {
     it('does not open overlay when input element is focused', () => {
       render(
-        <OverlayManager characterData={CHARACTER_DATA} inventoryData={INVENTORY_DATA}>
+        <StatefulOverlayManager>
           <input data-testid="game-input" />
-        </OverlayManager>,
+        </StatefulOverlayManager>,
       );
 
       const input = screen.getByTestId('game-input');
@@ -169,9 +180,9 @@ describe('OverlayManager', () => {
 
     it('does not open overlay when textarea is focused', () => {
       render(
-        <OverlayManager characterData={CHARACTER_DATA} inventoryData={INVENTORY_DATA}>
+        <StatefulOverlayManager>
           <textarea data-testid="game-textarea" />
-        </OverlayManager>,
+        </StatefulOverlayManager>,
       );
 
       const textarea = screen.getByTestId('game-textarea');
@@ -183,9 +194,9 @@ describe('OverlayManager', () => {
 
     it('does not open overlay when contenteditable element is focused', () => {
       render(
-        <OverlayManager characterData={CHARACTER_DATA} inventoryData={INVENTORY_DATA}>
+        <StatefulOverlayManager>
           <div contentEditable data-testid="editable" />
-        </OverlayManager>,
+        </StatefulOverlayManager>,
       );
 
       const editable = screen.getByTestId('editable');
@@ -199,31 +210,30 @@ describe('OverlayManager', () => {
   // --- Edge cases ---
   describe('Edge cases', () => {
     it('renders children even when no overlay is active', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       expect(screen.getByTestId('game-content')).toBeInTheDocument();
     });
 
     it('children remain visible when overlay is open', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c' });
       expect(screen.getByTestId('game-content')).toBeInTheDocument();
     });
 
     it('handles null character data gracefully', () => {
-      renderWithOverlay(null, INVENTORY_DATA);
+      render(<StatefulOverlayManager characterData={null} />);
       fireEvent.keyDown(document, { key: 'c' });
-      // Should not crash; overlay should either not open or show empty state
       expect(screen.queryByTestId('character-sheet')).not.toBeInTheDocument();
     });
 
     it('handles null inventory data gracefully', () => {
-      renderWithOverlay(CHARACTER_DATA, null);
+      render(<StatefulOverlayManager inventoryData={null} />);
       fireEvent.keyDown(document, { key: 'i' });
       expect(screen.queryByTestId('inventory-panel')).not.toBeInTheDocument();
     });
 
     it('ignores modifier key combinations (Ctrl+C, Alt+I)', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'c', ctrlKey: true });
       expect(screen.queryByTestId('character-sheet')).not.toBeInTheDocument();
 
@@ -232,7 +242,7 @@ describe('OverlayManager', () => {
     });
 
     it('ignores unrelated keys', () => {
-      renderWithOverlay();
+      render(<StatefulOverlayManager />);
       fireEvent.keyDown(document, { key: 'a' });
       fireEvent.keyDown(document, { key: 'Enter' });
       fireEvent.keyDown(document, { key: ' ' });

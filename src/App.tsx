@@ -11,7 +11,7 @@ import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useStateMirror } from "@/hooks/useStateMirror";
-import { useSlashCommands } from "@/hooks/useSlashCommands";
+import { useSlashCommands, type OverlayType } from "@/hooks/useSlashCommands";
 import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
@@ -109,6 +109,9 @@ function AppInner() {
   const [characterSheet, setCharacterSheet] = useState<CharacterSheetData | null>(null);
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [mapData, setMapData] = useState<MapState | null>(null);
+
+  // Active overlay panel — lifted from OverlayManager so slash commands can trigger it
+  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
 
   // Party status — richer than state_delta (includes portrait_url)
   const [partyMembers, setPartyMembers] = useState<CharacterSummary[]>([]);
@@ -497,10 +500,15 @@ function AppInner() {
   // Send handler with slash command interception
   const handleSend = useCallback(
     (text: string, aside: boolean) => {
-      // Try slash commands first — resolve locally, no server round-trip
+      // Try slash commands first — overlay triggers resolve locally
       const slashResult = executeSlashCommand(text);
       if (slashResult.handled) {
-        setMessages((prev) => [...prev, ...slashResult.messages]);
+        if (slashResult.overlay) {
+          setActiveOverlay(slashResult.overlay);
+        }
+        if (slashResult.messages.length > 0) {
+          setMessages((prev) => [...prev, ...slashResult.messages]);
+        }
         return;
       }
 
@@ -527,6 +535,7 @@ function AppInner() {
     setCharacterSheet(null);
     setInventoryData(null);
     setMapData(null);
+    setActiveOverlay(null);
     setPartyMembers([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
@@ -700,6 +709,8 @@ function AppInner() {
               activePlayerId={activePlayerId}
               activePlayerName={activePlayerName}
               waitingForPlayer={waitingForPlayer}
+              activeOverlay={activeOverlay}
+              onOverlayChange={setActiveOverlay}
             />
           </ErrorBoundary>
         )}
