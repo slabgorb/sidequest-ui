@@ -5,8 +5,9 @@ import { MapOverlay, type MapState } from './MapOverlay';
 import { JournalView, type JournalEntry } from './JournalView';
 import { KnowledgeJournal } from './KnowledgeJournal';
 import type { KnowledgeEntry } from '@/providers/GameStateProvider';
+import { SettingsPanel, type SettingsPanelProps } from './SettingsPanel';
 
-export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | null;
+export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | 'settings' | null;
 
 export interface OverlayManagerProps {
   characterData: CharacterSheetData | null;
@@ -14,6 +15,7 @@ export interface OverlayManagerProps {
   mapData: MapState | null;
   journalEntries?: JournalEntry[];
   knowledgeEntries?: KnowledgeEntry[];
+  settingsProps?: SettingsPanelProps;
   activeOverlay: OverlayType;
   onOverlayChange: (overlay: OverlayType) => void;
   children: ReactNode;
@@ -27,7 +29,7 @@ function isTextInput(el: Element | null): boolean {
   return false;
 }
 
-export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, activeOverlay, onOverlayChange, children }: OverlayManagerProps) {
+export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, settingsProps, activeOverlay, onOverlayChange, children }: OverlayManagerProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -104,6 +106,9 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
             )}
             {activeOverlay === 'knowledge' && knowledgeEntries && (
               <KnowledgeJournal entries={knowledgeEntries} />
+            )}
+            {activeOverlay === 'settings' && settingsProps && (
+              <SettingsPanel {...settingsProps} />
             )}
           </div>
         </div>
