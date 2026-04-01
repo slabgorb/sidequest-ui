@@ -17,6 +17,7 @@ import type { MapState } from "@/components/MapOverlay";
 import { CombatOverlay, type CombatState } from "@/components/CombatOverlay";
 import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
+import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { GameMessage } from "@/types/protocol";
 
 export interface GameLayoutProps {
@@ -38,6 +39,7 @@ export interface GameLayoutProps {
   activePlayerId?: string | null;
   activePlayerName?: string | null;
   waitingForPlayer?: string;
+  turnStatusEntries?: TurnStatusEntry[];
   settingsProps?: SettingsPanelProps;
   activeOverlay: OverlayType;
   onOverlayChange: (overlay: OverlayType) => void;
@@ -62,6 +64,7 @@ export function GameLayout({
   activePlayerId,
   activePlayerName,
   waitingForPlayer,
+  turnStatusEntries = [],
   settingsProps,
   activeOverlay,
   onOverlayChange,
@@ -256,9 +259,17 @@ export function GameLayout({
                 data-testid="turn-indicator"
                 className="px-4 py-1.5 text-xs text-center text-muted-foreground/60 border-t border-border/30 bg-card/20 shrink-0 tracking-wide"
               >
-                {waitingForPlayer
-                  ? `[ ${activePlayerName}'s turn ]`
-                  : "[ Your turn ]"}
+                {turnStatusEntries.length > 0 ? (
+                  <TurnStatusPanel
+                    entries={turnStatusEntries}
+                    localPlayerId={currentPlayerId}
+                    gameMode="structured"
+                  />
+                ) : (
+                  waitingForPlayer
+                    ? `[ ${activePlayerName}'s turn ]`
+                    : "[ Your turn ]"
+                )}
               </div>
             )}
             <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">

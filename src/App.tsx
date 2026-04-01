@@ -19,6 +19,7 @@ import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
 import type { CombatState } from "@/components/CombatOverlay";
+import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -126,6 +127,7 @@ function AppInner() {
     () => loadSession()?.playerName ?? "",
   );
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
+  const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
 
   // Combat state from COMBAT_EVENT messages
   const [combatState, setCombatState] = useState<CombatState | null>(null);
@@ -373,11 +375,40 @@ function AppInner() {
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
+      const playerId = msg.payload.player_id as string | undefined;
+
       if (name && status === "active") {
         setActivePlayerName(name);
       } else if (status === "resolved") {
         setActivePlayerName(null);
+        setTurnStatusEntries([]);
       }
+
+      // Update per-player turn status entries for TurnStatusPanel
+      if (playerId && name && status) {
+        const mapped: TurnStatusEntry["status"] =
+          status === "submitted" ? "submitted" :
+          status === "auto_resolved" ? "auto_resolved" :
+          "pending";
+        setTurnStatusEntries((prev) => {
+          const next = prev.filter((e) => e.player_id !== playerId);
+          next.push({ player_id: playerId, character_name: name, status: mapped });
+          return next;
+        });
+      }
+
+      // Batch entries support (server may send full list)
+      const entries = msg.payload.entries as Array<Record<string, unknown>> | undefined;
+      if (entries) {
+        setTurnStatusEntries(
+          entries.map((e) => ({
+            player_id: (e.player_id as string) ?? "",
+            character_name: (e.character_name as string) ?? (e.player_name as string) ?? "",
+            status: (e.status as TurnStatusEntry["status"]) ?? "pending",
+          })),
+        );
+      }
+
       return;
     }
 
@@ -777,6 +808,7 @@ function AppInner() {
               activePlayerName={activePlayerName}
               waitingForPlayer={waitingForPlayer}
               settingsProps={settingsProps}
+              turnStatusEntries={turnStatusEntries}
               activeOverlay={activeOverlay}
               onOverlayChange={setActiveOverlay}
             />

@@ -1,15 +1,17 @@
+import { useContext } from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   ThemeProvider,
-  useTheme,
+  ThemeContext,
   DEFAULT_THEME,
   type GenreTheme,
+  type ThemeContextValue,
 } from '../ThemeProvider';
 
-/** Helper that renders useTheme inside a provider and returns the ref. */
-function ThemeConsumer({ onTheme }: { onTheme: (v: ReturnType<typeof useTheme>) => void }) {
-  const value = useTheme();
+/** Helper that consumes ThemeContext inside a provider and returns the ref. */
+function ThemeConsumer({ onTheme }: { onTheme: (v: ThemeContextValue) => void }) {
+  const value = useContext(ThemeContext);
   onTheme(value);
   return <div data-testid="consumer">{value.theme.name}</div>;
 }
@@ -50,7 +52,7 @@ describe('ThemeProvider', () => {
   });
 
   it('provides default theme via context when no initialTheme', () => {
-    let captured: ReturnType<typeof useTheme> | undefined;
+    let captured: ThemeContextValue | undefined;
 
     render(
       <ThemeProvider>
@@ -79,7 +81,7 @@ describe('ThemeProvider', () => {
   });
 
   it('switches CSS variables when setTheme called with new genre theme', () => {
-    let captured: ReturnType<typeof useTheme> | undefined;
+    let captured: ThemeContextValue | undefined;
 
     render(
       <ThemeProvider initialTheme={LOW_FANTASY}>
@@ -97,7 +99,7 @@ describe('ThemeProvider', () => {
   });
 
   it('cleans up old CSS variables when theme changes (no stale vars)', () => {
-    let captured: ReturnType<typeof useTheme> | undefined;
+    let captured: ThemeContextValue | undefined;
 
     render(
       <ThemeProvider initialTheme={LOW_FANTASY}>
@@ -119,8 +121,8 @@ describe('ThemeProvider', () => {
     expect(document.documentElement.style.getPropertyValue('--foreground')).toBe('');
   });
 
-  it('useTheme hook returns current theme and setTheme', () => {
-    let captured: ReturnType<typeof useTheme> | undefined;
+  it('context returns current theme and setTheme', () => {
+    let captured: ThemeContextValue | undefined;
 
     render(
       <ThemeProvider initialTheme={LOW_FANTASY}>
@@ -136,7 +138,7 @@ describe('ThemeProvider', () => {
   it('falls back to default colors when theme.colors is empty/undefined', () => {
     const noColors: GenreTheme = { name: 'bare' };
 
-    let captured: ReturnType<typeof useTheme> | undefined;
+    let captured: ThemeContextValue | undefined;
 
     render(
       <ThemeProvider initialTheme={noColors}>

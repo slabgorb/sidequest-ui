@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useState, useEffect, useRef, type ReactNode } from 'react';
 
 export interface GenreTheme {
   name: string;
@@ -16,7 +16,7 @@ export const DEFAULT_THEME: GenreTheme = {
   name: 'default',
 };
 
-const ThemeContext = createContext<ThemeContextValue>({
+export const ThemeContext = createContext<ThemeContextValue>({
   theme: DEFAULT_THEME,
   setTheme: () => {},
 });
@@ -68,6 +68,3 @@ export function ThemeProvider({ children, initialTheme }: ThemeProviderProps) {
   );
 }
 
-export function useTheme(): ThemeContextValue {
-  return useContext(ThemeContext);
-}
