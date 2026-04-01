@@ -1,5 +1,6 @@
 import { VerbositySlider } from "./VerbositySlider";
 import { VocabularySlider } from "./VocabularySlider";
+import { ImagePacingSlider } from "./ImagePacingSlider";
 import type { NarratorVerbosity, NarratorVocabulary } from "@/types/protocol";
 
 export interface SettingsPanelProps {
@@ -34,23 +35,8 @@ export function SettingsPanel({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium block" htmlFor="image-cooldown">
-          Image Cooldown (seconds)
-        </label>
-        <input
-          id="image-cooldown"
-          type="number"
-          min={0}
-          max={120}
-          value={imageCooldown}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            if (!isNaN(v) && v >= 0 && v <= 120) {
-              onImageCooldownChange(v);
-            }
-          }}
-          className="w-20 border rounded px-2 py-1 text-sm bg-background"
-        />
+        <label className="text-sm font-medium block">Image Cooldown</label>
+        <ImagePacingSlider value={imageCooldown} onChange={onImageCooldownChange} />
       </div>
     </div>
   );

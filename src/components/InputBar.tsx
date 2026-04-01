@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type KeyboardEvent } from "react";
 import { Input } from "@/components/ui/input";
+import { TranscriptPreview } from "@/components/TranscriptPreview";
 import { cn } from "@/lib/utils";
 import type { PTTState } from "@/hooks/usePushToTalk";
 
@@ -180,7 +181,15 @@ export default function InputBar({
     "What do you do?";
 
   return (
-    <div data-testid="input-bar" className="flex items-center gap-2">
+    <div data-testid="input-bar" className="space-y-2">
+      <TranscriptPreview
+        transcript={transcript ?? ""}
+        state={pttState}
+        onConfirm={onTranscriptConfirm}
+        onDiscard={onTranscriptDiscard}
+        onEdit={onTranscriptEdit}
+      />
+      <div className="flex items-center gap-2">
       {/* DISABLED: Voice/mic off until rethought — mic captures TTS audio feedback */}
       {false && <VoiceOrnament
         micEnabled={micEnabled}
@@ -225,6 +234,7 @@ export default function InputBar({
       >
         (…)
       </button>
+      </div>
     </div>
   );
 }
