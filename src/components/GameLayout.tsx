@@ -4,6 +4,7 @@ import InputBar from "@/components/InputBar";
 import { PartyPanel } from "@/components/PartyPanel";
 import { AudioStatus } from "@/components/AudioStatus";
 import { OverlayManager, type OverlayType } from "@/components/OverlayManager";
+import type { SettingsPanelProps } from "@/components/SettingsPanel";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { useWhisper } from "@/hooks/useWhisper";
@@ -37,6 +38,7 @@ export interface GameLayoutProps {
   activePlayerId?: string | null;
   activePlayerName?: string | null;
   waitingForPlayer?: string;
+  settingsProps?: SettingsPanelProps;
   activeOverlay: OverlayType;
   onOverlayChange: (overlay: OverlayType) => void;
 }
@@ -60,6 +62,7 @@ export function GameLayout({
   activePlayerId,
   activePlayerName,
   waitingForPlayer,
+  settingsProps,
   activeOverlay,
   onOverlayChange,
 }: GameLayoutProps) {
@@ -173,6 +176,7 @@ export function GameLayout({
       mapData={mapData}
       journalEntries={journalEntries}
       knowledgeEntries={knowledgeEntries}
+      settingsProps={settingsProps}
       activeOverlay={activeOverlay}
       onOverlayChange={onOverlayChange}
     >
