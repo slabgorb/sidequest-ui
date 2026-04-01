@@ -1,8 +1,14 @@
+export interface StatusEffectInfo {
+  kind: string;
+  remaining_rounds: number;
+}
+
 export interface CombatEnemy {
   name: string;
   hp: number;
   max_hp: number;
   ac?: number;
+  status_effects?: StatusEffectInfo[];
 }
 
 export interface CombatState {
@@ -66,6 +72,24 @@ export function CombatOverlay({ combat }: CombatOverlayProps) {
                   }}
                 />
               </div>
+              {enemy.status_effects && enemy.status_effects.length > 0 && (
+                <div className="flex gap-1 mt-0.5">
+                  {enemy.status_effects.map((effect, i) => (
+                    <span
+                      key={`${effect.kind}-${i}`}
+                      className={`text-[10px] px-1 rounded ${
+                        effect.kind === 'Poison' ? 'bg-green-900/50 text-green-400' :
+                        effect.kind === 'Stun' ? 'bg-yellow-900/50 text-yellow-400' :
+                        effect.kind === 'Bless' ? 'bg-blue-900/50 text-blue-400' :
+                        effect.kind === 'Curse' ? 'bg-purple-900/50 text-purple-400' :
+                        'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      {effect.kind} ({effect.remaining_rounds}r)
+                    </span>
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
