@@ -463,18 +463,18 @@ function renderSegment(
       );
     }
     case "image": {
-      const tierClass = seg.tier === "portrait"
+      // Portrait images stay small and centered.
+      // Scene/landscape images float right (~40% width) so text wraps
+      // around them inline — avoids TEXT → HUGE IMAGE → TEXT scroll.
+      const isPortrait = seg.tier === "portrait";
+      const tierClass = isPortrait
         ? "my-4 max-w-[12rem] mx-auto"
-        : seg.tier === "landscape"
-        ? "my-8 max-w-2xl mx-auto"
-        : seg.tier === "scene"
-        ? "my-8 max-w-full mx-auto"
-        : "my-8 max-w-[85ch] mx-auto";
+        : "float-right ml-4 mb-3 mt-1 w-[40%] max-w-sm rounded-sm";
       return (
         <figure key={i} className={tierClass}>
           <NarrativeImage seg={seg} onLightbox={(url) => setLightboxUrl(url)} />
           {seg.caption && (
-            <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center max-w-[80%] mx-auto">
+            <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
               {seg.caption}
             </figcaption>
           )}
@@ -486,7 +486,7 @@ function renderSegment(
         <hr
           key={i}
           data-testid="segment-separator"
-          className="border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
+          className="clear-both border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
         />
       );
     case "system":
