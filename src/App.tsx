@@ -329,22 +329,27 @@ function AppInner() {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
       } else if (event === "ready") {
+        // On reconnect (phase not yet "game"), clear stale messages and
+        // narration buffer to avoid duplicates.  On first connect after
+        // chargen, CHARACTER_CREATION "complete" already set phase to
+        // "game" — DON'T clear, or the opening narration (already
+        // buffered from the auto-first-turn) gets wiped.
+        const isReconnect = sessionPhaseRef.current !== "game";
         sessionPhaseRef.current = "game";
         setSessionPhase("game");
-        // Clear HMR-restored messages on reconnect — the server replays
-        // the last narration, so keeping old messages causes duplicates.
-        setMessages((prev) =>
-          prev.filter((m) => m.type === MessageType.SESSION_EVENT),
-        );
-        // Clear narration buffer to avoid stale chunks leaking into new session
-        const buf = narrationBufferRef.current;
-        if (buf.flushTimer) clearTimeout(buf.flushTimer);
-        if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
-        buf.narration = null;
-        buf.narrationEnd = null;
-        buf.chunks = [];
-        buf.flushTimer = null;
-        buf.watchdogTimer = null;
+        if (isReconnect) {
+          setMessages((prev) =>
+            prev.filter((m) => m.type === MessageType.SESSION_EVENT),
+          );
+          const buf = narrationBufferRef.current;
+          if (buf.flushTimer) clearTimeout(buf.flushTimer);
+          if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
+          buf.narration = null;
+          buf.narrationEnd = null;
+          buf.chunks = [];
+          buf.flushTimer = null;
+          buf.watchdogTimer = null;
+        }
       }
       if (event === "settings_updated") {
         if (msg.payload.narrator_verbosity) setNarratorVerbosity(msg.payload.narrator_verbosity as NarratorVerbosity);
