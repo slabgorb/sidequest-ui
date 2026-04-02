@@ -16,6 +16,7 @@ export interface CreationScene {
   choices?: CreationChoice[];
   allows_freeform?: boolean;
   input_type?: string;
+  loading_text?: string;
   character_preview?: Record<string, unknown>;
   previous_choice?: number;
   previous_input?: string;
@@ -42,7 +43,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
         <div data-testid="creation-loading" role="status"
              className="flex items-center justify-center min-h-[200px]">
           <p className="text-sm italic text-muted-foreground/50 animate-pulse">
-            The old woman considers your words...
+            {scene?.loading_text ?? "Considering your words..."}
           </p>
         </div>
       </div>
