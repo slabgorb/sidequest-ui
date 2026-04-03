@@ -20,12 +20,17 @@ export interface JournalEntry {
 
 export type FactCategory = 'Lore' | 'Place' | 'Person' | 'Quest' | 'Ability';
 
+export type FactSource = 'Observation' | 'Dialogue' | 'Discovery' | 'Backstory';
+export type Confidence = 'Certain' | 'Suspected' | 'Rumored';
+
 export interface KnowledgeEntry {
   fact_id: string;
   content: string;
   category: FactCategory;
   is_new: boolean;
   learned_turn: number;
+  source: FactSource;
+  confidence: Confidence;
 }
 
 export interface ClientGameState {

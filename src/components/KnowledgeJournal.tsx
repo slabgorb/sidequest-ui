@@ -86,6 +86,8 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
             <div className="flex gap-2 text-xs text-muted-foreground/50 mt-0.5">
               <span>{entry.category}</span>
               <span>Turn {entry.learned_turn}</span>
+              {entry.source && <span>{entry.source}</span>}
+              {entry.confidence && <span>{entry.confidence}</span>}
               {entry.is_new && <span className="text-accent-foreground/40 italic">new</span>}
             </div>
           </div>

@@ -13,6 +13,8 @@ function entry(overrides: Partial<KnowledgeEntry> & { fact_id: string }): Knowle
     category: 'Lore' as FactCategory,
     is_new: true,
     learned_turn: 1,
+    source: 'Observation',
+    confidence: 'Certain',
     ...overrides,
   };
 }
