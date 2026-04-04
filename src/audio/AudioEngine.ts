@@ -73,6 +73,7 @@ export class AudioEngine {
   private activeSources: AudioBufferSourceNode[] = [];
   private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
+  private _voicePlaybackRate = 1.0;
 
   constructor() {
     this.ctx = new AudioContext();
@@ -219,6 +220,7 @@ export class AudioEngine {
 
           const source = this.ctx.createBufferSource();
           source.buffer = audioBuffer;
+          source.playbackRate.value = this._voicePlaybackRate;
           source.connect(this.channels.voice);
           source.onended = () => {
             this.ducker.unduck();
@@ -259,6 +261,15 @@ export class AudioEngine {
     const restored = this.preMuteVolumes[channel] ?? 1.0;
     delete this.preMuteVolumes[channel];
     this.setVolume(channel, restored);
+  }
+
+  /** Voice playback rate (0.5–2.0). Affects all future TTS segments. */
+  get voicePlaybackRate(): number {
+    return this._voicePlaybackRate;
+  }
+
+  set voicePlaybackRate(rate: number) {
+    this._voicePlaybackRate = Math.max(0.5, Math.min(2.0, rate));
   }
 
   dispose(): void {

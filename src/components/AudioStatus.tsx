@@ -8,6 +8,8 @@ export interface AudioStatusProps {
   muted: { music: boolean; sfx: boolean; voice: boolean };
   onVolumeChange: (channel: string, value: number) => void;
   onMuteToggle: (channel: string) => void;
+  voicePlaybackRate?: number;
+  onPlaybackRateChange?: (rate: number) => void;
 }
 
 const CHANNELS = ["music", "sfx", "voice"] as const;
@@ -36,6 +38,8 @@ export function AudioStatus({
   muted,
   onVolumeChange,
   onMuteToggle,
+  voicePlaybackRate = 1.0,
+  onPlaybackRateChange,
 }: AudioStatusProps) {
   const [expanded, setExpanded] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -160,6 +164,24 @@ export function AudioStatus({
           </button>
         </div>
       ))}
+
+      {onPlaybackRateChange && (
+        <div data-testid="playback-rate-slider" className="flex items-center gap-2 pt-1 border-t border-border/10">
+          <span className="text-[10px] text-muted-foreground/50 w-8">speed</span>
+          <input
+            type="range"
+            min="50"
+            max="200"
+            step="10"
+            value={Math.round(voicePlaybackRate * 100)}
+            className="flex-1 h-1 accent-muted-foreground/40"
+            aria-label="Voice playback speed"
+            onChange={(e) => onPlaybackRateChange(Number(e.target.value) / 100)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <span className="text-[10px] text-muted-foreground/40 w-6 text-right">{voicePlaybackRate.toFixed(1)}×</span>
+        </div>
+      )}
     </div>
   );
 }

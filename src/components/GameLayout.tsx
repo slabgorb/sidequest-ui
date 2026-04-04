@@ -79,6 +79,7 @@ export function GameLayout({
   // Audio state — tracked locally, synced to AudioEngine
   const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5, voice: 0.5 });
   const [muted, setMuted] = useState({ music: false, sfx: false, voice: false });
+  const [voicePlaybackRate, setVoicePlaybackRate] = useState(1.0);
 
   // Mic on/off toggle — persisted to localStorage
   const [micEnabled, setMicEnabled] = useState(() =>
@@ -153,6 +154,14 @@ export function GameLayout({
     (channel: string, value: number) => {
       setVolumes((prev) => ({ ...prev, [channel]: value }));
       audio?.setVolume(channel as "music" | "sfx" | "voice", value);
+    },
+    [audio],
+  );
+
+  const handlePlaybackRateChange = useCallback(
+    (rate: number) => {
+      setVoicePlaybackRate(rate);
+      if (audio) audio.voicePlaybackRate = rate;
     },
     [audio],
   );
@@ -305,6 +314,8 @@ export function GameLayout({
           muted={muted}
           onVolumeChange={handleVolumeChange}
           onMuteToggle={handleMuteToggle}
+          voicePlaybackRate={voicePlaybackRate}
+          onPlaybackRateChange={handlePlaybackRateChange}
         />
 
         {/* Mobile: PartyPanel as overlay — only in multiplayer */}
