@@ -1,7 +1,8 @@
-import { useCallback, useEffect, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { CharacterSheet, type CharacterSheetData } from './CharacterSheet';
 import { InventoryPanel, type InventoryData } from './InventoryPanel';
 import { MapOverlay, type MapState } from './MapOverlay';
+import { Automapper, type ExploredRoom, type ExitInfo } from './Automapper';
 import { JournalView, type JournalEntry } from './JournalView';
 import { KnowledgeJournal } from './KnowledgeJournal';
 import type { KnowledgeEntry } from '@/providers/GameStateProvider';
@@ -29,7 +30,39 @@ function isTextInput(el: Element | null): boolean {
   return false;
 }
 
+/** Bridge MapState → Automapper props when room graph data is present */
+function useAutomapperData(mapData: MapState | null) {
+  return useMemo(() => {
+    if (!mapData) return null;
+    // Room graph mode: at least one explored location has room_exits
+    const hasRoomGraph = mapData.explored.some(
+      (loc: Record<string, unknown>) => Array.isArray((loc as Record<string, unknown>).room_exits) && ((loc as Record<string, unknown>).room_exits as unknown[]).length > 0
+    );
+    if (!hasRoomGraph) return null;
+
+    const rooms: ExploredRoom[] = mapData.explored.map((loc: Record<string, unknown>) => {
+      const roomExits = ((loc as Record<string, unknown>).room_exits ?? []) as Array<{ target: string; exit_type: string }>;
+      const exits: ExitInfo[] = roomExits.map((re) => ({
+        direction: re.exit_type.includes("chute") ? "down" : "east", // direction from exit_type as fallback
+        exit_type: re.exit_type.replace("_down", "").replace("_up", ""),
+        to_room_id: re.target || undefined,
+      }));
+      return {
+        id: (loc as Record<string, unknown>).name as string,
+        name: (loc as Record<string, unknown>).name as string,
+        room_type: ((loc as Record<string, unknown>).room_type as string) || "chamber",
+        size: "medium",
+        is_current: (loc as Record<string, unknown>).name === mapData.current_location,
+        exits,
+      };
+    });
+
+    return { rooms, currentRoomId: mapData.current_location };
+  }, [mapData]);
+}
+
 export function OverlayManager({ characterData, inventoryData, mapData, journalEntries, knowledgeEntries, settingsProps, activeOverlay, onOverlayChange, children }: OverlayManagerProps) {
+  const automapperData = useAutomapperData(mapData);
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
@@ -99,7 +132,9 @@ export function OverlayManager({ characterData, inventoryData, mapData, journalE
               <InventoryPanel data={inventoryData} />
             )}
             {activeOverlay === 'map' && mapData && (
-              <MapOverlay mapData={mapData} onClose={closeOverlay} />
+              automapperData
+                ? <Automapper rooms={automapperData.rooms} currentRoomId={automapperData.currentRoomId} />
+                : <MapOverlay mapData={mapData} onClose={closeOverlay} />
             )}
             {activeOverlay === 'journal' && journalEntries && (
               <JournalView entries={journalEntries} />
