@@ -94,6 +94,8 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
 
   // Dedup ACTION_REVEAL by turn_number (prevents duplicates on WebSocket reconnect)
   const seenRevealTurns = new Set<number>();
+  // Bug #14: Dedup consecutive ChapterMarker messages for the same location
+  let lastChapterLocation = "";
 
   const flushChunks = () => {
     if (chunkBuffer) {
@@ -219,8 +221,12 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
       case MessageType.CHAPTER_MARKER: {
         flushChunks();
         const location = msg.payload.location as string;
-        if (location) {
+        // Bug #14: Dedup consecutive ChapterMarker messages for the same location.
+        // Without this, reconnects and multiplayer rebroadcasts cause duplicate
+        // "◇ ◇ ◇ Location" dividers between every turn.
+        if (location && location !== lastChapterLocation) {
           segments.push({ kind: "chapter-marker", text: location });
+          lastChapterLocation = location;
         }
         break;
       }
