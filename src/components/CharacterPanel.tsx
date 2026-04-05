@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, useEffect } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
-import type { InventoryData } from "./InventoryPanel";
+import type { InventoryData, InventoryItem } from "./InventoryPanel";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "./PartyPanel";
@@ -289,13 +289,24 @@ function BackstoryContent({ backstory }: { backstory: string }) {
 }
 
 function InventoryContent({ inventory }: { inventory: InventoryData }) {
+  // Stack identical items by name, summing quantities
+  const stacked = new Map<string, { item: InventoryItem; count: number }>();
+  for (const item of inventory.items) {
+    const existing = stacked.get(item.name);
+    if (existing) {
+      existing.count += item.quantity ?? 1;
+    } else {
+      stacked.set(item.name, { item, count: item.quantity ?? 1 });
+    }
+  }
+
   return (
     <div className="space-y-2">
-      {inventory.items.map((item) => (
-        <div key={item.name} className="text-sm">
+      {Array.from(stacked.entries()).map(([name, { item, count }]) => (
+        <div key={name} className="text-sm">
           <span className="font-medium">{item.name}</span>
-          {"quantity" in item && item.quantity && (
-            <span className="text-muted-foreground ml-1">×{item.quantity}</span>
+          {count > 1 && (
+            <span className="text-muted-foreground ml-1">x{count}</span>
           )}
         </div>
       ))}
