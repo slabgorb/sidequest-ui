@@ -108,7 +108,7 @@ export function CharacterPanel({
     <div
       data-testid="character-panel"
       ref={panelRef}
-      className="flex flex-col border-r border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
+      className="character-panel flex flex-col border-r border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
       style={{ width: sidebarWidth }}
     >
       {/* Header: portrait + name */}

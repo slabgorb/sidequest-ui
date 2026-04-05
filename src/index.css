@@ -124,10 +124,21 @@
     }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body, var(--font-sans));
     }
   html {
     @apply font-sans;
+    border-radius: var(--border-radius, var(--radius));
     }
+}
+
+/* Archetype font-ui — applied to interactive/HUD elements when an archetype is active */
+[data-archetype] button,
+[data-archetype] input,
+[data-archetype] select,
+[data-archetype] .character-panel,
+[data-archetype] .character-hud {
+  font-family: var(--font-ui, inherit);
 }
 
 /* Scroll snap for book-like page turns */

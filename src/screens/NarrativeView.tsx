@@ -49,12 +49,12 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
       {chapterTitle && (
         <div
           data-testid="running-header"
-          className="sticky top-0 z-10 flex items-baseline justify-between
+          className="running-header sticky top-0 z-10 flex items-baseline justify-between
                      px-6 pt-3 pb-4
                      bg-gradient-to-b from-background via-background/95 to-transparent
                      pointer-events-none select-none"
         >
-          <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
+          <span className="location text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
             {chapterTitle}
           </span>
         </div>

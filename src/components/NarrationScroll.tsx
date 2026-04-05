@@ -36,7 +36,7 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
       ref={scrollRef}
       data-testid="narration-scroll"
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto flex flex-col"
+      className="narrative-scroll flex-1 overflow-y-auto flex flex-col"
     >
       <div className="flex-1" />
       <div className="px-6 py-8 space-y-4">
