@@ -11,6 +11,7 @@ import { useChromeArchetype } from "@/hooks/useChromeArchetype";
 import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
+import { useTtsMicGating } from "@/hooks/useTtsMicGating";
 import { useStateMirror } from "@/hooks/useStateMirror";
 import { useSlashCommands, type OverlayType } from "@/hooks/useSlashCommands";
 import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
@@ -525,6 +526,9 @@ function AppInner() {
   });
   // eslint-disable-next-line react-hooks/immutability
   voiceHandleSignalRef.current = voiceChat.handleSignal;
+
+  // Mute outgoing mic during TTS voice playback to prevent feedback loops
+  useTtsMicGating(voiceChat);
 
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
