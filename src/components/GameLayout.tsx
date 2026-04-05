@@ -93,7 +93,11 @@ export function GameLayout({
   // Resource threshold crossing → route to audio SFX
   const handleResourceThresholdCrossed = useCallback(
     (info: { resource: string; threshold: ResourceThreshold }) => {
-      const sfxKey = `${genreSlug ?? "default"}_${info.resource.toLowerCase()}_threshold`;
+      if (!genreSlug) {
+        console.warn("[GameLayout] Resource threshold crossed but genreSlug is missing — cannot route SFX");
+        return;
+      }
+      const sfxKey = `${genreSlug}_${info.resource.toLowerCase()}_threshold`;
       audio?.playSfx(sfxKey);
     },
     [audio, genreSlug],

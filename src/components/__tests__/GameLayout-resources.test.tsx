@@ -196,15 +196,17 @@ describe("25-11 AC-5: No silent fallbacks", () => {
     expect(screen.getAllByTestId("resource-bar")).toHaveLength(2);
   });
 
-  it("degrades gracefully when resources present but genreSlug missing", () => {
-    // Should still render but with a logged warning — not silently pass empty string
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("logs warning when resources present but genreSlug missing and threshold fires", () => {
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Fuel value=2 crosses threshold — callback fires but genreSlug is missing
     renderLayout({
-      resources: MOCK_RESOURCES,
-      // genreSlug intentionally omitted
+      resources: { Fuel: FUEL_RESOURCE },
+      // genreSlug intentionally omitted — should warn, not silently fallback
     });
-    // Should either: not render status tab, OR render with warning logged
-    // The key rule: NO silent empty-string fallback to genre_slug
+    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("genreSlug"),
+    );
     consoleSpy.mockRestore();
   });
 });
