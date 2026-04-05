@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import { GameLayout } from "@/components/GameLayout";
+import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
@@ -128,6 +129,9 @@ function AppInner() {
 
   // Party status — richer than state_delta (includes portrait_url)
   const [partyMembers, setPartyMembers] = useState<CharacterSummary[]>([]);
+
+  // Genre resources extracted from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
+  const [partyResources, setPartyResources] = useState<Record<string, ResourcePool>>({});
 
   // Multiplayer identity — who this tab is and whose turn it is
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>(
@@ -456,6 +460,13 @@ function AppInner() {
         return true;
       });
       setPartyMembers(deduped);
+
+      // Extract genre resources from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
+      const resources = msg.payload.resources as Record<string, ResourcePool> | undefined;
+      if (resources && typeof resources === "object") {
+        setPartyResources(resources);
+      }
+
       return;
     }
 
@@ -835,6 +846,8 @@ function AppInner() {
               activePlayerName={activePlayerName}
               waitingForPlayer={waitingForPlayer}
               settingsProps={settingsProps}
+              resources={partyResources}
+              genreSlug={currentGenre ?? undefined}
               turnStatusEntries={turnStatusEntries}
               activeOverlay={activeOverlay}
               onOverlayChange={setActiveOverlay}
