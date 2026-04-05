@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Settings } from "lucide-react";
 import { NarrativeView } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 // PartyPanel is now integrated into CharacterPanel as an inline section
@@ -155,7 +156,7 @@ export function GameLayout({
 
       const key = e.key.toLowerCase();
 
-      if (key === "escape" && activeOverlay && activeOverlay !== "settings") {
+      if (key === "escape" && activeOverlay) {
         onOverlayChange(null);
         return;
       }
@@ -168,6 +169,7 @@ export function GameLayout({
       if (key === "m" && mapData) { toggle("map"); return; }
       if (key === "j" && journalEntries && journalEntries.length > 0) { toggle("journal"); return; }
       if (key === "k" && knowledgeEntries && knowledgeEntries.length > 0) { toggle("knowledge"); return; }
+      if (key === "s") { toggle("settings"); return; }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
@@ -214,7 +216,7 @@ export function GameLayout({
       <div
         data-testid="game-layout"
         data-breakpoint={breakpoint}
-        className="flex flex-col flex-1 min-h-0"
+        className="flex flex-col h-screen overflow-hidden"
       >
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* CharacterPanel — persistent sidebar with integrated party list */}
@@ -233,9 +235,18 @@ export function GameLayout({
 
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-            {/* Top bar with leave button */}
-            {onLeave && (
-              <div className="flex items-center justify-end px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
+            {/* Top bar with settings + leave */}
+            <div className="flex items-center justify-end gap-2 px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
+              <button
+                data-testid="settings-button"
+                onClick={() => onOverlayChange(activeOverlay === 'settings' ? null : 'settings')}
+                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
+                title="Settings (S)"
+                aria-label="Settings"
+              >
+                <Settings className="size-4" />
+              </button>
+              {onLeave && (
                 <button
                   onClick={onLeave}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
@@ -243,8 +254,8 @@ export function GameLayout({
                 >
                   Leave Game
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             <NarrativeView messages={messages} thinking={thinking} />
 
             {/* Character HUD — persistent single-player status bar */}
