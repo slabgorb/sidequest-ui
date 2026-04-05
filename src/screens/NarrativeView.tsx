@@ -94,6 +94,8 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
 
   // Dedup ACTION_REVEAL by turn_number (prevents duplicates on WebSocket reconnect)
   const seenRevealTurns = new Set<number>();
+  // Dedup NARRATION messages by text (prevents double-render from direct+broadcast)
+  const seenNarrationTexts = new Set<string>();
   // Bug #14: Dedup consecutive ChapterMarker messages for the same location
   let lastChapterLocation = "";
 
@@ -125,6 +127,12 @@ function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         // or when look-ahead finds chunks will deliver it (server sends
         // NARRATION in the direct response before TTS streams chunks).
         if (hasChunksForTurn || skipNarrationAt.has(i)) break;
+        // Dedup identical narration text (direct + broadcast can deliver same text)
+        {
+          const narText = msg.payload.text as string;
+          if (seenNarrationTexts.has(narText)) break;
+          seenNarrationTexts.add(narText);
+        }
         flushChunks();
         {
           const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
