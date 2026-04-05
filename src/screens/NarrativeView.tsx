@@ -63,8 +63,8 @@ function markdownToHtml(text: string): string {
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
     // Paragraphs — double newline becomes paragraph break
     .replace(/\n\n/g, "</p><p>")
-    // Single newlines become line breaks
-    .replace(/\n/g, "<br>")
+    // Single newlines also become paragraph breaks (narrator prose, not code)
+    .replace(/\n/g, "</p><p>")
     // Convert footnote markers [N] and [^N] to superscript links pointing to footnote anchors
     .replace(/\[\^?(\d+)\]/g, '<sup><a href="#footnote-$1">$1</a></sup>');
   return `<p>${result}</p>`;
