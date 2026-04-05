@@ -272,12 +272,13 @@ function StatsContent({ stats }: { stats: Record<string, number> }) {
 }
 
 function AbilitiesContent({ abilities }: { abilities: string[] }) {
-  if (abilities.length === 0) {
+  const real = abilities.filter((a) => !a.includes("auto-filled"));
+  if (real.length === 0) {
     return <p className="text-sm text-muted-foreground/60">No abilities.</p>;
   }
   return (
     <ul className="list-disc list-inside text-sm space-y-1">
-      {abilities.map((ability) => (
+      {real.map((ability) => (
         <li key={ability}>{ability}</li>
       ))}
     </ul>
@@ -289,14 +290,15 @@ function BackstoryContent({ backstory }: { backstory: string }) {
 }
 
 function InventoryContent({ inventory }: { inventory: InventoryData }) {
-  // Stack identical items by name, summing quantities
+  // Stack identical items by normalized name, summing quantities
   const stacked = new Map<string, { item: InventoryItem; count: number }>();
   for (const item of inventory.items) {
-    const existing = stacked.get(item.name);
+    const key = item.name.trim();
+    const existing = stacked.get(key);
     if (existing) {
       existing.count += item.quantity ?? 1;
     } else {
-      stacked.set(item.name, { item, count: item.quantity ?? 1 });
+      stacked.set(key, { item, count: item.quantity ?? 1 });
     }
   }
 
