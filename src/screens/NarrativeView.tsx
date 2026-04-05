@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
-import { toRoman } from "@/lib/utils";
+
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 
 export interface NarrativeViewProps {
@@ -378,17 +378,13 @@ function useDinkusGlyph(messages: GameMessage[]): string {
 function useRunningHeader(messages: GameMessage[]) {
   return useMemo(() => {
     let chapterTitle: string | null = null;
-    let turnCount = 0;
     for (const msg of messages) {
       if (msg.type === MessageType.CHAPTER_MARKER) {
         const loc = msg.payload.location as string;
         if (loc) chapterTitle = loc;
       }
-      if (msg.type === MessageType.PLAYER_ACTION) {
-        turnCount++;
-      }
     }
-    return { chapterTitle, turnCount };
+    return { chapterTitle };
   }, [messages]);
 }
 
@@ -648,7 +644,7 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const dinkusGlyph = useDinkusGlyph(messages);
-  const { chapterTitle, turnCount } = useRunningHeader(messages);
+  const { chapterTitle } = useRunningHeader(messages);
 
   const segments = useMemo(() => groupPortraitSegments(buildSegments(messages)), [messages]);
 
@@ -720,11 +716,6 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
           <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
             {chapterTitle}
           </span>
-          {turnCount > 0 && (
-            <span className="text-xs tracking-widest text-muted-foreground/25 font-light tabular-nums">
-              {toRoman(turnCount)}
-            </span>
-          )}
         </div>
       )}
 
