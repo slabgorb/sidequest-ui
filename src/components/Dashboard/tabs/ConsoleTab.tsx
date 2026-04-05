@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import type { WatcherEvent } from "@/types/watcher";
-import { THEME, COMP_COLORS } from "../shared/constants";
+import { THEME, COMP_COLORS, safeStr } from "../shared/constants";
 
 interface Props {
   allEvents: WatcherEvent[];
@@ -18,14 +18,14 @@ export function ConsoleTab({ allEvents }: Props) {
     [allEvents],
   );
   const eventTypes = useMemo(
-    () => [...new Set(allEvents.map((e) => e.event_type))].sort(),
+    () => [...new Set(allEvents.map((e) => safeStr(e.event_type)))].sort(),
     [allEvents],
   );
 
   const filtered = useMemo(() => {
     let events = allEvents;
     if (compFilter) events = events.filter((e) => e.component === compFilter);
-    if (typeFilter) events = events.filter((e) => e.event_type === typeFilter);
+    if (typeFilter) events = events.filter((e) => safeStr(e.event_type) === typeFilter);
     return events;
   }, [allEvents, compFilter, typeFilter]);
 
@@ -122,7 +122,7 @@ function EventRow({ event }: { event: WatcherEvent }) {
       }}
     >
       <span style={{ color: compColor }}>{event.component}</span>{" "}
-      <span style={{ color: THEME.teal }}>{event.event_type}</span>{" "}
+      <span style={{ color: THEME.teal }}>{safeStr(event.event_type)}</span>{" "}
       <span style={{ color: THEME.muted }}>{fieldPairs}</span>
     </div>
   );

@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { WatcherEvent } from "@/types/watcher";
-import { THEME, COMP_COLORS } from "../shared/constants";
+import { THEME, COMP_COLORS, safeStr } from "../shared/constants";
 
 interface Props {
   allEvents: WatcherEvent[];
@@ -16,7 +16,7 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
     const buckets: WatcherEvent[][] = [[]];
     for (const ev of allEvents) {
       buckets[buckets.length - 1].push(ev);
-      if (ev.event_type === "turn_complete") {
+      if (safeStr(ev.event_type) === "turn_complete") {
         buckets.push([]);
       }
     }
@@ -97,9 +97,8 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
 
             {/* Data rows */}
             {gridData.map(({ comp, cells }) => (
-              <>
+              <React.Fragment key={comp}>
                 <div
-                  key={comp}
                   style={{
                     textAlign: "right",
                     paddingRight: 8,
@@ -132,7 +131,7 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
                     {cell === "ok" ? "●" : cell === "warn" ? "◆" : cell === "error" ? "✕" : "·"}
                   </div>
                 ))}
-              </>
+              </React.Fragment>
             ))}
           </div>
         )}
@@ -195,7 +194,7 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
                 marginBottom: 1,
               }}
             >
-              <span style={{ color: THEME.teal }}>{ev.event_type}</span>{" "}
+              <span style={{ color: THEME.teal }}>{safeStr(ev.event_type)}</span>{" "}
               <span style={{ color: THEME.muted }}>
                 {Object.entries(ev.fields)
                   .filter(([, v]) => typeof v !== "object")

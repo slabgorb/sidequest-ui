@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import type { SessionStateView, NpcRegistryEntry, PlayerStateView } from "@/types/watcher";
-import { THEME } from "../shared/constants";
+import { THEME, safeStr } from "../shared/constants";
 
 interface Props {
   debugState: SessionStateView[] | null;
@@ -238,19 +238,18 @@ function PlayerCard({
                 const key = `${player.player_name}::${item.name}`;
                 const isExpanded = expandedItems.has(key);
                 return (
-                  <>
+                  <React.Fragment key={item.id || item.name}>
                     <tr
-                      key={item.id || item.name}
                       style={{ cursor: "pointer" }}
                       onClick={() => onToggleItem(key)}
                     >
                       <td style={tdStyle}>{item.name}</td>
                       <td style={tdStyle}>{w.toFixed(2)}</td>
                       <td style={tdStyle}>{stage}</td>
-                      <td style={tdStyle}>{item.state}</td>
+                      <td style={tdStyle}>{safeStr(item.state)}</td>
                     </tr>
                     {isExpanded && (
-                      <tr key={`${item.id}-detail`}>
+                      <tr>
                         <td colSpan={4} style={{ padding: "4px 8px" }}>
                           <pre
                             style={{
@@ -265,7 +264,7 @@ function PlayerCard({
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -346,9 +345,8 @@ function NpcRegistry({
           {filtered.map((n) => {
             const isExpanded = expanded.has(n.name);
             return (
-              <>
+              <React.Fragment key={n.name}>
                 <tr
-                  key={n.name}
                   style={{ cursor: "pointer" }}
                   onClick={() => onToggleExpand(n.name)}
                 >
@@ -365,7 +363,7 @@ function NpcRegistry({
                   </td>
                 </tr>
                 {isExpanded && (
-                  <tr key={`${n.name}-detail`}>
+                  <tr>
                     <td colSpan={7} style={{ padding: "4px 8px" }}>
                       <pre
                         style={{
@@ -380,7 +378,7 @@ function NpcRegistry({
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             );
           })}
         </tbody>
