@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
+import { useChromeArchetype } from "@/hooks/useChromeArchetype";
 import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
@@ -102,6 +103,7 @@ function AppInner() {
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genreError, setGenreError] = useState(false);
+  const [currentGenre, setCurrentGenre] = useState<string | null>(hmrState ? loadSession()?.genre ?? null : null);
   const [thinking, setThinking] = useState(false);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
@@ -252,6 +254,9 @@ function AppInner() {
 
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
+
+  // Chrome archetype: structural CSS (fonts, borders) based on genre family
+  useChromeArchetype(currentGenre);
 
   // State mirror: process state_delta from server messages into GameStateContext
   useStateMirror(messages);
@@ -524,6 +529,7 @@ function AppInner() {
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
       saveSession(playerName, genre, world);
+      setCurrentGenre(genre);
       setConnectedPlayerName(playerName);
       connect();
       setConnected(true);
