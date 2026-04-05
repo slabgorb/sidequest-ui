@@ -3,8 +3,9 @@ import { NarrativeView } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 import { PartyPanel } from "@/components/PartyPanel";
 import { AudioStatus } from "@/components/AudioStatus";
-import { OverlayManager, type OverlayType } from "@/components/OverlayManager";
+import { SettingsOverlay } from "@/components/SettingsOverlay";
 import type { SettingsPanelProps } from "@/components/SettingsPanel";
+import type { OverlayType } from "@/hooks/useSlashCommands";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { useWhisper } from "@/hooks/useWhisper";
@@ -190,15 +191,11 @@ export function GameLayout({
   );
 
   return (
-    <OverlayManager
-      characterData={characterSheet}
-      inventoryData={inventoryData}
-      mapData={mapData}
-      journalEntries={journalEntries}
-      knowledgeEntries={knowledgeEntries}
+    <SettingsOverlay
       settingsProps={settingsProps}
-      activeOverlay={activeOverlay}
-      onOverlayChange={onOverlayChange}
+      isOpen={activeOverlay === 'settings'}
+      onToggle={() => onOverlayChange(activeOverlay === 'settings' ? null : 'settings')}
+      onClose={() => onOverlayChange(null)}
     >
       <div
         data-testid="game-layout"
@@ -362,6 +359,6 @@ export function GameLayout({
           )
         )}
       </div>
-    </OverlayManager>
+    </SettingsOverlay>
   );
 }
