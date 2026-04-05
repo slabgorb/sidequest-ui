@@ -33,8 +33,18 @@ describe("useWhisper", () => {
     useWhisper = mod.useWhisper;
   });
 
+  it("does not initialize when enabled is false", () => {
+    const { result } = renderHook(() => useWhisper({ enabled: false }));
+
+    expect(result.current.status).toBe("unloaded");
+    expect(result.current).toHaveProperty("loadProgress");
+    expect(result.current).toHaveProperty("isWebGPU");
+    expect(result.current).toHaveProperty("transcribe");
+    expect(typeof result.current.transcribe).toBe("function");
+  });
+
   it("exposes status, loadProgress, isWebGPU, and transcribe", () => {
-    const { result } = renderHook(() => useWhisper());
+    const { result } = renderHook(() => useWhisper({ enabled: true }));
 
     expect(result.current).toHaveProperty("status");
     expect(result.current).toHaveProperty("loadProgress");
@@ -44,7 +54,7 @@ describe("useWhisper", () => {
   });
 
   it("transcribe function returns a string", async () => {
-    const { result } = renderHook(() => useWhisper());
+    const { result } = renderHook(() => useWhisper({ enabled: true }));
 
     // Wait for initialization
     await waitFor(() => {

@@ -4,6 +4,11 @@ import {
   type TranscriberStatus,
 } from "@/audio/LocalTranscriber";
 
+export interface UseWhisperOptions {
+  /** Gate initialization — Whisper model only loads when enabled is true. */
+  enabled: boolean;
+}
+
 export interface UseWhisperResult {
   transcribe: (audio: Float32Array) => Promise<string>;
   status: TranscriberStatus;
@@ -12,15 +17,18 @@ export interface UseWhisperResult {
 }
 
 /**
- * React hook wrapping LocalTranscriber — initializes on mount, exposes transcribe().
+ * React hook wrapping LocalTranscriber — initializes only when enabled,
+ * avoiding eager ONNX model load when mic is disabled.
  */
-export function useWhisper(): UseWhisperResult {
+export function useWhisper({ enabled }: UseWhisperOptions): UseWhisperResult {
   const transcriberRef = useRef<LocalTranscriber | null>(null);
   const [status, setStatus] = useState<TranscriberStatus>("unloaded");
   const [loadProgress, setLoadProgress] = useState(0);
   const [isWebGPU, setIsWebGPU] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const transcriber = new LocalTranscriber();
     transcriberRef.current = transcriber;
 
@@ -37,7 +45,7 @@ export function useWhisper(): UseWhisperResult {
     return () => {
       transcriberRef.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   const transcribe = useCallback(async (audio: Float32Array): Promise<string> => {
     const transcriber = transcriberRef.current;

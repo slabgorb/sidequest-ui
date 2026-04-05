@@ -146,9 +146,12 @@ describe("CharacterPanel — AC-2: tabbed sections", () => {
     expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
   });
 
-  it("does not render Inventory tab when inventory is absent", () => {
+  it("renders Inventory tab with empty state when inventory is absent", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.queryByRole("tab", { name: /inventory/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /inventory/i }));
+    const tabpanel = screen.getByRole("tabpanel");
+    expect(within(tabpanel).getByText("No items yet.")).toBeInTheDocument();
   });
 
   it("shows inventory items when Inventory tab is selected", () => {
@@ -178,7 +181,7 @@ describe("CharacterPanel — AC-3: tab persistence", () => {
   it("restores previously selected tab from localStorage on mount", () => {
     localStorage.setItem(
       "sq-character-panel",
-      JSON.stringify({ activeTab: "backstory", collapsed: false }),
+      JSON.stringify({ activeTab: "backstory", sidebarWidth: 288 }),
     );
     render(<CharacterPanel character={CHARACTER} />);
     expect(screen.getByRole("tab", { name: /backstory/i })).toHaveAttribute(
@@ -198,52 +201,23 @@ describe("CharacterPanel — AC-3: tab persistence", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AC-4: Collapse/expand
+// AC-4: Sidebar is always visible (no collapse) with resize handle
 // ---------------------------------------------------------------------------
 
-describe("CharacterPanel — AC-4: collapse/expand", () => {
-  it("renders a collapse toggle button", () => {
+describe("CharacterPanel — AC-4: always visible with resize", () => {
+  it("does NOT render a collapse toggle button", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.getByTestId("panel-collapse-toggle")).toBeInTheDocument();
+    expect(screen.queryByTestId("panel-collapse-toggle")).not.toBeInTheDocument();
   });
 
-  it("hides tab content when collapsed", () => {
+  it("always shows tab content (no collapsed state)", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    fireEvent.click(screen.getByTestId("panel-collapse-toggle"));
-    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
-  });
-
-  it("still shows character name when collapsed", () => {
-    render(<CharacterPanel character={CHARACTER} />);
-    fireEvent.click(screen.getByTestId("panel-collapse-toggle"));
-    expect(screen.getByText("Kael")).toBeInTheDocument();
-  });
-
-  it("expands back on second toggle click", () => {
-    render(<CharacterPanel character={CHARACTER} />);
-    const toggle = screen.getByTestId("panel-collapse-toggle");
-    fireEvent.click(toggle); // collapse
-    fireEvent.click(toggle); // expand
     expect(screen.getByRole("tabpanel")).toBeInTheDocument();
   });
 
-  it("persists collapsed state to localStorage", () => {
+  it("renders a resize handle on the right edge", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    fireEvent.click(screen.getByTestId("panel-collapse-toggle"));
-
-    const stored = localStorage.getItem("sq-character-panel");
-    expect(stored).toBeTruthy();
-    const parsed = JSON.parse(stored!);
-    expect(parsed.collapsed).toBe(true);
-  });
-
-  it("restores collapsed state from localStorage on mount", () => {
-    localStorage.setItem(
-      "sq-character-panel",
-      JSON.stringify({ activeTab: "stats", collapsed: true }),
-    );
-    render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-resize-handle")).toBeInTheDocument();
   });
 });
 
@@ -269,6 +243,60 @@ describe("CharacterPanel — AC-5: edge cases", () => {
     render(<CharacterPanel character={data} />);
     expect(screen.getByText("Kael")).toBeInTheDocument();
     expect(screen.queryByText("The Rusty Cantina")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-6: Integrated party list
+// ---------------------------------------------------------------------------
+
+describe("CharacterPanel — AC-6: integrated party list", () => {
+  const PARTY = [
+    {
+      player_id: "p1",
+      name: "Kael",
+      character_name: "Kael",
+      portrait_url: "/renders/kael.png",
+      hp: 24,
+      hp_max: 30,
+      status_effects: ["poisoned"],
+      class: "Ranger",
+      level: 3,
+      current_location: "The Rusty Cantina",
+    },
+    {
+      player_id: "p2",
+      name: "Lyra",
+      character_name: "Lyra Dawnforge",
+      portrait_url: "",
+      hp: 8,
+      hp_max: 40,
+      status_effects: [],
+      class: "Cleric",
+      level: 5,
+      current_location: "The Rusty Cantina",
+    },
+  ];
+
+  it("renders a party section when characters are provided", () => {
+    render(<CharacterPanel character={CHARACTER} characters={PARTY} />);
+    expect(screen.getByTestId("party-section")).toBeInTheDocument();
+  });
+
+  it("renders a card for each party member", () => {
+    render(<CharacterPanel character={CHARACTER} characters={PARTY} />);
+    expect(screen.getByTestId("party-member-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-p2")).toBeInTheDocument();
+  });
+
+  it("does not render party section when no characters", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(screen.queryByTestId("party-section")).not.toBeInTheDocument();
+  });
+
+  it("does not render party section when characters array is empty", () => {
+    render(<CharacterPanel character={CHARACTER} characters={[]} />);
+    expect(screen.queryByTestId("party-section")).not.toBeInTheDocument();
   });
 });
 

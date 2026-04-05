@@ -15,12 +15,30 @@ export interface InventoryPanelProps {
   data: InventoryData;
 }
 
+interface StackedItem {
+  item: InventoryItem;
+  count: number;
+}
+
 export function InventoryPanel({ data }: InventoryPanelProps) {
-  const grouped = new Map<string, InventoryItem[]>();
+  // Stack identical items by normalized name, then group by type
+  const stacked = new Map<string, StackedItem>();
   for (const item of data.items) {
-    const list = grouped.get(item.type) ?? [];
-    list.push(item);
-    grouped.set(item.type, list);
+    const key = item.name.trim();
+    const existing = stacked.get(key);
+    if (existing) {
+      existing.count += item.quantity ?? 1;
+    } else {
+      stacked.set(key, { item, count: item.quantity ?? 1 });
+    }
+  }
+
+  // Group stacked items by type
+  const grouped = new Map<string, StackedItem[]>();
+  for (const entry of stacked.values()) {
+    const list = grouped.get(entry.item.type) ?? [];
+    list.push(entry);
+    grouped.set(entry.item.type, list);
   }
 
   return (
@@ -34,22 +52,24 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
         <div key={type}>
           <h3 className="text-sm font-semibold capitalize mb-1">{type}</h3>
           <ul className="space-y-2">
-            {items.map((item, idx) => (
+            {items.map(({ item, count }) => (
               <li
-                key={`${item.type}-${item.name}-${idx}`}
+                key={`${item.type}-${item.name.trim()}`}
                 data-testid={`item-${item.name}`}
                 data-equipped={item.equipped != null ? String(item.equipped) : undefined}
                 className="p-2 rounded bg-[var(--surface)]"
               >
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">
+                    {item.name}
+                    {count > 1 && (
+                      <span className="text-muted-foreground ml-1 font-normal">x{count}</span>
+                    )}
+                  </span>
                   {item.equipped != null && (
                     <span className="text-xs text-[var(--accent)]">
                       {item.equipped ? 'Equipped' : 'Unequipped'}
                     </span>
-                  )}
-                  {item.quantity != null && (
-                    <span className="text-xs font-mono">x{item.quantity}</span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">{item.description}</p>

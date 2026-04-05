@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { MessageType, type GameMessage } from "@/types/protocol";
-import { useLayoutMode } from "@/hooks/useLayoutMode";
+import { useLayoutMode, type LayoutMode } from "@/hooks/useLayoutMode";
 import { NarrationScroll } from "@/components/NarrationScroll";
 import { NarrationFocus } from "@/components/NarrationFocus";
 import { NarrationCards } from "@/components/NarrationCards";
@@ -8,9 +9,11 @@ import { NarrationCards } from "@/components/NarrationCards";
 export interface NarrativeViewProps {
   messages: GameMessage[];
   thinking?: boolean;
+  /** When provided, overrides the hook-based layout mode (single source of truth from parent). */
+  layoutMode?: LayoutMode;
 }
 
-function useRunningHeader(messages: GameMessage[]) {
+export function useRunningHeader(messages: GameMessage[]) {
   return useMemo(() => {
     let chapterTitle: string | null = null;
     for (const msg of messages) {
@@ -23,9 +26,9 @@ function useRunningHeader(messages: GameMessage[]) {
   }, [messages]);
 }
 
-export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
-  const { mode } = useLayoutMode();
-  const { chapterTitle } = useRunningHeader(messages);
+export function NarrativeView({ messages, thinking, layoutMode }: NarrativeViewProps) {
+  const { mode: hookMode } = useLayoutMode();
+  const mode = layoutMode ?? hookMode;
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Escape closes lightbox
@@ -44,26 +47,11 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
     NarrationScroll;
 
   return (
-    <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 relative">
-      {/* Running header */}
-      {chapterTitle && (
-        <div
-          data-testid="running-header"
-          className="sticky top-0 z-10 flex items-baseline justify-between
-                     px-6 pt-3 pb-4
-                     bg-gradient-to-b from-background via-background/95 to-transparent
-                     pointer-events-none select-none"
-        >
-          <span className="text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
-            {chapterTitle}
-          </span>
-        </div>
-      )}
+    <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
+      <LayoutComponent messages={messages} thinking={thinking} setLightboxUrl={setLightboxUrl} />
 
-      <LayoutComponent messages={messages} thinking={thinking} />
-
-      {/* Lightbox overlay */}
-      {lightboxUrl && (
+      {/* Lightbox overlay — portal to body to escape overflow-hidden ancestors */}
+      {lightboxUrl && createPortal(
         <div
           data-testid="image-lightbox"
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-pointer"
@@ -76,7 +64,8 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

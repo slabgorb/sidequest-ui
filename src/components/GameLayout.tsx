@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { NarrativeView } from "@/screens/NarrativeView";
+import { Settings } from "lucide-react";
+import { NarrativeView, useRunningHeader } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
-import { PartyPanel } from "@/components/PartyPanel";
+// PartyPanel is now integrated into CharacterPanel as an inline section
 import { AudioStatus } from "@/components/AudioStatus";
 import { SettingsOverlay } from "@/components/SettingsOverlay";
 import type { SettingsPanelProps } from "@/components/SettingsPanel";
@@ -28,6 +29,7 @@ import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { GameMessage } from "@/types/protocol";
+import type { LayoutMode } from "@/hooks/useLayoutMode";
 
 export interface GameLayoutProps {
   messages: GameMessage[];
@@ -36,6 +38,7 @@ export interface GameLayoutProps {
   onLeave?: () => void;
   disabled: boolean;
   thinking?: boolean;
+  layoutMode?: LayoutMode;
   characterSheet?: CharacterSheetData | null;
   inventoryData?: InventoryData | null;
   mapData?: MapState | null;
@@ -65,6 +68,7 @@ export function GameLayout({
   onLeave,
   disabled,
   thinking,
+  layoutMode,
   characterSheet = null,
   inventoryData = null,
   mapData = null,
@@ -88,7 +92,6 @@ export function GameLayout({
 }: GameLayoutProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
-  const isTablet = breakpoint === "tablet";
 
   // Resource threshold crossing → route to audio SFX
   const handleResourceThresholdCrossed = useCallback(
@@ -102,9 +105,6 @@ export function GameLayout({
     },
     [audio, genreSlug],
   );
-
-  const [overlayOpen, setOverlayOpen] = useState(false);
-  const [partyVisible, setPartyVisible] = useState(true);
 
   // Audio state — tracked locally, synced to AudioEngine
   const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5, voice: 0.5 });
@@ -133,7 +133,7 @@ export function GameLayout({
   }, []);
 
   // PTT pipeline: Whisper STT + push-to-talk state machine
-  const { transcribe } = useWhisper();
+  const { transcribe } = useWhisper({ enabled: micEnabled });
   const ptt = usePushToTalk({
     transcribe,
     onConfirm: (text: string) => onSend(text, false),
@@ -149,53 +149,21 @@ export function GameLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [micEnabled]);
 
-  // P key handler — toggles party panel on all breakpoints
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "p") return;
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      if ((e.target as HTMLElement)?.isContentEditable) return;
-      e.stopImmediatePropagation(); // prevent PartyPanel's own handler
-      if (isMobile) {
-        setOverlayOpen((prev) => !prev);
-      } else {
-        setPartyVisible((prev) => !prev);
-      }
-    };
-    // Escape closes mobile overlay
-    const escHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isMobile) {
-        setOverlayOpen(false);
-      }
-    };
-    // Use capture phase to fire before PartyPanel's handler
-    document.addEventListener("keydown", handler, true);
-    document.addEventListener("keydown", escHandler);
-    return () => {
-      document.removeEventListener("keydown", handler, true);
-      document.removeEventListener("keydown", escHandler);
-    };
-  }, [isMobile]);
-
-  // Close overlay when leaving mobile breakpoint
-  useEffect(() => {
-    if (!isMobile) {
-      setOverlayOpen(false);
-    }
-  }, [isMobile]);
-
   // Game state overlay hotkeys — C/I/M/J/K/Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (tag === "textarea" || tag === "select") return;
+      if (tag === "input") {
+        const inputType = ((e.target as HTMLInputElement).type ?? "").toLowerCase();
+        if (inputType !== "radio" && inputType !== "checkbox") return;
+      }
       if ((e.target as HTMLElement)?.getAttribute?.("contenteditable") != null) return;
 
       const key = e.key.toLowerCase();
 
-      if (key === "escape" && activeOverlay && activeOverlay !== "settings") {
+      if (key === "escape" && activeOverlay) {
         onOverlayChange(null);
         return;
       }
@@ -208,13 +176,11 @@ export function GameLayout({
       if (key === "m" && mapData) { toggle("map"); return; }
       if (key === "j" && journalEntries && journalEntries.length > 0) { toggle("journal"); return; }
       if (key === "k" && knowledgeEntries && knowledgeEntries.length > 0) { toggle("knowledge"); return; }
+      if (key === "s") { toggle("settings"); return; }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [activeOverlay, onOverlayChange, characterSheet, inventoryData, mapData, journalEntries, knowledgeEntries]);
-
-  // Toggle party sidebar visibility (desktop/tablet)
-  const toggleParty = useCallback(() => setPartyVisible((prev) => !prev), []);
 
   const handleVolumeChange = useCallback(
     (channel: string, value: number) => {
@@ -247,6 +213,8 @@ export function GameLayout({
     [audio],
   );
 
+  const { chapterTitle } = useRunningHeader(messages);
+
   return (
     <SettingsOverlay
       settingsProps={settingsProps}
@@ -257,84 +225,44 @@ export function GameLayout({
       <div
         data-testid="game-layout"
         data-breakpoint={breakpoint}
-        className="flex flex-col flex-1 min-h-0"
+        className="flex flex-col h-screen overflow-hidden"
       >
-        <div className="flex flex-1 min-h-0">
-          {/* CharacterPanel — persistent sidebar for single-player */}
-          {!isMobile && characterSheet && (
-            <CharacterPanel
-              character={characterSheet}
-              inventory={inventoryData}
-              resources={resources}
-              genreSlug={genreSlug}
-              onResourceThresholdCrossed={handleResourceThresholdCrossed}
-            />
-          )}
-
-          {/* Sidebar — only in multiplayer, visible on desktop (expanded) and tablet (collapsed) */}
-          {!isMobile && characters.length > 1 && partyVisible && (
-            <PartyPanel
-              characters={characters}
-              collapsed={isTablet}
-              onToggle={toggleParty}
-              currentPlayerId={currentPlayerId}
-              activePlayerId={activePlayerId}
-            />
-          )}
-
-          {/* Main content area */}
-          <div className="flex flex-col flex-1 min-h-0">
-            {/* Top bar with leave button */}
+        {/* Running header — top level, matching mockup */}
+        <div
+          data-testid="running-header"
+          className="running-header flex items-baseline justify-between px-6 py-2
+                     border-b border-border/50 bg-[var(--surface,theme(colors.card))]
+                     shrink-0 z-10"
+        >
+          <span className="location text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
+            {chapterTitle ?? '\u00A0'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="settings-button"
+              onClick={() => onOverlayChange(activeOverlay === 'settings' ? null : 'settings')}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
+              title="Settings (S)"
+              aria-label="Settings"
+            >
+              <Settings className="size-4" />
+            </button>
             {onLeave && (
-              <div className="flex items-center justify-end px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
-                <button
-                  onClick={onLeave}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
-                  title="Return to lobby"
-                >
-                  Leave Game
-                </button>
-              </div>
-            )}
-            <NarrativeView messages={messages} thinking={thinking} />
-
-            {/* Character HUD — persistent single-player status bar */}
-            {characters.length > 0 && characters.length <= 1 && (
-              <div
-                data-testid="character-hud"
-                className="flex items-center gap-4 px-6 py-2 border-t border-border/30 bg-card/30 text-sm text-muted-foreground/70 shrink-0"
+              <button
+                onClick={onLeave}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
+                title="Return to lobby"
               >
-                {characters.map((c) => (
-                  <div key={c.player_id} className="flex items-center gap-3">
-                    <span className="font-medium text-foreground/80">{c.name}</span>
-                    <span>{c.class} Lv {c.level}</span>
-                    <span className="flex items-center gap-1.5">
-                      HP {c.hp}/{c.hp_max}
-                      <span
-                        data-testid="hp-bar"
-                        className="inline-block w-16 h-1.5 rounded-full bg-muted/40 overflow-hidden"
-                      >
-                        <span
-                          className={`block h-full rounded-full transition-all ${
-                            c.hp / c.hp_max > 0.66
-                              ? "bg-emerald-500/80"
-                              : c.hp / c.hp_max > 0.33
-                                ? "bg-amber-500/80"
-                                : "bg-red-500/80"
-                          }`}
-                          style={{ width: `${Math.max(0, Math.min(100, (c.hp / c.hp_max) * 100))}%` }}
-                        />
-                      </span>
-                    </span>
-                    {c.status_effects.length > 0 && (
-                      <span className="text-accent-foreground/60">
-                        {c.status_effects.join(", ")}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                Leave
+              </button>
             )}
+          </div>
+        </div>
+
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Main content area */}
+          <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+            <NarrativeView messages={messages} thinking={thinking} layoutMode={layoutMode} />
 
             {characters.length > 1 && activePlayerName && (
               <div
@@ -354,7 +282,7 @@ export function GameLayout({
                 )}
               </div>
             )}
-            <div className="border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">
+            <div className="input-area border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">
               <InputBar
                 onSend={onSend}
                 disabled={disabled}
@@ -375,6 +303,19 @@ export function GameLayout({
             </div>
           </div>
 
+          {/* CharacterPanel — right sidebar (mockup: border-left, 300px) */}
+          {!isMobile && characterSheet && (
+            <CharacterPanel
+              character={characterSheet}
+              inventory={inventoryData}
+              resources={resources}
+              genreSlug={genreSlug}
+              onResourceThresholdCrossed={handleResourceThresholdCrossed}
+              characters={characters}
+              currentPlayerId={currentPlayerId}
+              activePlayerId={activePlayerId}
+            />
+          )}
         </div>
 
         {/* Combat overlay — visible only during combat */}
@@ -426,39 +367,6 @@ export function GameLayout({
           onVoiceChange={handleVoiceChange}
         />
 
-        {/* Mobile: PartyPanel as overlay — only in multiplayer */}
-        {isMobile && characters.length > 1 && (
-          overlayOpen ? (
-            <div
-              data-testid="party-overlay"
-              className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center"
-              onClick={() => setOverlayOpen(false)}
-            >
-              <div
-                className="bg-background w-full h-full overflow-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <PartyPanel
-                  characters={characters}
-                  collapsed={false}
-                  onToggle={() => setOverlayOpen(false)}
-                  currentPlayerId={currentPlayerId}
-                  activePlayerId={activePlayerId}
-                />
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "none" }} aria-hidden="true">
-              <PartyPanel
-                characters={characters}
-                collapsed={false}
-                onToggle={toggleParty}
-                currentPlayerId={currentPlayerId}
-                activePlayerId={activePlayerId}
-              />
-            </div>
-          )
-        )}
       </div>
     </SettingsOverlay>
   );

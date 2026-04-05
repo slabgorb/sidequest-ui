@@ -1,9 +1,11 @@
-import { pipeline } from "@huggingface/transformers";
-
 export type TranscriberStatus = "unloaded" | "loading" | "ready" | "error";
 
 /**
  * Whisper STT pipeline wrapper with WebGPU detection and WASM fallback.
+ *
+ * The @huggingface/transformers import is dynamic (inside initialize()) so
+ * that ONNX runtime globals are not loaded at module import time. This
+ * prevents console spam when mic is disabled.
  */
 export class LocalTranscriber {
   private transcriber: any = null;
@@ -23,6 +25,7 @@ export class LocalTranscriber {
     };
 
     try {
+      const { pipeline } = await import("@huggingface/transformers");
       this.device = navigator.gpu ? "webgpu" : "wasm";
 
       this.transcriber = await pipeline(

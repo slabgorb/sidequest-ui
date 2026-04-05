@@ -15,6 +15,14 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
     [messages],
   );
 
+  // Find the last separator index to split history from current turn
+  const lastSeparatorIdx = useMemo(() => {
+    for (let i = segments.length - 1; i >= 0; i--) {
+      if (segments[i].kind === "separator") return i;
+    }
+    return -1;
+  }, [segments]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
 
@@ -31,21 +39,36 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
     }
   }, [segments, thinking]);
 
+  const hasHistory = lastSeparatorIdx >= 0;
+  const historySegments = hasHistory ? segments.slice(0, lastSeparatorIdx) : [];
+  const currentSegments = hasHistory ? segments.slice(lastSeparatorIdx + 1) : segments;
+
   return (
     <div
       ref={scrollRef}
       data-testid="narration-scroll"
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto flex flex-col"
+      className="narrative-scroll flex-1 min-h-0 overflow-y-auto flex flex-col"
     >
       <div className="flex-1" />
       <div className="px-6 py-8 space-y-4">
         {segments.length === 0 ? (
           <EmptyNarrationState />
         ) : (
-          segments.map((seg, i) =>
-            renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
-          )
+          <>
+            {/* History — dimmed at 0.4 opacity */}
+            {hasHistory && historySegments.length > 0 && (
+              <div className="opacity-40 space-y-4 pb-6 mb-6 border-b-2 border-border/50">
+                {historySegments.map((seg, i) =>
+                  renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
+                )}
+              </div>
+            )}
+            {/* Current turn — full opacity */}
+            {currentSegments.map((seg, i) =>
+              renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
+            )}
+          </>
         )}
         {thinking && <ThinkingIndicator />}
       </div>

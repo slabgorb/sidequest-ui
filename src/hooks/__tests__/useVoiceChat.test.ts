@@ -96,7 +96,38 @@ describe("useVoiceChat", () => {
   const defaultOptions = {
     peers: [] as string[],
     onSignal: vi.fn(),
+    enabled: true,
   };
+
+  // -- AC-0: mic gating — getUserMedia not called when disabled -------------
+  describe("AC-0: mic gating", () => {
+    it("does not call getUserMedia when enabled is false", async () => {
+      const { result } = renderHook(() =>
+        useVoiceChat({ ...defaultOptions, enabled: false }),
+      );
+
+      // Give any async work a chance to run
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(mockGetUserMedia).not.toHaveBeenCalled();
+      expect(result.current.localStream).toBeNull();
+    });
+
+    it("does not call getUserMedia when enabled is omitted and localStorage is unset", async () => {
+      const { result } = renderHook(() =>
+        useVoiceChat({ peers: [], onSignal: vi.fn() }),
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(mockGetUserMedia).not.toHaveBeenCalled();
+      expect(result.current.localStream).toBeNull();
+    });
+  });
 
   // -- AC-1: Local audio stream captured ------------------------------------
   describe("AC-1: getUserMedia audio capture", () => {
@@ -142,7 +173,7 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       // Wait for getUserMedia
@@ -151,7 +182,7 @@ describe("useVoiceChat", () => {
       });
 
       // Add a peer
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(1);
@@ -162,14 +193,14 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
         expect(result.current.localStream).toBeDefined();
       });
 
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(onSignal).toHaveBeenCalledWith(
@@ -186,14 +217,14 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
         expect(result.current.localStream).toBeDefined();
       });
 
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(1);
@@ -221,14 +252,14 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
         expect(result.current.localStream).toBeDefined();
       });
 
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(1);
@@ -258,7 +289,7 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
@@ -266,7 +297,7 @@ describe("useVoiceChat", () => {
       });
 
       // Add peer
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(1);
@@ -275,7 +306,7 @@ describe("useVoiceChat", () => {
       const pc = MockRTCPeerConnection.instances[0];
 
       // Remove peer
-      rerender({ peers: [], onSignal });
+      rerender({ peers: [], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(pc.close).toHaveBeenCalled();
@@ -286,14 +317,14 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
         expect(result.current.localStream).toBeDefined();
       });
 
-      rerender({ peers: ["player-2"], onSignal });
+      rerender({ peers: ["player-2"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(1);
@@ -307,7 +338,7 @@ describe("useVoiceChat", () => {
       expect(result.current.peerStreams.has("player-2")).toBe(true);
 
       // Remove peer
-      rerender({ peers: [], onSignal });
+      rerender({ peers: [], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(result.current.peerStreams.has("player-2")).toBe(false);
@@ -318,14 +349,14 @@ describe("useVoiceChat", () => {
       const onSignal = vi.fn();
       const { result, rerender, unmount } = renderHook(
         (props) => useVoiceChat(props),
-        { initialProps: { peers: [] as string[], onSignal } },
+        { initialProps: { peers: [] as string[], onSignal, enabled: true } },
       );
 
       await vi.waitFor(() => {
         expect(result.current.localStream).toBeDefined();
       });
 
-      rerender({ peers: ["player-2", "player-3"], onSignal });
+      rerender({ peers: ["player-2", "player-3"], onSignal, enabled: true });
 
       await vi.waitFor(() => {
         expect(MockRTCPeerConnection.instances.length).toBeGreaterThanOrEqual(2);

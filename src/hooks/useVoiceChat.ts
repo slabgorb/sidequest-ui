@@ -5,6 +5,8 @@ import { PeerMesh } from "@/webrtc/PeerMesh";
 export interface UseVoiceChatOptions {
   peers: string[];
   onSignal: (peerId: string, signal: Record<string, unknown>) => void;
+  /** Gate mic acquisition. When false, getUserMedia is never called. Defaults to localStorage "sq-mic-enabled". */
+  enabled?: boolean;
 }
 
 export interface UseVoiceChatReturn {
@@ -17,7 +19,9 @@ export interface UseVoiceChatReturn {
   unmuteOutgoing: () => void;
 }
 
-export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoiceChatReturn {
+export function useVoiceChat({ peers, onSignal, enabled }: UseVoiceChatOptions): UseVoiceChatReturn {
+  // Default to localStorage value — mic is opt-in (false unless explicitly "true")
+  const micEnabled = enabled ?? (typeof window !== "undefined" && localStorage.getItem("sq-mic-enabled") === "true");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peerStreams, setPeerStreams] = useState<Map<string, MediaStream>>(new Map());
   const [muted, setMutedState] = useState(false);
@@ -27,9 +31,21 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
   const onSignalRef = useRef(onSignal);
   onSignalRef.current = onSignal;
 
-  // Capture local audio — gracefully degrade if mediaDevices unavailable
-  // (insecure HTTP context: navigator.mediaDevices is undefined)
+  // Capture local audio — only when mic is enabled
+  // Gracefully degrade if mediaDevices unavailable (insecure HTTP context)
   useEffect(() => {
+    if (!micEnabled) {
+      // Mic disabled — stop any existing stream and clear state
+      const stream = localStreamRef.current;
+      if (stream) {
+        for (const track of stream.getTracks()) {
+          track.stop();
+        }
+        localStreamRef.current = null;
+        setLocalStream(null);
+      }
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) return;
     let cancelled = false;
     navigator.mediaDevices
@@ -38,6 +54,11 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
         if (!cancelled) {
           localStreamRef.current = stream;
           flushSync(() => setLocalStream(stream));
+        } else {
+          // Effect was cleaned up before promise resolved — stop tracks
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
         }
       })
       .catch(() => {
@@ -46,7 +67,7 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [micEnabled]);
 
   // Create/update mesh when localStream is ready
   useEffect(() => {
