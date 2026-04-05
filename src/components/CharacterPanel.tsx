@@ -91,7 +91,7 @@ export function CharacterPanel({
   useEffect(() => {
     if (!dragging) return;
     const onMouseMove = (e: MouseEvent) => {
-      const delta = e.clientX - dragStartX.current;
+      const delta = dragStartX.current - e.clientX;
       const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragStartWidth.current + delta));
       setPref({ sidebarWidth: newWidth });
     };
@@ -108,7 +108,7 @@ export function CharacterPanel({
     <div
       data-testid="character-panel"
       ref={panelRef}
-      className="character-panel flex flex-col border-r border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
+      className="character-panel flex flex-col border-l border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
       style={{ width: sidebarWidth }}
     >
       {/* Header: portrait + name */}
@@ -239,7 +239,7 @@ export function CharacterPanel({
         data-testid="sidebar-resize-handle"
         onMouseDown={onMouseDown}
         className={[
-          "absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/30 transition-colors",
+          "absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/30 transition-colors",
           dragging ? "bg-primary/50" : "",
         ].filter(Boolean).join(" ")}
       />

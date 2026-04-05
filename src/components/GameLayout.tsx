@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Settings } from "lucide-react";
-import { NarrativeView } from "@/screens/NarrativeView";
+import { NarrativeView, useRunningHeader } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 // PartyPanel is now integrated into CharacterPanel as an inline section
 import { AudioStatus } from "@/components/AudioStatus";
@@ -206,6 +205,8 @@ export function GameLayout({
     [audio],
   );
 
+  const { chapterTitle } = useRunningHeader(messages);
+
   return (
     <SettingsOverlay
       settingsProps={settingsProps}
@@ -218,83 +219,24 @@ export function GameLayout({
         data-breakpoint={breakpoint}
         className="flex flex-col h-screen overflow-hidden"
       >
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          {/* CharacterPanel — persistent sidebar with integrated party list */}
-          {!isMobile && characterSheet && (
-            <CharacterPanel
-              character={characterSheet}
-              inventory={inventoryData}
-              resources={resources}
-              genreSlug={genreSlug}
-              onResourceThresholdCrossed={handleResourceThresholdCrossed}
-              characters={characters}
-              currentPlayerId={currentPlayerId}
-              activePlayerId={activePlayerId}
-            />
-          )}
+        {/* Running header — top level, matching mockup */}
+        {chapterTitle && (
+          <div
+            data-testid="running-header"
+            className="running-header flex items-baseline justify-between px-6 py-2
+                       border-b border-border/50 bg-[var(--surface,theme(colors.card))]
+                       shrink-0 z-10"
+          >
+            <span className="location text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
+              {chapterTitle}
+            </span>
+          </div>
+        )}
 
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-            {/* Top bar with settings + leave */}
-            <div className="flex items-center justify-end gap-2 px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
-              <button
-                data-testid="settings-button"
-                onClick={() => onOverlayChange(activeOverlay === 'settings' ? null : 'settings')}
-                className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
-                title="Settings (S)"
-                aria-label="Settings"
-              >
-                <Settings className="size-4" />
-              </button>
-              {onLeave && (
-                <button
-                  onClick={onLeave}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
-                  title="Return to lobby"
-                >
-                  Leave Game
-                </button>
-              )}
-            </div>
             <NarrativeView messages={messages} thinking={thinking} />
-
-            {/* Character HUD — persistent single-player status bar */}
-            {characters.length > 0 && characters.length <= 1 && (
-              <div
-                data-testid="character-hud"
-                className="character-hud flex items-center gap-4 px-6 py-2 border-t border-border/30 bg-card/30 text-sm text-muted-foreground/70 shrink-0"
-              >
-                {characters.map((c) => (
-                  <div key={c.player_id} className="flex items-center gap-3">
-                    <span className="font-medium text-foreground/80">{c.name}</span>
-                    <span>{c.class} Lv {c.level}</span>
-                    <span className="flex items-center gap-1.5">
-                      HP {c.hp}/{c.hp_max}
-                      <span
-                        data-testid="hp-bar"
-                        className="inline-block w-16 h-1.5 rounded-full bg-muted/40 overflow-hidden"
-                      >
-                        <span
-                          className={`block h-full rounded-full transition-all ${
-                            c.hp / c.hp_max > 0.66
-                              ? "bg-emerald-500/80"
-                              : c.hp / c.hp_max > 0.33
-                                ? "bg-amber-500/80"
-                                : "bg-red-500/80"
-                          }`}
-                          style={{ width: `${Math.max(0, Math.min(100, (c.hp / c.hp_max) * 100))}%` }}
-                        />
-                      </span>
-                    </span>
-                    {c.status_effects.length > 0 && (
-                      <span className="text-accent-foreground/60">
-                        {c.status_effects.join(", ")}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
 
             {characters.length > 1 && activePlayerName && (
               <div
@@ -335,6 +277,19 @@ export function GameLayout({
             </div>
           </div>
 
+          {/* CharacterPanel — right sidebar (mockup: border-left, 300px) */}
+          {!isMobile && characterSheet && (
+            <CharacterPanel
+              character={characterSheet}
+              inventory={inventoryData}
+              resources={resources}
+              genreSlug={genreSlug}
+              onResourceThresholdCrossed={handleResourceThresholdCrossed}
+              characters={characters}
+              currentPlayerId={currentPlayerId}
+              activePlayerId={activePlayerId}
+            />
+          )}
         </div>
 
         {/* Combat overlay — visible only during combat */}

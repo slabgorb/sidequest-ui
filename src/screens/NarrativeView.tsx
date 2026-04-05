@@ -10,7 +10,7 @@ export interface NarrativeViewProps {
   thinking?: boolean;
 }
 
-function useRunningHeader(messages: GameMessage[]) {
+export function useRunningHeader(messages: GameMessage[]) {
   return useMemo(() => {
     let chapterTitle: string | null = null;
     for (const msg of messages) {
@@ -25,7 +25,6 @@ function useRunningHeader(messages: GameMessage[]) {
 
 export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
   const { mode } = useLayoutMode();
-  const { chapterTitle } = useRunningHeader(messages);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   // Escape closes lightbox
@@ -45,21 +44,6 @@ export function NarrativeView({ messages, thinking }: NarrativeViewProps) {
 
   return (
     <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 relative">
-      {/* Running header */}
-      {chapterTitle && (
-        <div
-          data-testid="running-header"
-          className="running-header sticky top-0 z-10 flex items-baseline justify-between
-                     px-6 pt-3 pb-4
-                     bg-gradient-to-b from-background via-background/95 to-transparent
-                     pointer-events-none select-none"
-        >
-          <span className="location text-xs tracking-widest uppercase text-muted-foreground/30 font-light">
-            {chapterTitle}
-          </span>
-        </div>
-      )}
-
       <LayoutComponent messages={messages} thinking={thinking} />
 
       {/* Lightbox overlay */}
