@@ -55,3 +55,13 @@ export const THEME = {
   pink: "#f06292",
   sky: "#4fc3f7",
 } as const;
+
+/**
+ * Safely extract a string from a value that may be a plain string or a Rust
+ * serde-serialized tagged enum like `{kind: "variant"}`.
+ */
+export function safeStr(val: unknown): string {
+  if (typeof val === "string") return val;
+  if (val && typeof val === "object" && "kind" in val) return String((val as Record<string, unknown>).kind);
+  return String(val);
+}
