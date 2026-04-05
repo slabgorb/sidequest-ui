@@ -45,11 +45,13 @@ export const ARCHETYPE_PROPERTIES: Record<
   },
 };
 
-export function useChromeArchetype(genreSlug: string): ChromeArchetype {
+export function useChromeArchetype(genreSlug: string | null): ChromeArchetype | null {
   const prevKeysRef = useRef<string[]>([]);
-  const archetype = getArchetypeForGenre(genreSlug);
+  const archetype = genreSlug ? getArchetypeForGenre(genreSlug) : null;
 
   useEffect(() => {
+    if (!archetype) return;
+
     const root = document.documentElement;
     const style = root.style;
 
