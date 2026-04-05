@@ -271,8 +271,8 @@ export function GameLayout({
             />
           )}
 
-          {/* Sidebar — only in multiplayer, visible on desktop (expanded) and tablet (collapsed) */}
-          {!isMobile && characters.length > 1 && partyVisible && (
+          {/* Sidebar — visible on desktop (expanded) and tablet (collapsed) */}
+          {!isMobile && characters.length > 0 && partyVisible && (
             <PartyPanel
               characters={characters}
               collapsed={isTablet}
@@ -426,8 +426,8 @@ export function GameLayout({
           onVoiceChange={handleVoiceChange}
         />
 
-        {/* Mobile: PartyPanel as overlay — only in multiplayer */}
-        {isMobile && characters.length > 1 && (
+        {/* Mobile: PartyPanel as overlay */}
+        {isMobile && characters.length > 0 && (
           overlayOpen ? (
             <div
               data-testid="party-overlay"
