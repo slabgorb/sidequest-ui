@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import { GameLayout } from "@/components/GameLayout";
@@ -24,6 +24,10 @@ import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
 import type { CombatState } from "@/components/CombatOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
+
+const LazyDashboard = lazy(() =>
+  import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
+);
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -860,6 +864,26 @@ function AppInner() {
 }
 
 function App() {
+  const [isDashboard, setIsDashboard] = useState(
+    () => window.location.hash === "#/dashboard",
+  );
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setIsDashboard(window.location.hash === "#/dashboard");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (isDashboard) {
+    return (
+      <Suspense fallback={<div style={{ color: "#e0e0e0", background: "#1a1a2e", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>}>
+        <LazyDashboard />
+      </Suspense>
+    );
+  }
+
   return (
     <ThemeProvider>
       <GameStateProvider>
