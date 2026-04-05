@@ -6,6 +6,12 @@ import { AudioStatus } from "@/components/AudioStatus";
 import { SettingsOverlay } from "@/components/SettingsOverlay";
 import type { SettingsPanelProps } from "@/components/SettingsPanel";
 import type { OverlayType } from "@/hooks/useSlashCommands";
+import { CharacterPanel } from "@/components/CharacterPanel";
+import { CharacterSheet } from "@/components/CharacterSheet";
+import { InventoryPanel } from "@/components/InventoryPanel";
+import { MapOverlay } from "@/components/MapOverlay";
+import { JournalView } from "@/components/JournalView";
+import { KnowledgeJournal } from "@/components/KnowledgeJournal";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 import { useWhisper } from "@/hooks/useWhisper";
@@ -156,6 +162,34 @@ export function GameLayout({
     }
   }, [isMobile]);
 
+  // Game state overlay hotkeys — C/I/M/J/K/Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if ((e.target as HTMLElement)?.getAttribute?.("contenteditable") != null) return;
+
+      const key = e.key.toLowerCase();
+
+      if (key === "escape" && activeOverlay && activeOverlay !== "settings") {
+        onOverlayChange(null);
+        return;
+      }
+
+      const toggle = (overlay: OverlayType) =>
+        onOverlayChange(activeOverlay === overlay ? null : overlay);
+
+      if (key === "c" && characterSheet) { toggle("character"); return; }
+      if (key === "i" && inventoryData) { toggle("inventory"); return; }
+      if (key === "m" && mapData) { toggle("map"); return; }
+      if (key === "j" && journalEntries && journalEntries.length > 0) { toggle("journal"); return; }
+      if (key === "k" && knowledgeEntries && knowledgeEntries.length > 0) { toggle("knowledge"); return; }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [activeOverlay, onOverlayChange, characterSheet, inventoryData, mapData, journalEntries, knowledgeEntries]);
+
   // Toggle party sidebar visibility (desktop/tablet)
   const toggleParty = useCallback(() => setPartyVisible((prev) => !prev), []);
 
@@ -203,6 +237,11 @@ export function GameLayout({
         className="flex flex-col flex-1 min-h-0"
       >
         <div className="flex flex-1 min-h-0">
+          {/* CharacterPanel — persistent sidebar for single-player */}
+          {!isMobile && characterSheet && (
+            <CharacterPanel character={characterSheet} inventory={inventoryData} />
+          )}
+
           {/* Sidebar — only in multiplayer, visible on desktop (expanded) and tablet (collapsed) */}
           {!isMobile && characters.length > 1 && partyVisible && (
             <PartyPanel
@@ -311,6 +350,36 @@ export function GameLayout({
 
         {/* Combat overlay — visible only during combat */}
         {combatState && <CombatOverlay combat={combatState} />}
+
+        {/* Game state overlay modals */}
+        {activeOverlay && activeOverlay !== "settings" && (
+          <div
+            data-testid="overlay-backdrop"
+            className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center"
+            onClick={() => onOverlayChange(null)}
+          >
+            <div
+              className="bg-background border rounded-lg shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto z-50"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {activeOverlay === "character" && characterSheet && (
+                <CharacterSheet data={characterSheet} />
+              )}
+              {activeOverlay === "inventory" && inventoryData && (
+                <InventoryPanel data={inventoryData} />
+              )}
+              {activeOverlay === "map" && mapData && (
+                <MapOverlay mapData={mapData} onClose={() => onOverlayChange(null)} />
+              )}
+              {activeOverlay === "journal" && journalEntries && (
+                <JournalView entries={journalEntries} />
+              )}
+              {activeOverlay === "knowledge" && knowledgeEntries && (
+                <KnowledgeJournal entries={knowledgeEntries} />
+              )}
+            </div>
+          </div>
+        )}
 
         {/* AudioStatus — always visible */}
         <AudioStatus

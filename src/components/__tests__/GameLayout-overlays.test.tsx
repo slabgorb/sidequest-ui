@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GameLayout, type GameLayoutProps } from '../GameLayout';
 import type { OverlayType } from '@/hooks/useSlashCommands';
+import type { JournalEntry, KnowledgeEntry } from '@/providers/GameStateProvider';
 
 // Minimal mock data
 const CHARACTER_SHEET = {
@@ -29,12 +30,26 @@ const MAP_DATA = {
   ],
 };
 
-const JOURNAL_ENTRIES = [
-  { id: '1', text: 'Arrived at the village.', timestamp: '2026-04-01' },
+const JOURNAL_ENTRIES: JournalEntry[] = [
+  {
+    type: 'handout',
+    url: '/renders/journal-1.png',
+    description: 'Arrived at the village.',
+    timestamp: 1704067200,
+    render_id: 'journal-1',
+  },
 ];
 
-const KNOWLEDGE_ENTRIES = [
-  { id: 'k1', category: 'lore', label: 'Ancient Ruins', text: 'Once a temple.', source: 'narration', created_at: '2026-04-01' },
+const KNOWLEDGE_ENTRIES: KnowledgeEntry[] = [
+  {
+    fact_id: 'k1',
+    content: 'Ancient Ruins are a place of historical significance.',
+    category: 'Lore',
+    is_new: false,
+    learned_turn: 5,
+    source: 'Discovery',
+    confidence: 'Certain',
+  },
 ];
 
 const CHARACTER_SUMMARY = {
@@ -85,10 +100,11 @@ describe('GameLayout — Overlay Rewiring (25-4)', () => {
 
     it('passes character and inventory data to CharacterPanel', () => {
       renderLayout({ activeOverlay: null });
-      // CharacterPanel renders character name
+      // CharacterPanel renders character name — use getByTestId to avoid ambiguity
       const panel = screen.getByTestId('character-panel');
       expect(panel).toBeInTheDocument();
-      expect(screen.getByText('Kael')).toBeInTheDocument();
+      // Verify the sidebar contains the character info
+      expect(screen.getAllByText('Kael').length).toBeGreaterThan(0);
     });
   });
 
@@ -113,12 +129,14 @@ describe('GameLayout — Overlay Rewiring (25-4)', () => {
 
     it('renders journal overlay when activeOverlay is journal', () => {
       renderLayout({ activeOverlay: 'journal' });
+      // JournalView renders the description from entries
       expect(screen.getByText('Arrived at the village.')).toBeInTheDocument();
     });
 
     it('renders knowledge overlay when activeOverlay is knowledge', () => {
       renderLayout({ activeOverlay: 'knowledge' });
-      expect(screen.getByText('Ancient Ruins')).toBeInTheDocument();
+      // KnowledgeJournal renders entry content
+      expect(screen.getByText(/Ancient Ruins/)).toBeInTheDocument();
     });
 
     it('renders no overlay when activeOverlay is null', () => {
@@ -193,14 +211,18 @@ describe('GameLayout — Overlay Rewiring (25-4)', () => {
     it('does not trigger hotkeys when input is focused', () => {
       const onOverlayChange = vi.fn();
       const { container } = renderLayout({ activeOverlay: null, onOverlayChange });
-      // Find the InputBar's input or add one
-      const inputs = container.querySelectorAll('input, textarea');
-      if (inputs.length > 0) {
-        (inputs[0] as HTMLElement).focus();
-        fireEvent.keyDown(document, { key: 'c' });
-        // Should NOT have been called with 'character' — input is focused
-        expect(onOverlayChange).not.toHaveBeenCalledWith('character');
-      }
+      // Create a synthetic input element and make it the keydown event target
+      const input = document.createElement('input');
+      container.appendChild(input);
+      input.focus();
+
+      // Dispatch event with input as target
+      const event = new KeyboardEvent('keydown', { key: 'c', bubbles: true });
+      Object.defineProperty(event, 'target', { value: input, enumerable: true });
+      document.dispatchEvent(event);
+
+      // Should NOT have been called with 'character' — input is focused
+      expect(onOverlayChange).not.toHaveBeenCalledWith('character');
     });
 
     it('does not trigger hotkeys with modifier keys', () => {
