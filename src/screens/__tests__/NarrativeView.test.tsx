@@ -73,11 +73,10 @@ describe("NarrativeView", () => {
         ]}
       />,
     );
-    // NARRATION_END creates a page boundary — the two chunks should be
-    // in separate snap-start page containers (separators are consumed
-    // as page breaks, not rendered as <hr> elements).
-    const pages = document.querySelectorAll(".snap-start");
-    expect(pages.length).toBeGreaterThanOrEqual(2);
+    // NARRATION_END creates a separator between segments — both chunks
+    // should render as separate text blocks
+    const proseBlocks = document.querySelectorAll(".prose");
+    expect(proseBlocks.length).toBeGreaterThanOrEqual(2);
   });
 
   // -- inline images ---------------------------------------------------------
@@ -102,7 +101,7 @@ describe("NarrativeView", () => {
       <NarrativeView messages={[narration("Line one.")]} />,
     );
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Add more content
@@ -127,7 +126,7 @@ describe("NarrativeView", () => {
     );
     const { rerender } = render(<NarrativeView messages={messages} />);
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Simulate user scrolling up by setting scrollTop and firing scroll event
@@ -155,7 +154,7 @@ describe("NarrativeView", () => {
     );
     const { rerender } = render(<NarrativeView messages={messages} />);
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Simulate scroll up
@@ -320,8 +319,9 @@ describe("NarrativeView", () => {
     );
     expect(screen.getByText("Before unknown.")).toBeInTheDocument();
     expect(screen.getByText("After unknown.")).toBeInTheDocument();
-    // Should not render any content for the unknown message
-    expect(container.querySelectorAll("[data-testid='narrative-view'] > div > *").length).toBe(2);
+    // Should not render any content for the unknown message — 2 prose blocks for the 2 narrations
+    const proseBlocks = container.querySelectorAll(".prose");
+    expect(proseBlocks.length).toBe(2);
   });
 
   // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
