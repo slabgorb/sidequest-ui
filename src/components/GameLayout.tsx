@@ -80,6 +80,14 @@ export function GameLayout({
   const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5, voice: 0.5 });
   const [muted, setMuted] = useState({ music: false, sfx: false, voice: false });
   const [voicePlaybackRate, setVoicePlaybackRate] = useState(1.0);
+  const [selectedVoice, setSelectedVoice] = useState(() =>
+    localStorage.getItem("sq-selected-voice") ?? ""
+  );
+
+  const handleVoiceChange = useCallback((voice: string) => {
+    setSelectedVoice(voice);
+    localStorage.setItem("sq-selected-voice", voice);
+  }, []);
 
   // Mic on/off toggle — persisted to localStorage
   const [micEnabled, setMicEnabled] = useState(() =>
@@ -316,6 +324,8 @@ export function GameLayout({
           onMuteToggle={handleMuteToggle}
           voicePlaybackRate={voicePlaybackRate}
           onPlaybackRateChange={handlePlaybackRateChange}
+          selectedVoice={selectedVoice}
+          onVoiceChange={handleVoiceChange}
         />
 
         {/* Mobile: PartyPanel as overlay — only in multiplayer */}

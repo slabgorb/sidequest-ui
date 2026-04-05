@@ -10,6 +10,8 @@ export interface AudioStatusProps {
   onMuteToggle: (channel: string) => void;
   voicePlaybackRate?: number;
   onPlaybackRateChange?: (rate: number) => void;
+  selectedVoice?: string;
+  onVoiceChange?: (voice: string) => void;
 }
 
 const CHANNELS = ["music", "sfx", "voice"] as const;
@@ -40,9 +42,23 @@ export function AudioStatus({
   onMuteToggle,
   voicePlaybackRate = 1.0,
   onPlaybackRateChange,
+  selectedVoice,
+  onVoiceChange,
 }: AudioStatusProps) {
   const [expanded, setExpanded] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const [availableVoices, setAvailableVoices] = useState<string[]>([]);
+
+  // Fetch voice list from daemon when panel expands (lazy load)
+  useEffect(() => {
+    if (!expanded || !onVoiceChange || availableVoices.length > 0) return;
+    fetch("/api/voices")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.voices)) setAvailableVoices(data.voices);
+      })
+      .catch(() => {}); // daemon may be offline
+  }, [expanded, onVoiceChange, availableVoices.length]);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -180,6 +196,23 @@ export function AudioStatus({
             onClick={(e) => e.stopPropagation()}
           />
           <span className="text-[10px] text-muted-foreground/40 w-6 text-right">{voicePlaybackRate.toFixed(1)}×</span>
+        </div>
+      )}
+
+      {onVoiceChange && availableVoices.length > 0 && (
+        <div data-testid="voice-selector" className="flex items-center gap-2 pt-1 border-t border-border/10">
+          <span className="text-[10px] text-muted-foreground/50 w-8">voice</span>
+          <select
+            value={selectedVoice ?? ""}
+            className="flex-1 text-[10px] bg-background/50 border border-border/20 rounded px-1 py-0.5 text-muted-foreground/70"
+            aria-label="Narrator voice"
+            onChange={(e) => onVoiceChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {availableVoices.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
         </div>
       )}
     </div>
