@@ -232,7 +232,7 @@ export function GameLayout({
           )}
 
           {/* Main content area */}
-          <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
             {/* Top bar with leave button */}
             {onLeave && (
               <div className="flex items-center justify-end px-4 py-1 border-b border-border/30 bg-card/30 shrink-0">
