@@ -47,7 +47,7 @@ export function NarrativeView({ messages, thinking, layoutMode }: NarrativeViewP
     NarrationScroll;
 
   return (
-    <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 relative">
+    <div data-testid="narrative-view" className="flex flex-col flex-1 min-h-0 overflow-hidden relative">
       <LayoutComponent messages={messages} thinking={thinking} setLightboxUrl={setLightboxUrl} />
 
       {/* Lightbox overlay — portal to body to escape overflow-hidden ancestors */}

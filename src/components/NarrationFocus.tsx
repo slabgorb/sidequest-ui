@@ -7,9 +7,10 @@ import { ThinkingIndicator } from "./NarrationShared";
 export interface NarrationFocusProps {
   messages: GameMessage[];
   thinking?: boolean;
+  setLightboxUrl?: (url: string | null) => void;
 }
 
-export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
+export function NarrationFocus({ messages, thinking, setLightboxUrl }: NarrationFocusProps) {
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
     [messages],
@@ -29,10 +30,10 @@ export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
 
   return (
     <div data-testid="narration-focus" className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 flex items-center justify-center px-6 py-8">
+      <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center px-6 py-8">
         {segments.length > 0 && (
           <div className="max-w-[85ch] w-full">
-            {renderSegment(segments[index], index, { maxTextWidth: "max-w-[85ch]" })}
+            {renderSegment(segments[index], index, { maxTextWidth: "max-w-[85ch]", setLightboxUrl })}
           </div>
         )}
       </div>
