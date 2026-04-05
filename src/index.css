@@ -124,12 +124,18 @@
     }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-body, var(--font-sans));
     }
   html {
     @apply font-sans;
     border-radius: var(--border-radius, var(--radius));
     }
+}
+
+/* Archetype body font — outside @layer so it beats injected genre theme CSS.
+   [data-archetype] selector ensures this only fires when useChromeArchetype is active,
+   preserving the genre theme's font-family for any genre without an archetype mapping. */
+[data-archetype] body {
+  font-family: var(--font-body, var(--font-sans));
 }
 
 /* Archetype font-ui — applied to interactive/HUD elements when an archetype is active */
