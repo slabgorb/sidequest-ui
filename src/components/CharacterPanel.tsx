@@ -1,7 +1,9 @@
+import { useCallback, useRef, useState, useEffect } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
 import type { InventoryData } from "./InventoryPanel";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
+import type { CharacterSummary } from "./PartyPanel";
 
 type TabId = "stats" | "abilities" | "backstory" | "inventory" | "status";
 
@@ -13,12 +15,16 @@ export interface ResourcePool {
 
 interface CharacterPanelPrefs {
   activeTab: TabId;
-  collapsed: boolean;
+  sidebarWidth: number;
 }
+
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 500;
+const DEFAULT_WIDTH = 288; // 72 * 4 = w-72
 
 const DEFAULTS: CharacterPanelPrefs = {
   activeTab: "stats",
-  collapsed: false,
+  sidebarWidth: DEFAULT_WIDTH,
 };
 
 export interface CharacterPanelProps {
@@ -30,6 +36,9 @@ export interface CharacterPanelProps {
     resource: string;
     threshold: ResourceThreshold;
   }) => void;
+  characters?: CharacterSummary[];
+  currentPlayerId?: string;
+  activePlayerId?: string | null;
 }
 
 function toDisplayName(id: string): string {
@@ -44,6 +53,9 @@ export function CharacterPanel({
   resources,
   genreSlug,
   onResourceThresholdCrossed,
+  characters = [],
+  currentPlayerId,
+  activePlayerId,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
     "sq-character-panel",
@@ -51,7 +63,7 @@ export function CharacterPanel({
   );
 
   const activeTab = prefs.activeTab;
-  const collapsed = prefs.collapsed;
+  const sidebarWidth = prefs.sidebarWidth ?? DEFAULT_WIDTH;
 
   const hasResources = resources != null && Object.keys(resources).length > 0;
 
@@ -63,8 +75,42 @@ export function CharacterPanel({
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
   ];
 
+  // Drag-to-resize state
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(sidebarWidth);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setDragging(true);
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = sidebarWidth;
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - dragStartX.current;
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragStartWidth.current + delta));
+      setPref({ sidebarWidth: newWidth });
+    };
+    const onMouseUp = () => setDragging(false);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [dragging, setPref]);
+
   return (
-    <div data-testid="character-panel" className="flex flex-col border-r border-border/50 bg-card/50 w-72 shrink-0 h-full overflow-y-auto">
+    <div
+      data-testid="character-panel"
+      ref={panelRef}
+      className="flex flex-col border-r border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
+      style={{ width: sidebarWidth }}
+    >
       {/* Header: portrait + name */}
       <div className="flex items-start gap-3 p-4">
         {character.portrait_url && (
@@ -85,54 +131,125 @@ export function CharacterPanel({
             </p>
           )}
         </div>
-        <button
-          data-testid="panel-collapse-toggle"
-          onClick={() => setPref({ collapsed: !collapsed })}
-          className="ml-auto text-muted-foreground hover:text-foreground text-sm shrink-0"
-          aria-label={collapsed ? "Expand panel" : "Collapse panel"}
-        >
-          {collapsed ? "▶" : "◀"}
-        </button>
       </div>
 
-      {/* Tabs + content — hidden when collapsed */}
-      {!collapsed && (
-        <>
-          <div role="tablist" className="flex border-b border-border/30 px-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                onClick={() => setPref({ activeTab: tab.id })}
-                className={`px-3 py-1.5 text-xs transition-colors ${
-                  activeTab === tab.id
-                    ? "text-[var(--primary)] border-b-2 border-[var(--primary)]"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Tabs + content */}
+      <div role="tablist" className="flex border-b border-border/30 px-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            onClick={() => setPref({ activeTab: tab.id })}
+            className={`px-3 py-1.5 text-xs transition-colors ${
+              activeTab === tab.id
+                ? "text-[var(--primary)] border-b-2 border-[var(--primary)]"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-          <div role="tabpanel" className="flex-1 overflow-auto p-4">
-            {activeTab === "stats" && <StatsContent stats={character.stats} />}
-            {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
-            {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
-            {activeTab === "inventory" && inventory && <InventoryContent inventory={inventory} />}
-            {activeTab === "status" && hasResources && (
-              <StatusContent
-                resources={resources!}
-                genreSlug={genreSlug ?? ""}
-                onThresholdCrossed={onResourceThresholdCrossed}
-              />
-            )}
-          </div>
-        </>
+      <div role="tabpanel" className="flex-1 overflow-auto p-4">
+        {activeTab === "stats" && <StatsContent stats={character.stats} />}
+        {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
+        {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
+        {activeTab === "inventory" && inventory && <InventoryContent inventory={inventory} />}
+        {activeTab === "status" && hasResources && (
+          <StatusContent
+            resources={resources!}
+            genreSlug={genreSlug ?? ""}
+            onThresholdCrossed={onResourceThresholdCrossed}
+          />
+        )}
+      </div>
+
+      {/* Party members section */}
+      {characters.length > 0 && (
+        <div data-testid="party-section" className="border-t border-border/30 p-2 flex flex-col gap-1">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">Party</h3>
+          {characters.map((c) => {
+            const hpPct = Math.min(100, c.hp_max > 0 ? (c.hp / c.hp_max) * 100 : 0);
+            const hpLevel = getHpLevel(c.hp, c.hp_max);
+            const isSelf = currentPlayerId !== undefined && c.player_id === currentPlayerId;
+            const isActing = activePlayerId !== undefined && activePlayerId !== null && c.player_id === activePlayerId;
+            const isWaiting = activePlayerId !== undefined && activePlayerId !== null && c.player_id !== activePlayerId;
+            return (
+              <div
+                key={c.player_id}
+                data-testid={`party-member-${c.player_id}`}
+                className={[
+                  "flex items-center gap-2 p-2 rounded-md bg-card border border-border/50",
+                  "transition-all duration-300",
+                  isActing ? "ring-2 ring-primary" : "",
+                  isWaiting ? "opacity-65" : "",
+                ].filter(Boolean).join(" ")}
+              >
+                {c.portrait_url ? (
+                  <img
+                    src={c.portrait_url}
+                    alt={c.character_name || c.name}
+                    className="w-8 h-8 rounded-full object-cover border border-border flex-shrink-0"
+                  />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground flex-shrink-0 border border-border">
+                    {(c.character_name || c.name).split(/\s+/).map((w) => w[0]).join("").toUpperCase()}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="block text-xs font-semibold text-foreground truncate">
+                    {c.character_name || c.name}
+                    {isSelf && <span className="ml-1 text-[10px] text-muted-foreground/50 font-normal">YOU</span>}
+                    {isActing && <span className="ml-1 text-[10px] text-primary font-semibold uppercase">ACTING</span>}
+                  </span>
+                  <span className="block text-[10px] text-muted-foreground">{c.class} Lv.{c.level} — {c.hp}/{c.hp_max}</span>
+                  <div className="mt-0.5 h-1 w-full rounded-full bg-border/30 overflow-hidden">
+                    <div
+                      className={[
+                        "h-full rounded-full transition-all duration-500 ease-out",
+                        hpLevel === "healthy" ? "bg-green-500" : "",
+                        hpLevel === "warning" ? "bg-amber-500" : "",
+                        hpLevel === "critical" ? "bg-red-500 animate-pulse" : "",
+                      ].filter(Boolean).join(" ")}
+                      style={{ width: `${hpPct}%` }}
+                    />
+                  </div>
+                  {c.status_effects.length > 0 && (
+                    <div className="mt-0.5 flex flex-wrap gap-0.5">
+                      {c.status_effects.map((effect) => (
+                        <span key={effect} className="inline-block px-1 py-0.5 text-[9px] rounded bg-accent/20 text-accent-foreground">
+                          {effect}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {/* Resize handle */}
+      <div
+        data-testid="sidebar-resize-handle"
+        onMouseDown={onMouseDown}
+        className={[
+          "absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/30 transition-colors",
+          dragging ? "bg-primary/50" : "",
+        ].filter(Boolean).join(" ")}
+      />
     </div>
   );
+}
+
+function getHpLevel(hp: number, hpMax: number): "healthy" | "warning" | "critical" {
+  const pct = hpMax > 0 ? (hp / hpMax) * 100 : 0;
+  if (pct > 50) return "healthy";
+  if (pct > 25) return "warning";
+  return "critical";
 }
 
 function StatsContent({ stats }: { stats: Record<string, number> }) {
