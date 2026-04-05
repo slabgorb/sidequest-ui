@@ -1,8 +1,15 @@
 import type { CharacterSheetData } from "./CharacterSheet";
 import type { InventoryData } from "./InventoryPanel";
+import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 
-type TabId = "stats" | "abilities" | "backstory" | "inventory";
+type TabId = "stats" | "abilities" | "backstory" | "inventory" | "status";
+
+export interface ResourcePool {
+  value: number;
+  max: number;
+  thresholds: ResourceThreshold[];
+}
 
 interface CharacterPanelPrefs {
   activeTab: TabId;
@@ -17,6 +24,12 @@ const DEFAULTS: CharacterPanelPrefs = {
 export interface CharacterPanelProps {
   character: CharacterSheetData;
   inventory?: InventoryData | null;
+  resources?: Record<string, ResourcePool> | null;
+  genreSlug?: string;
+  onResourceThresholdCrossed?: (info: {
+    resource: string;
+    threshold: ResourceThreshold;
+  }) => void;
 }
 
 function toDisplayName(id: string): string {
@@ -25,7 +38,13 @@ function toDisplayName(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function CharacterPanel({ character, inventory }: CharacterPanelProps) {
+export function CharacterPanel({
+  character,
+  inventory,
+  resources,
+  genreSlug,
+  onResourceThresholdCrossed,
+}: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
     "sq-character-panel",
     DEFAULTS,
@@ -34,11 +53,14 @@ export function CharacterPanel({ character, inventory }: CharacterPanelProps) {
   const activeTab = prefs.activeTab;
   const collapsed = prefs.collapsed;
 
+  const hasResources = resources != null && Object.keys(resources).length > 0;
+
   const tabs: { id: TabId; label: string }[] = [
     { id: "stats", label: "Stats" },
     { id: "abilities", label: "Abilities" },
     { id: "backstory", label: "Backstory" },
     ...(inventory ? [{ id: "inventory" as TabId, label: "Inventory" }] : []),
+    ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
   ];
 
   return (
@@ -99,6 +121,13 @@ export function CharacterPanel({ character, inventory }: CharacterPanelProps) {
             {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
             {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
             {activeTab === "inventory" && inventory && <InventoryContent inventory={inventory} />}
+            {activeTab === "status" && hasResources && (
+              <StatusContent
+                resources={resources!}
+                genreSlug={genreSlug ?? ""}
+                onThresholdCrossed={onResourceThresholdCrossed}
+              />
+            )}
           </div>
         </>
       )}
@@ -154,6 +183,36 @@ function InventoryContent({ inventory }: { inventory: InventoryData }) {
       {inventory.gold != null && (
         <div className="text-sm text-amber-500/80 mt-2">Gold: {inventory.gold}</div>
       )}
+    </div>
+  );
+}
+
+function StatusContent({
+  resources,
+  genreSlug,
+  onThresholdCrossed,
+}: {
+  resources: Record<string, ResourcePool>;
+  genreSlug: string;
+  onThresholdCrossed?: (info: {
+    resource: string;
+    threshold: ResourceThreshold;
+  }) => void;
+}) {
+  const entries = Object.entries(resources);
+  return (
+    <div className="space-y-3">
+      {entries.map(([name, pool]) => (
+        <GenericResourceBar
+          key={name}
+          name={name}
+          value={pool.value}
+          max={pool.max}
+          genre_slug={genreSlug}
+          thresholds={pool.thresholds}
+          onThresholdCrossed={onThresholdCrossed}
+        />
+      ))}
     </div>
   );
 }
