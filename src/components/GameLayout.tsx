@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Settings } from "lucide-react";
 import { NarrativeView, useRunningHeader } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
 // PartyPanel is now integrated into CharacterPanel as an inline section
@@ -220,18 +221,36 @@ export function GameLayout({
         className="flex flex-col h-screen overflow-hidden"
       >
         {/* Running header — top level, matching mockup */}
-        {chapterTitle && (
-          <div
-            data-testid="running-header"
-            className="running-header flex items-baseline justify-between px-6 py-2
-                       border-b border-border/50 bg-[var(--surface,theme(colors.card))]
-                       shrink-0 z-10"
-          >
-            <span className="location text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
-              {chapterTitle}
-            </span>
+        <div
+          data-testid="running-header"
+          className="running-header flex items-baseline justify-between px-6 py-2
+                     border-b border-border/50 bg-[var(--surface,theme(colors.card))]
+                     shrink-0 z-10"
+        >
+          <span className="location text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
+            {chapterTitle ?? '\u00A0'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              data-testid="settings-button"
+              onClick={() => onOverlayChange(activeOverlay === 'settings' ? null : 'settings')}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
+              title="Settings (S)"
+              aria-label="Settings"
+            >
+              <Settings className="size-4" />
+            </button>
+            {onLeave && (
+              <button
+                onClick={onLeave}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
+                title="Return to lobby"
+              >
+                Leave
+              </button>
+            )}
           </div>
-        )}
+        </div>
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Main content area */}
