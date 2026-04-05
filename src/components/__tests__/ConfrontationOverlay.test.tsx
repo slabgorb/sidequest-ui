@@ -74,13 +74,13 @@ const NEGOTIATION_DATA: ConfrontationData = {
 };
 
 const CHASE_SECONDARY_STATS: SecondaryStats = {
-  rig_hp: 18,
-  max_rig_hp: 18,
-  speed: 3,
-  armor: 2,
-  maneuver: 3,
-  fuel: 10,
-  max_fuel: 10,
+  stats: {
+    hp: { current: 18, max: 18 },
+    speed: { current: 3, max: 3 },
+    armor: { current: 2, max: 2 },
+    maneuver: { current: 3, max: 3 },
+    fuel: { current: 10, max: 10 },
+  },
 };
 
 const CHASE_DATA: ConfrontationData = {

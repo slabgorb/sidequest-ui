@@ -23,6 +23,7 @@ import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
 import type { CombatState } from "@/components/CombatOverlay";
+import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 
 type SessionPhase = "connect" | "creation" | "game";
@@ -142,6 +143,8 @@ function AppInner() {
 
   // Combat state from COMBAT_EVENT messages
   const [combatState, setCombatState] = useState<CombatState | null>(null);
+  // Confrontation state from CONFRONTATION messages (structured encounters)
+  const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
 
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
@@ -488,6 +491,11 @@ function AppInner() {
       setCombatState(payload.in_combat ? payload : null);
       return;
     }
+    if (msg.type === MessageType.CONFRONTATION) {
+      const payload = msg.payload as unknown as ConfrontationData;
+      setConfrontationData(payload.active !== false ? payload : null);
+      return;
+    }
 
     // Server says the session is gone — re-send the connect handshake so the
     // server can restore (or start fresh).  This happens after a server restart
@@ -676,6 +684,7 @@ function AppInner() {
     setConnectedPlayerName("");
     setActivePlayerName(null);
     setCombatState(null);
+    setConfrontationData(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
@@ -841,6 +850,7 @@ function AppInner() {
               journalEntries={gameState.journal}
               knowledgeEntries={gameState.knowledge}
               combatState={combatState}
+              confrontationData={confrontationData}
               currentPlayerId={currentPlayerId ?? undefined}
               activePlayerId={activePlayerId}
               activePlayerName={activePlayerName}
