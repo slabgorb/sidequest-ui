@@ -71,7 +71,7 @@ export function CharacterPanel({
     { id: "stats", label: "Stats" },
     { id: "abilities", label: "Abilities" },
     { id: "backstory", label: "Backstory" },
-    ...(inventory ? [{ id: "inventory" as TabId, label: "Inventory" }] : []),
+    { id: "inventory" as TabId, label: "Inventory" },
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
   ];
 
@@ -156,7 +156,9 @@ export function CharacterPanel({
         {activeTab === "stats" && <StatsContent stats={character.stats} />}
         {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
         {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
-        {activeTab === "inventory" && inventory && <InventoryContent inventory={inventory} />}
+        {activeTab === "inventory" && (
+          inventory ? <InventoryContent inventory={inventory} /> : <p className="text-sm text-muted-foreground/60">No items yet.</p>
+        )}
         {activeTab === "status" && hasResources && (
           <StatusContent
             resources={resources!}

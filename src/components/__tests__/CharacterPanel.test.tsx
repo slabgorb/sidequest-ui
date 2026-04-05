@@ -146,9 +146,12 @@ describe("CharacterPanel — AC-2: tabbed sections", () => {
     expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
   });
 
-  it("does not render Inventory tab when inventory is absent", () => {
+  it("renders Inventory tab with empty state when inventory is absent", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.queryByRole("tab", { name: /inventory/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /inventory/i }));
+    const tabpanel = screen.getByRole("tabpanel");
+    expect(within(tabpanel).getByText("No items yet.")).toBeInTheDocument();
   });
 
   it("shows inventory items when Inventory tab is selected", () => {
