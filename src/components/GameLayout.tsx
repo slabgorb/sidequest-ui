@@ -6,7 +6,8 @@ import { AudioStatus } from "@/components/AudioStatus";
 import { SettingsOverlay } from "@/components/SettingsOverlay";
 import type { SettingsPanelProps } from "@/components/SettingsPanel";
 import type { OverlayType } from "@/hooks/useSlashCommands";
-import { CharacterPanel } from "@/components/CharacterPanel";
+import { CharacterPanel, type ResourcePool } from "@/components/CharacterPanel";
+import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import { CharacterSheet } from "@/components/CharacterSheet";
 import { InventoryPanel } from "@/components/InventoryPanel";
 import { MapOverlay } from "@/components/MapOverlay";
@@ -51,6 +52,8 @@ export interface GameLayoutProps {
   waitingForPlayer?: string;
   turnStatusEntries?: TurnStatusEntry[];
   settingsProps?: SettingsPanelProps;
+  resources?: Record<string, ResourcePool> | null;
+  genreSlug?: string;
   activeOverlay: OverlayType;
   onOverlayChange: (overlay: OverlayType) => void;
 }
@@ -78,12 +81,23 @@ export function GameLayout({
   waitingForPlayer,
   turnStatusEntries = [],
   settingsProps,
+  resources,
+  genreSlug,
   activeOverlay,
   onOverlayChange,
 }: GameLayoutProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
   const isTablet = breakpoint === "tablet";
+
+  // Resource threshold crossing → route to audio SFX
+  const handleResourceThresholdCrossed = useCallback(
+    (info: { resource: string; threshold: ResourceThreshold }) => {
+      const sfxKey = `${genreSlug ?? "default"}_${info.resource.toLowerCase()}_threshold`;
+      audio?.playSfx(sfxKey);
+    },
+    [audio, genreSlug],
+  );
 
   const [overlayOpen, setOverlayOpen] = useState(false);
   const [partyVisible, setPartyVisible] = useState(true);
@@ -244,7 +258,13 @@ export function GameLayout({
         <div className="flex flex-1 min-h-0">
           {/* CharacterPanel — persistent sidebar for single-player */}
           {!isMobile && characterSheet && (
-            <CharacterPanel character={characterSheet} inventory={inventoryData} />
+            <CharacterPanel
+              character={characterSheet}
+              inventory={inventoryData}
+              resources={resources}
+              genreSlug={genreSlug}
+              onResourceThresholdCrossed={handleResourceThresholdCrossed}
+            />
           )}
 
           {/* Sidebar — only in multiplayer, visible on desktop (expanded) and tablet (collapsed) */}
