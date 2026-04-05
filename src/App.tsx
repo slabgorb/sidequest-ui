@@ -128,8 +128,12 @@ function AppInner() {
   const { mode: layoutMode, setMode: setLayoutMode } = useLayoutMode();
 
   // Narrator settings — per-session, sent to server via SESSION_EVENT{settings}
-  const [narratorVerbosity, setNarratorVerbosity] = useState<NarratorVerbosity>("standard");
-  const [narratorVocabulary, setNarratorVocabulary] = useState<NarratorVocabulary>("literary");
+  const [narratorVerbosity, setNarratorVerbosity] = useState<NarratorVerbosity>(
+    () => (localStorage.getItem("sq-narrator-verbosity") as NarratorVerbosity) || "standard"
+  );
+  const [narratorVocabulary, setNarratorVocabulary] = useState<NarratorVocabulary>(
+    () => (localStorage.getItem("sq-narrator-vocabulary") as NarratorVocabulary) || "literary"
+  );
   const [imageCooldown, setImageCooldown] = useState<number>(30);
 
   // Party status — richer than state_delta (includes portrait_url)
@@ -636,6 +640,7 @@ function AppInner() {
   const handleVerbosityChange = useCallback(
     (value: NarratorVerbosity) => {
       setNarratorVerbosity(value);
+      localStorage.setItem("sq-narrator-verbosity", value);
       sendSettings({ verbosity: value });
     },
     [sendSettings],
@@ -644,6 +649,7 @@ function AppInner() {
   const handleVocabularyChange = useCallback(
     (value: NarratorVocabulary) => {
       setNarratorVocabulary(value);
+      localStorage.setItem("sq-narrator-vocabulary", value);
       sendSettings({ vocabulary: value });
     },
     [sendSettings],
@@ -863,6 +869,7 @@ function AppInner() {
               resources={partyResources}
               genreSlug={currentGenre ?? undefined}
               turnStatusEntries={turnStatusEntries}
+              layoutMode={layoutMode}
               activeOverlay={activeOverlay}
               onOverlayChange={setActiveOverlay}
             />

@@ -29,6 +29,7 @@ import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { GameMessage } from "@/types/protocol";
+import type { LayoutMode } from "@/hooks/useLayoutMode";
 
 export interface GameLayoutProps {
   messages: GameMessage[];
@@ -37,6 +38,7 @@ export interface GameLayoutProps {
   onLeave?: () => void;
   disabled: boolean;
   thinking?: boolean;
+  layoutMode?: LayoutMode;
   characterSheet?: CharacterSheetData | null;
   inventoryData?: InventoryData | null;
   mapData?: MapState | null;
@@ -66,6 +68,7 @@ export function GameLayout({
   onLeave,
   disabled,
   thinking,
+  layoutMode,
   characterSheet = null,
   inventoryData = null,
   mapData = null,
@@ -151,7 +154,11 @@ export function GameLayout({
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (tag === "textarea" || tag === "select") return;
+      if (tag === "input") {
+        const inputType = ((e.target as HTMLInputElement).type ?? "").toLowerCase();
+        if (inputType !== "radio" && inputType !== "checkbox") return;
+      }
       if ((e.target as HTMLElement)?.getAttribute?.("contenteditable") != null) return;
 
       const key = e.key.toLowerCase();
@@ -255,7 +262,7 @@ export function GameLayout({
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-            <NarrativeView messages={messages} thinking={thinking} />
+            <NarrativeView messages={messages} thinking={thinking} layoutMode={layoutMode} />
 
             {characters.length > 1 && activePlayerName && (
               <div
