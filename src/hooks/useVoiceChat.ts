@@ -18,11 +18,6 @@ export interface UseVoiceChatReturn {
 }
 
 export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoiceChatReturn {
-  // DISABLED: Voice/mic functionality is off. Mic was capturing TTS audio
-  // and feeding it back as player input, causing narration fragmentation.
-  // No mic access, no getUserMedia, no peer mesh initialization.
-  const VOICE_DISABLED = true;
-
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peerStreams, setPeerStreams] = useState<Map<string, MediaStream>>(new Map());
   const [muted, setMutedState] = useState(false);
@@ -35,7 +30,6 @@ export function useVoiceChat({ peers, onSignal }: UseVoiceChatOptions): UseVoice
   // Capture local audio — gracefully degrade if mediaDevices unavailable
   // (insecure HTTP context: navigator.mediaDevices is undefined)
   useEffect(() => {
-    if (VOICE_DISABLED) return;
     if (!navigator.mediaDevices?.getUserMedia) return;
     let cancelled = false;
     navigator.mediaDevices

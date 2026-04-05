@@ -74,6 +74,15 @@ export class AudioEngine {
   private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
   private _voicePlaybackRate = 1.0;
+  private _voiceSegmentCount = 0;
+
+  /** Callback fired when voice playback starts (true) or all segments end (false). */
+  onVoicePlaybackChange?: (playing: boolean) => void;
+
+  /** True when at least one voice segment is actively playing. */
+  get isVoicePlaying(): boolean {
+    return this._voiceSegmentCount > 0;
+  }
 
   constructor() {
     this.ctx = new AudioContext();
@@ -212,25 +221,41 @@ export class AudioEngine {
    * text reveal with TTS playback so narration text appears as the voice reads.
    */
   private playVoiceBuffer(audioBuffer: AudioBuffer, onStart?: () => void): void {
-    // Queue segments so they play sequentially, not all at once.
+    const wasPlaying = this._voiceSegmentCount > 0;
+    this._voiceSegmentCount++;
+    if (!wasPlaying) {
+      this.onVoicePlaybackChange?.(true);
+    }
+
+    // Create source eagerly so it's available for inspection,
+    // but schedule start() through the voiceChain for sequential playback.
+    const source = this.ctx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.playbackRate.value = this._voicePlaybackRate;
+    source.connect(this.channels.voice);
+    this.activeSources.push(source);
+
+    // Chain resolve callback — set once the chain executor runs.
+    let chainResolve: (() => void) | null = null;
+
+    source.onended = () => {
+      this.ducker.unduck();
+      source.disconnect();
+      this.activeSources = this.activeSources.filter((s) => s !== source);
+      this._voiceSegmentCount--;
+      if (this._voiceSegmentCount === 0) {
+        this.onVoicePlaybackChange?.(false);
+      }
+      chainResolve?.();
+    };
+
     this.voiceChain = this.voiceChain.then(
       () =>
         new Promise<void>((resolve) => {
+          chainResolve = resolve;
           this.ducker.duck();
-
-          const source = this.ctx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.playbackRate.value = this._voicePlaybackRate;
-          source.connect(this.channels.voice);
-          source.onended = () => {
-            this.ducker.unduck();
-            source.disconnect();
-            this.activeSources = this.activeSources.filter((s) => s !== source);
-            resolve();
-          };
           onStart?.();
           source.start();
-          this.activeSources.push(source);
         }),
     );
   }

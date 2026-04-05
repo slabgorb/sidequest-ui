@@ -190,8 +190,7 @@ export default function InputBar({
         onEdit={onTranscriptEdit}
       />
       <div className="flex items-center gap-2">
-      {/* DISABLED: Voice/mic off until rethought — mic captures TTS audio feedback */}
-      {false && <VoiceOrnament
+      <VoiceOrnament
         micEnabled={micEnabled}
         onMicToggle={onMicToggle}
         pttState={pttState}
@@ -199,7 +198,7 @@ export default function InputBar({
         onPttStop={onPttStop}
         duration={duration}
         mobile={mobile}
-      />}
+      />
       <div className="flex items-center flex-1">
         {aside && (
           <span className="text-muted-foreground/40 text-lg pl-1 select-none">(</span>
