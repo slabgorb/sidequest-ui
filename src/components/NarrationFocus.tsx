@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
-import { buildSegments, groupPortraitSegments, type NarrativeSegment } from "@/lib/narrativeSegments";
+import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import { renderSegment } from "./narrativeRenderers";
+import { ThinkingIndicator } from "./NarrationShared";
 
 export interface NarrationFocusProps {
   messages: GameMessage[];
@@ -36,16 +37,7 @@ export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
         )}
       </div>
 
-      {thinking && (
-        <div
-          data-testid="thinking-indicator"
-          className="flex items-center justify-center gap-3 py-2 text-muted-foreground/30"
-        >
-          <span className="text-sm animate-pulse">◇</span>
-          <span className="text-sm animate-pulse [animation-delay:200ms]">◇</span>
-          <span className="text-sm animate-pulse [animation-delay:400ms]">◇</span>
-        </div>
-      )}
+      {thinking && <ThinkingIndicator />}
 
       <div className="flex items-center justify-center gap-4 py-4 border-t border-border/30">
         <button
