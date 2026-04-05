@@ -50,6 +50,7 @@ export interface ConfrontationData {
 
 interface ConfrontationOverlayProps {
   data: ConfrontationData | null;
+  onBeatSelect?: (beatId: string) => void;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -129,7 +130,7 @@ function ActorPortrait({
 // Beat action buttons
 // ═══════════════════════════════════════════════════════════
 
-function BeatActions({ beats }: { beats: BeatOption[] }) {
+function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelect?: (beatId: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2 mt-3">
       {beats.map((beat) => (
@@ -137,6 +138,7 @@ function BeatActions({ beats }: { beats: BeatOption[] }) {
           key={beat.id}
           type="button"
           data-resolution={beat.resolution ? 'true' : undefined}
+          onClick={() => onBeatSelect?.(beat.id)}
           className={[
             'px-3 py-1.5 rounded text-xs border transition-colors',
             beat.resolution
@@ -196,7 +198,7 @@ function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
 // Main component
 // ═══════════════════════════════════════════════════════════
 
-export function ConfrontationOverlay({ data }: ConfrontationOverlayProps) {
+export function ConfrontationOverlay({ data, onBeatSelect }: ConfrontationOverlayProps) {
   if (!data) return null;
 
   const isStandoff = data.type === 'standoff';
@@ -232,7 +234,7 @@ export function ConfrontationOverlay({ data }: ConfrontationOverlayProps) {
       <MetricBar metric={data.metric} />
 
       {/* Beat action buttons */}
-      <BeatActions beats={data.beats} />
+      <BeatActions beats={data.beats} onBeatSelect={onBeatSelect} />
 
       {/* Secondary stats (chase rigs, etc.) */}
       {data.secondary_stats && (
