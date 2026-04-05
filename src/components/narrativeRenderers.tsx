@@ -21,7 +21,6 @@ function NarrativeImage({
       className={`overflow-hidden transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20 ${isClickable ? "cursor-pointer" : ""}`}
       style={aspectRatio ? { aspectRatio } : undefined}
       onClick={() => {
-        console.warn("[lightbox] click", { url: seg.url, hasOnLightbox: !!onLightbox, errored, isClickable });
         if (isClickable) onLightbox!(seg.url!);
       }}
       role={isClickable ? "button" : undefined}
