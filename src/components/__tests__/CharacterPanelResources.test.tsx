@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CharacterPanel } from "../CharacterPanel";
-import type { CharacterPanelProps } from "../CharacterPanel";
+import type { CharacterPanelProps, ResourcePool } from "../CharacterPanel";
 import type { CharacterSheetData } from "../CharacterSheet";
 import type { ResourceThreshold } from "../GenericResourceBar";
 
@@ -19,13 +19,6 @@ const CHARACTER: CharacterSheetData = {
   portrait_url: "/renders/kael.png",
   current_location: "The Rusty Cantina",
 };
-
-/** Resource pool shape matching the session AC spec. */
-export interface ResourcePool {
-  value: number;
-  max: number;
-  thresholds: ResourceThreshold[];
-}
 
 const LUCK_RESOURCE: ResourcePool = {
   value: 4,
