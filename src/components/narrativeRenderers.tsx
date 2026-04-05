@@ -124,7 +124,7 @@ export function renderSegment(
       const isPortrait = seg.tier === "portrait";
       const tierClass = isPortrait
         ? "my-4 max-w-[12rem] mx-auto"
-        : "float-right ml-4 mb-3 mt-1 w-[40%] max-w-sm rounded-sm";
+        : "my-4 max-w-sm mx-auto rounded-sm";
       return (
         <figure key={i} className={tierClass}>
           <NarrativeImage seg={seg} onLightbox={setLightboxUrl ? (url) => setLightboxUrl(url) : undefined} />
@@ -140,7 +140,7 @@ export function renderSegment(
       const isPortrait = seg.tier === "portrait";
       const pendingClass = isPortrait
         ? "my-4 max-w-[12rem] mx-auto"
-        : "float-right ml-4 mb-3 mt-1 w-[40%] max-w-sm rounded-sm";
+        : "my-4 max-w-sm mx-auto rounded-sm";
       const aspectRatio = seg.width && seg.height
         ? `${seg.width} / ${seg.height}`
         : undefined;
@@ -159,7 +159,7 @@ export function renderSegment(
         <hr
           key={i}
           data-testid="segment-separator"
-          className="clear-both border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
+          className="border-0 border-t border-border/20 my-8 max-w-[8rem] mx-auto"
         />
       );
     case "system":

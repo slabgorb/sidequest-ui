@@ -133,7 +133,7 @@ export function GameLayout({
   }, []);
 
   // PTT pipeline: Whisper STT + push-to-talk state machine
-  const { transcribe } = useWhisper();
+  const { transcribe } = useWhisper({ enabled: micEnabled });
   const ptt = usePushToTalk({
     transcribe,
     onConfirm: (text: string) => onSend(text, false),
@@ -259,7 +259,7 @@ export function GameLayout({
         data-breakpoint={breakpoint}
         className="flex flex-col flex-1 min-h-0"
       >
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* CharacterPanel — persistent sidebar for single-player */}
           {!isMobile && characterSheet && (
             <CharacterPanel
