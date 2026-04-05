@@ -63,6 +63,7 @@ export interface MockGainNode {
 export interface MockAudioBufferSourceNode {
   buffer: MockAudioBuffer | null;
   loop: boolean;
+  playbackRate: MockAudioParam;
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
   start: ReturnType<typeof vi.fn>;
@@ -163,6 +164,7 @@ export function createMockAudioContext(): MockAudioContext {
     const source: MockAudioBufferSourceNode = {
       buffer: null,
       loop: false,
+      playbackRate: createMockAudioParam(1),
       connect: vi.fn().mockReturnThis(),
       disconnect: vi.fn(),
       start: vi.fn(),
