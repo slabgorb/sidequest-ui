@@ -136,6 +136,24 @@ export function renderSegment(
         </figure>
       );
     }
+    case "render-pending": {
+      const isPortrait = seg.tier === "portrait";
+      const pendingClass = isPortrait
+        ? "my-4 max-w-[12rem] mx-auto"
+        : "float-right ml-4 mb-3 mt-1 w-[40%] max-w-sm rounded-sm";
+      const aspectRatio = seg.width && seg.height
+        ? `${seg.width} / ${seg.height}`
+        : undefined;
+      return (
+        <div
+          key={i}
+          className={`${pendingClass} overflow-hidden rounded-sm`}
+          style={aspectRatio ? { aspectRatio } : undefined}
+        >
+          <div className="w-full h-full min-h-[8rem] bg-muted/20 animate-pulse rounded" />
+        </div>
+      );
+    }
     case "separator":
       return (
         <hr

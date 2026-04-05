@@ -15,7 +15,7 @@ export interface ActionRevealEntry {
 }
 
 export interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal" | "render-pending";
   html?: string;
   url?: string;
   alt?: string;
@@ -24,6 +24,7 @@ export interface NarrativeSegment {
   width?: number;
   height?: number;
   tier?: string;
+  render_id?: string;
   footnotes?: FootnoteData[];
   portraitImage?: NarrativeSegment;
   adjacentText?: NarrativeSegment;
@@ -106,9 +107,24 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
           });
         }
         break;
-      case MessageType.IMAGE:
+      case MessageType.RENDER_QUEUED:
         flushChunks();
         segments.push({
+          kind: "render-pending",
+          render_id: msg.payload.render_id as string,
+          tier: msg.payload.tier as string | undefined,
+          width: msg.payload.width as number | undefined,
+          height: msg.payload.height as number | undefined,
+        });
+        break;
+      case MessageType.IMAGE: {
+        flushChunks();
+        const renderId = msg.payload.render_id as string | undefined;
+        // Replace matching render-pending placeholder if one exists
+        const pendingIdx = renderId
+          ? segments.findIndex(s => s.kind === "render-pending" && s.render_id === renderId)
+          : -1;
+        const imgSeg: NarrativeSegment = {
           kind: "image",
           url: msg.payload.url as string,
           alt: (msg.payload.alt ?? msg.payload.description) as string | undefined,
@@ -116,8 +132,15 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
           width: msg.payload.width as number | undefined,
           height: msg.payload.height as number | undefined,
           tier: msg.payload.tier as string | undefined,
-        });
+          render_id: renderId,
+        };
+        if (pendingIdx >= 0) {
+          segments[pendingIdx] = imgSeg;
+        } else {
+          segments.push(imgSeg);
+        }
         break;
+      }
       case MessageType.SESSION_EVENT: {
         const event = msg.payload.event as string | undefined;
         if (event === "theme_css" || event === "connected" || event === "ready") break;

@@ -26,14 +26,14 @@ export interface BeatOption {
   resolution?: boolean;
 }
 
+export interface StatValue {
+  current: number;
+  max: number;
+}
+
 export interface SecondaryStats {
-  rig_hp: number;
-  max_rig_hp: number;
-  speed: number;
-  armor: number;
-  maneuver: number;
-  fuel: number;
-  max_fuel: number;
+  stats: Record<string, StatValue>;
+  damage_tier?: string;
 }
 
 export interface ConfrontationData {
@@ -166,30 +166,19 @@ function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelec
 // ═══════════════════════════════════════════════════════════
 
 function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
+  const entries = Object.entries(stats.stats ?? {});
+  if (entries.length === 0) return null;
   return (
     <div data-testid="secondary-stats" className="mt-3 p-2 bg-muted/50 rounded text-xs space-y-1">
-      <div className="flex justify-between">
-        <span>HP</span>
-        <span>
-          {stats.rig_hp} / {stats.max_rig_hp}
-        </span>
-      </div>
-      <div className="flex justify-between">
-        <span>Fuel</span>
-        <span>{stats.fuel}</span>
-      </div>
-      <div className="flex justify-between">
-        <span>Speed</span>
-        <span>{stats.speed}</span>
-      </div>
-      <div className="flex justify-between">
-        <span>Armor</span>
-        <span>{stats.armor}</span>
-      </div>
-      <div className="flex justify-between">
-        <span>Maneuver</span>
-        <span>{stats.maneuver}</span>
-      </div>
+      {stats.damage_tier && (
+        <div className="text-center font-semibold text-muted-foreground/70 mb-1">{stats.damage_tier}</div>
+      )}
+      {entries.map(([name, val]) => (
+        <div key={name} className="flex justify-between">
+          <span className="capitalize">{name.replace(/_/g, " ")}</span>
+          <span>{val.current} / {val.max}</span>
+        </div>
+      ))}
     </div>
   );
 }
