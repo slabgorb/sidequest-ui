@@ -16,7 +16,7 @@ export function NarrationCards({ messages, thinking }: NarrationCardsProps) {
   );
 
   return (
-    <div data-testid="narration-cards" className="flex-1 overflow-y-auto px-6 py-8">
+    <div data-testid="narration-cards" className="flex-1 min-h-0 overflow-y-auto px-6 py-8">
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {segments.map((seg, i) => (
           <div
