@@ -13,6 +13,7 @@ import { useAudio } from "@/hooks/useAudio";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useStateMirror } from "@/hooks/useStateMirror";
 import { useSlashCommands, type OverlayType } from "@/hooks/useSlashCommands";
+import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
 import { MessageType, type GameMessage, type NarratorVerbosity, type NarratorVocabulary } from "@/types/protocol";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
@@ -115,6 +116,9 @@ function AppInner() {
 
   // Active overlay panel — lifted from OverlayManager so slash commands can trigger it
   const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
+
+  // Layout mode — client-only, persisted to localStorage
+  const { mode: layoutMode, setMode: setLayoutMode } = useLayoutMode();
 
   // Narrator settings — per-session, sent to server via SESSION_EVENT{settings}
   const [narratorVerbosity, setNarratorVerbosity] = useState<NarratorVerbosity>("standard");
@@ -634,8 +638,10 @@ function AppInner() {
       onVerbosityChange: handleVerbosityChange,
       onVocabularyChange: handleVocabularyChange,
       onImageCooldownChange: handleImageCooldownChange,
+      layoutMode,
+      onLayoutModeChange: setLayoutMode,
     }),
-    [narratorVerbosity, narratorVocabulary, imageCooldown, handleVerbosityChange, handleVocabularyChange, handleImageCooldownChange],
+    [narratorVerbosity, narratorVocabulary, imageCooldown, handleVerbosityChange, handleVocabularyChange, handleImageCooldownChange, layoutMode, setLayoutMode],
   );
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby
