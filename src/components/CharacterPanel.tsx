@@ -64,7 +64,7 @@ export function CharacterPanel({
   ];
 
   return (
-    <div data-testid="character-panel" className="flex flex-col border-r border-border/50 bg-card/50 w-72 shrink-0 sticky top-0 h-screen overflow-y-auto">
+    <div data-testid="character-panel" className="flex flex-col border-r border-border/50 bg-card/50 w-72 shrink-0 h-full overflow-y-auto">
       {/* Header: portrait + name */}
       <div className="flex items-start gap-3 p-4">
         {character.portrait_url && (
