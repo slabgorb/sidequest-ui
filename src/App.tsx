@@ -663,6 +663,20 @@ function AppInner() {
     [sendSettings],
   );
 
+  const handleRequestJournal = useCallback(
+    (category?: string) => {
+      send({
+        type: MessageType.JOURNAL_REQUEST,
+        payload: {
+          ...(category ? { category } : {}),
+          sort_by: 'time',
+        },
+        player_id: '',
+      });
+    },
+    [send],
+  );
+
   const settingsProps = useMemo(
     () => ({
       verbosity: narratorVerbosity,
@@ -859,6 +873,9 @@ function AppInner() {
               nowPlaying={nowPlaying}
               journalEntries={gameState.journal}
               knowledgeEntries={gameState.knowledge}
+              depletions={gameState.depletions}
+              resourceAlerts={gameState.resourceAlerts}
+              onRequestJournal={handleRequestJournal}
               combatState={combatState}
               confrontationData={confrontationData}
               currentPlayerId={currentPlayerId ?? undefined}
