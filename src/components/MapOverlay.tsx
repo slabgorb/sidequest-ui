@@ -6,11 +6,32 @@ export interface ExploredLocation {
   connections: string[];
 }
 
+export interface CartographyRegion {
+  name: string;
+  description?: string;
+  adjacent?: string[];
+}
+
+export interface CartographyRoute {
+  name: string;
+  description?: string;
+  from_id?: string;
+  to_id?: string;
+}
+
+export interface CartographyMetadata {
+  navigation_mode: string;
+  starting_region: string;
+  regions: Record<string, CartographyRegion>;
+  routes: CartographyRoute[];
+}
+
 export interface MapState {
   current_location: string;
   region: string;
   explored: ExploredLocation[];
   fog_bounds: { width: number; height: number };
+  cartography?: CartographyMetadata;
 }
 
 export interface MapOverlayProps {
@@ -22,6 +43,7 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
   const explored = mapData.explored ?? [];
   const fogBounds = mapData.fog_bounds ?? { width: 10, height: 10 };
   const connections = getUniqueConnections(explored);
+  const cartography = mapData.cartography;
   // Fall back to list view when no coordinate data (all x/y are 0)
   const hasCoordinates = explored.some((loc) => loc.x !== 0 || loc.y !== 0);
 
@@ -33,6 +55,46 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
           Close
         </button>
       </div>
+
+      {cartography && (
+        <>
+          <div data-testid="map-navigation-mode" className="text-xs text-muted-foreground/60">
+            {cartography.navigation_mode}
+          </div>
+
+          <div data-testid="map-regions-panel" className="space-y-1">
+            {Object.entries(cartography.regions).map(([slug, region]) => (
+              <div
+                key={slug}
+                data-testid={`map-region-${region.name}`}
+                data-starting={slug === cartography.starting_region ? 'true' : undefined}
+                className="text-sm"
+              >
+                <span className="font-medium">{region.name}</span>
+                {region.description && (
+                  <span className="text-muted-foreground/50 ml-2">{region.description}</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {cartography.routes.length > 0 && (
+            <div className="space-y-1">
+              {cartography.routes.map((route) => (
+                <div
+                  key={route.name}
+                  data-testid={`map-route-${route.name}`}
+                  data-from={route.from_id}
+                  data-to={route.to_id}
+                  className="text-xs text-muted-foreground/40"
+                >
+                  {route.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {hasCoordinates ? (
         <svg
