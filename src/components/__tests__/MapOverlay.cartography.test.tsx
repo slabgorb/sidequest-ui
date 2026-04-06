@@ -26,7 +26,6 @@ const MAP_WITH_CARTOGRAPHY: MapState = {
     { name: 'Forest Path', x: 6, y: 4, type: 'road', connections: ['The Ashwood Tavern', 'Ruins'] },
   ],
   fog_bounds: { width: 20, height: 15 },
-  // @ts-expect-error — cartography field does not exist yet on MapState
   cartography: {
     navigation_mode: 'region',
     starting_region: 'Eldergrove',
@@ -61,7 +60,6 @@ const MAP_WITH_ROOM_GRAPH: MapState = {
     { name: 'Entry Hall', x: 0, y: 0, type: 'room', connections: ['Corridor'] },
   ],
   fog_bounds: { width: 10, height: 10 },
-  // @ts-expect-error — cartography field does not exist yet on MapState
   cartography: {
     navigation_mode: 'room_graph',
     starting_region: 'entry_hall',
@@ -95,8 +93,8 @@ describe('MapOverlay — Cartography Wiring (Story 26-10)', () => {
       render(<MapOverlay mapData={MAP_WITH_CARTOGRAPHY} onClose={() => {}} />);
       // Regions panel should list all regions from cartography
       expect(screen.getByTestId('map-regions-panel')).toBeInTheDocument();
-      expect(screen.getByText('Eldergrove')).toBeInTheDocument();
-      expect(screen.getByText('Shadowlands')).toBeInTheDocument();
+      expect(screen.getByTestId('map-region-Eldergrove')).toBeInTheDocument();
+      expect(screen.getByTestId('map-region-Shadowlands')).toBeInTheDocument();
     });
 
     it('shows region descriptions on hover or in detail view', () => {
@@ -149,7 +147,22 @@ describe('MapOverlay — Cartography Wiring (Story 26-10)', () => {
       expect(screen.getByText('Town Square')).toBeInTheDocument();
       // No cartography elements should be rendered
       expect(screen.queryByTestId('map-navigation-mode')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('map-regions-panel')).not.toBeInTheDocument();
+    });
+
+    it('renders list view when no coordinates are present', () => {
+      const noCoordMap: MapState = {
+        current_location: 'Tavern',
+        region: 'Market District',
+        explored: [
+          { name: 'Tavern', x: 0, y: 0, type: 'settlement', connections: [] },
+          { name: 'Market', x: 0, y: 0, type: 'market', connections: ['Tavern'] },
+        ],
+        fog_bounds: { width: 10, height: 10 },
+      };
+      render(<MapOverlay mapData={noCoordMap} onClose={() => {}} />);
+      // Should render list view instead of SVG
+      expect(screen.getByTestId('map-list')).toBeInTheDocument();
+      expect(screen.queryByTestId('map-fog')).not.toBeInTheDocument();
     });
   });
 });
