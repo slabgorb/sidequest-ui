@@ -13,7 +13,7 @@ This is a personal project under the `slabgorb` GitHub account.
 ## SideQuest System Overview
 
 Four repos compose the SideQuest Rust rewrite:
-- **sidequest-api** — Rust game engine and WebSocket API (workspace with 6 crates)
+- **sidequest-api** — Rust game engine and WebSocket API (workspace with 10 crates)
 - **sidequest-ui** — React/TypeScript game client
 - **sidequest-daemon** — Python media services (image gen, TTS, audio)
 - **sidequest-content** — Genre packs (YAML configs, audio, images, world data)
@@ -85,24 +85,25 @@ tell whether it's engaged or whether Claude is just improvising.
 
 ## Architecture Decision Index (docs/adr/)
 
-Before designing or modifying a subsystem, check the relevant ADR:
+Before designing or modifying a subsystem, check the relevant ADR (68 total):
 
 | Domain | ADRs |
 |--------|------|
 | Core architecture | 001 (Claude CLI only), 002 (SOUL principles), 005 (background-first), 006 (graceful degradation) |
 | Genre packs | 003 (pack architecture), 004 (lazy binding) |
-| Prompt engineering | 008 (three-tier taxonomy), 009 (attention-aware zones) |
-| Agent system | 010 (intent routing), 011 (JSON patches), 012 (session mgmt), 013 (lazy extraction) |
+| Prompt engineering | 008 (three-tier taxonomy), 009 (attention-aware zones), 066 (persistent Opus sessions / Full vs Delta tier) |
+| Agent system | 010 (intent routing), 011 (JSON patches), 012 (session mgmt), 013 (lazy extraction), 057 (narrator-crunch separation), 059 (monster manual server-side pregen), 067 (unified narrator agent — no keyword matching) |
 | Characters | 007 (unified model), 014 (diamonds/coal), 015 (builder FSM), 016 (three-mode chargen) |
 | Combat / chase | 017 (cinematic chase), 033 (confrontation resource pools) |
-| World / NPCs | 018 (trope engine), 019 (cartography), 020 (NPC disposition), 022 (world maturity) |
-| Progression | 021 (four-track progression) |
-| Narrative pacing | 024 (dual-track tension), 025 (pacing detection) |
+| World / NPCs | 018 (trope engine), 019 (cartography), 020 (NPC disposition), 022 (world maturity), 055 (room graph navigation) |
+| Progression | 021 (four-track progression), 052 (narrative axis system) |
+| Narrative pacing | 024 (dual-track tension), 025 (pacing detection), 050 (image pacing throttle), 051 (two-tier turn counter) |
 | Session persistence | 023 (state + recap) |
-| Frontend / protocol | 026 (client state mirror), 027 (reactive state messaging) |
-| Multiplayer | 028 (perception rewriter), 029 (guest NPC players), 030 (scenario packs) |
-| Telemetry | 031 (game watcher semantic telemetry) |
-| Media | 032 (genre LoRA style training), 034 (portrait identity consistency) |
+| Frontend / protocol | 026 (client state mirror), 027 (reactive state messaging), 054 (WebRTC voice chat disabled), 065 (protocol message decomposition) |
+| Multiplayer | 028 (perception rewriter), 029 (guest NPC players), 030 (scenario packs), 053 (scenario system) |
+| Telemetry | 031 (game watcher semantic telemetry), 058 (Claude subprocess OTEL passthrough) |
+| Media | 032 (genre LoRA style training), 034 (portrait identity consistency), 056 (script tool generators) |
+| Codebase structure | 060 (genre models decomposition), 061 (lore module decomposition), 062 (server lib extraction), 063 (dispatch handler splitting), 064 (game crate domain modules), 068 (magic literal extraction) |
 
 ## Spoiler Protection
 

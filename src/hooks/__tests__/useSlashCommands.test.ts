@@ -77,40 +77,40 @@ describe("useSlashCommands", () => {
     expect(out.overlay).toBe("inventory");
   });
 
-  it("unknown commands pass through to backend (handled=false)", () => {
+  it("unknown slash commands are swallowed client-side (handled=true, no overlay)", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/status");
 
-    expect(out.handled).toBe(false);
+    expect(out.handled).toBe(true);
     expect(out.messages).toEqual([]);
     expect(out.overlay).toBeUndefined();
   });
 
-  it("/help passes through to backend", () => {
+  it("/help is swallowed client-side", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/help");
 
-    expect(out.handled).toBe(false);
+    expect(out.handled).toBe(true);
   });
 
-  it("/quests passes through to backend", () => {
+  it("/quests is swallowed client-side", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/quests");
 
-    expect(out.handled).toBe(false);
+    expect(out.handled).toBe(true);
   });
 
-  it("/gm commands pass through to backend", () => {
+  it("/gm commands are swallowed client-side", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/gm set location tavern");
 
-    expect(out.handled).toBe(false);
+    expect(out.handled).toBe(true);
   });
 
-  it("/tone commands pass through to backend", () => {
+  it("/tone commands are swallowed client-side", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/tone humor 0.8");
 
-    expect(out.handled).toBe(false);
+    expect(out.handled).toBe(true);
   });
 });

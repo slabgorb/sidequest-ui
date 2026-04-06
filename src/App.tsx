@@ -606,6 +606,13 @@ function AppInner() {
         return;
       }
 
+      // Never send slash-prefixed text to the server as a game action.
+      // Unrecognised commands are swallowed client-side to prevent
+      // "Unexpected message in Playing state" errors from the backend.
+      if (text.trimStart().startsWith('/')) {
+        return;
+      }
+
       const msg: GameMessage = {
         type: MessageType.PLAYER_ACTION,
         payload: { action: text, aside },

@@ -25,7 +25,11 @@ export interface OverlayManagerProps {
 function isTextInput(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName.toLowerCase();
-  if (tag === 'input' || tag === 'textarea') return true;
+  if (tag === 'textarea') return true;
+  if (tag === 'input') {
+    const type = (el as HTMLInputElement).type?.toLowerCase();
+    return type !== 'radio' && type !== 'checkbox';
+  }
   if (el.getAttribute('contenteditable') != null) return true;
   return false;
 }

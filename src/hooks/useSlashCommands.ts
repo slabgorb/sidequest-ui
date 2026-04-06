@@ -35,9 +35,10 @@ export function useSlashCommands() {
       case '/settings':
         return { handled: true, messages: [], overlay: 'settings' };
       default:
-        // Passthrough — let the backend handle it. Backend has /status, /save,
-        // /help, /quests, /gm, /tone, and returns the response as NARRATION.
-        return { handled: false, messages: [] };
+        // Unknown slash command — swallow it client-side. The backend cannot
+        // receive slash text as PLAYER_ACTION without erroring. If a command
+        // needs server support, add an explicit case above.
+        return { handled: true, messages: [] };
     }
   }, []);
 
