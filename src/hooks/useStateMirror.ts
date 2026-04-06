@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
-import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory } from '../providers/GameStateProvider';
+import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
 
 interface FootnoteData {
   marker?: number;
@@ -28,6 +28,8 @@ export function useStateMirror(messages: GameMessage[]): void {
     const knowledge: KnowledgeEntry[] = [];
     const seenRenderIds = new Set<string>();
     const seenFactIds = new Set<string>();
+    const depletions: ItemDepletion[] = [];
+    const resourceAlerts: ResourceAlert[] = [];
     let myPlayerId = '';
     let turnCounter = 0;
 
@@ -69,6 +71,54 @@ export function useStateMirror(messages: GameMessage[]): void {
       // Track turns for knowledge entry timestamps
       if (msg.type === MessageType.PLAYER_ACTION) {
         turnCounter++;
+        continue;
+      }
+
+      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries
+      if (msg.type === MessageType.JOURNAL_RESPONSE) {
+        const entries = msg.payload.entries as Array<{
+          fact_id: string;
+          content: string;
+          category: string;
+          source: string;
+          confidence: string;
+          learned_turn: number;
+        }> | undefined;
+        if (entries) {
+          for (const entry of entries) {
+            if (seenFactIds.has(entry.fact_id)) continue;
+            seenFactIds.add(entry.fact_id);
+            const validCategories = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
+            const category = (validCategories.includes(entry.category) ? entry.category : 'Lore') as FactCategory;
+            knowledge.push({
+              fact_id: entry.fact_id,
+              content: entry.content,
+              category,
+              is_new: false,
+              learned_turn: entry.learned_turn,
+            });
+          }
+        }
+        continue;
+      }
+
+      // ITEM_DEPLETED: a consumable item was fully exhausted
+      if (msg.type === MessageType.ITEM_DEPLETED) {
+        const itemName = msg.payload.item_name as string;
+        const remainingBefore = msg.payload.remaining_before as number;
+        if (itemName) {
+          depletions.push({ item_name: itemName, remaining_before: remainingBefore ?? 0 });
+        }
+        continue;
+      }
+
+      // RESOURCE_MIN_REACHED: a resource decayed to its minimum
+      if (msg.type === MessageType.RESOURCE_MIN_REACHED) {
+        const resourceName = msg.payload.resource_name as string;
+        const minValue = msg.payload.min_value as number;
+        if (resourceName) {
+          resourceAlerts.push({ resource_name: resourceName, min_value: minValue ?? 0 });
+        }
         continue;
       }
 
@@ -124,6 +174,14 @@ export function useStateMirror(messages: GameMessage[]): void {
     // Merge accumulated knowledge
     if (knowledge.length > 0) {
       current = { ...current, knowledge };
+    }
+
+    // Merge accumulated depletions and resource alerts
+    if (depletions.length > 0) {
+      current = { ...current, depletions };
+    }
+    if (resourceAlerts.length > 0) {
+      current = { ...current, resourceAlerts };
     }
 
     if (messages.length !== prevLengthRef.current) {
