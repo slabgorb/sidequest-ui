@@ -4,8 +4,10 @@ import type { InventoryData, InventoryItem } from "./InventoryPanel";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "./PartyPanel";
+import { KnowledgeJournal } from "./KnowledgeJournal";
+import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 
-type TabId = "stats" | "abilities" | "backstory" | "inventory" | "status";
+type TabId = "stats" | "abilities" | "backstory" | "inventory" | "status" | "journal";
 
 export interface ResourcePool {
   value: number;
@@ -36,6 +38,8 @@ export interface CharacterPanelProps {
     resource: string;
     threshold: ResourceThreshold;
   }) => void;
+  knowledgeEntries?: KnowledgeEntry[];
+  onRequestJournal?: (category?: string) => void;
   characters?: CharacterSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
@@ -52,6 +56,8 @@ export function CharacterPanel({
   inventory,
   resources,
   genreSlug,
+  knowledgeEntries,
+  onRequestJournal,
   onResourceThresholdCrossed,
   characters = [],
   currentPlayerId,
@@ -73,6 +79,7 @@ export function CharacterPanel({
     { id: "backstory", label: "Backstory" },
     { id: "inventory" as TabId, label: "Inventory" },
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
+    ...(knowledgeEntries && knowledgeEntries.length > 0 ? [{ id: "journal" as TabId, label: "Journal" }] : []),
   ];
 
   // Drag-to-resize state
@@ -165,6 +172,9 @@ export function CharacterPanel({
             genreSlug={genreSlug ?? ""}
             onThresholdCrossed={onResourceThresholdCrossed}
           />
+        )}
+        {activeTab === "journal" && knowledgeEntries && (
+          <KnowledgeJournal entries={knowledgeEntries} onRequestJournal={onRequestJournal} />
         )}
       </div>
 

@@ -335,6 +335,8 @@ export function GameLayout({
               inventory={inventoryData}
               resources={resources}
               genreSlug={genreSlug}
+              knowledgeEntries={knowledgeEntries}
+              onRequestJournal={onRequestJournal}
               onResourceThresholdCrossed={handleResourceThresholdCrossed}
               characters={characters}
               currentPlayerId={currentPlayerId}
