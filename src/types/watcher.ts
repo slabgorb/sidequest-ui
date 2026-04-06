@@ -51,11 +51,6 @@ export interface TurnCompleteFields {
   delta_empty?: boolean;
 }
 
-/** Beat fired during a trope tick. */
-export interface FiredBeat {
-  trope: string;
-  threshold?: number;
-}
 
 // --- Debug state endpoint types (GET /api/debug/state) ---
 
