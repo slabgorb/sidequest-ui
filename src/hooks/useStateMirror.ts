@@ -7,15 +7,21 @@ const VALID_SOURCES: string[] = ['Observation', 'Dialogue', 'Discovery', 'Backst
 const VALID_CONFIDENCES: string[] = ['Certain', 'Suspected', 'Rumored'];
 
 function validateCategory(raw: string | undefined): FactCategory {
-  return (raw && VALID_CATEGORIES.includes(raw) ? raw : 'Lore') as FactCategory;
+  if (raw && VALID_CATEGORIES.includes(raw)) return raw as FactCategory;
+  if (raw) console.warn(`[useStateMirror] Unknown category "${raw}", falling back to "Lore"`);
+  return 'Lore';
 }
 
 function validateSource(raw: string | undefined): FactSource {
-  return (raw && VALID_SOURCES.includes(raw) ? raw : 'Observation') as FactSource;
+  if (raw && VALID_SOURCES.includes(raw)) return raw as FactSource;
+  if (raw) console.warn(`[useStateMirror] Unknown source "${raw}", falling back to "Observation"`);
+  return 'Observation';
 }
 
 function validateConfidence(raw: string | undefined): Confidence {
-  return (raw && VALID_CONFIDENCES.includes(raw) ? raw : 'Suspected') as Confidence;
+  if (raw && VALID_CONFIDENCES.includes(raw)) return raw as Confidence;
+  if (raw) console.warn(`[useStateMirror] Unknown confidence "${raw}", falling back to "Suspected"`);
+  return 'Suspected';
 }
 
 interface FootnoteData {
@@ -36,7 +42,13 @@ export function useStateMirror(messages: GameMessage[]): void {
   const prevLengthRef = useRef(0);
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+      if (prevLengthRef.current > 0) {
+        prevLengthRef.current = 0;
+        setState({ ...EMPTY_GAME_STATE });
+      }
+      return;
+    }
 
     // Replay all messages to compute current state (idempotent)
     let current: ClientGameState = { ...EMPTY_GAME_STATE, characters: [], quests: {}, knowledge: [] };
@@ -74,6 +86,8 @@ export function useStateMirror(messages: GameMessage[]): void {
         }
         const initialState = msg.payload.initial_state as ClientGameState | undefined;
         if (initialState) {
+          depletions.length = 0;
+          resourceAlerts.length = 0;
           current = {
             characters: (initialState.characters ?? []).map(normalizeCharacter),
             location: initialState.location ?? '',
