@@ -1,6 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
-import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
+import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
+
+const VALID_CATEGORIES: string[] = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
+const VALID_SOURCES: string[] = ['Observation', 'Dialogue', 'Discovery', 'Backstory'];
+const VALID_CONFIDENCES: string[] = ['Certain', 'Suspected', 'Rumored'];
+
+function validateCategory(raw: string | undefined): FactCategory {
+  return (raw && VALID_CATEGORIES.includes(raw) ? raw : 'Lore') as FactCategory;
+}
+
+function validateSource(raw: string | undefined): FactSource {
+  return (raw && VALID_SOURCES.includes(raw) ? raw : 'Observation') as FactSource;
+}
+
+function validateConfidence(raw: string | undefined): Confidence {
+  return (raw && VALID_CONFIDENCES.includes(raw) ? raw : 'Suspected') as Confidence;
+}
 
 interface FootnoteData {
   marker?: number;
@@ -88,12 +104,12 @@ export function useStateMirror(messages: GameMessage[]): void {
           for (const entry of entries) {
             if (seenFactIds.has(entry.fact_id)) continue;
             seenFactIds.add(entry.fact_id);
-            const validCategories = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
-            const category = (validCategories.includes(entry.category) ? entry.category : 'Lore') as FactCategory;
             knowledge.push({
               fact_id: entry.fact_id,
               content: entry.content,
-              category,
+              category: validateCategory(entry.category),
+              source: validateSource(entry.source),
+              confidence: validateConfidence(entry.confidence),
               is_new: false,
               learned_turn: entry.learned_turn,
             });
@@ -134,12 +150,12 @@ export function useStateMirror(messages: GameMessage[]): void {
           const factId = `${turnCounter}-${fn.marker ?? knowledge.length}`;
           if (seenFactIds.has(factId)) continue;
           seenFactIds.add(factId);
-          const validCategories = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
-          const category = (validCategories.includes(fn.category ?? '') ? fn.category : 'Lore') as FactCategory;
           knowledge.push({
             fact_id: factId,
             content: fn.summary,
-            category,
+            category: validateCategory(fn.category),
+            source: 'Observation' as FactSource,
+            confidence: 'Suspected' as Confidence,
             is_new: fn.is_new ?? true,
             learned_turn: turnCounter,
           });
