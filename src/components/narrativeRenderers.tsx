@@ -14,14 +14,18 @@ function NarrativeImage({
     ? `${seg.width} / ${seg.height}`
     : undefined;
 
+  const isClickable = !errored && !!onLightbox && !!seg.url;
+
   return (
     <div
-      className="overflow-hidden cursor-pointer transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20"
+      className={`overflow-hidden transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20 ${isClickable ? "cursor-pointer" : ""}`}
       style={aspectRatio ? { aspectRatio } : undefined}
-      onClick={() => !errored && onLightbox?.(seg.url!)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter" && !errored) onLightbox?.(seg.url!); }}
+      onClick={() => {
+        if (isClickable) onLightbox!(seg.url!);
+      }}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === "Enter") onLightbox!(seg.url!); } : undefined}
     >
       {!loaded && !errored && (
         <div className="absolute inset-0 bg-muted/20 animate-pulse rounded" />

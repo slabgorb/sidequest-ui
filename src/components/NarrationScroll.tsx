@@ -7,9 +7,10 @@ import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
 export interface NarrationScrollProps {
   messages: GameMessage[];
   thinking?: boolean;
+  setLightboxUrl?: (url: string | null) => void;
 }
 
-export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
+export function NarrationScroll({ messages, thinking, setLightboxUrl }: NarrationScrollProps) {
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)),
     [messages],
@@ -60,13 +61,13 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
             {hasHistory && historySegments.length > 0 && (
               <div className="opacity-40 space-y-4 pb-6 mb-6 border-b-2 border-border/50">
                 {historySegments.map((seg, i) =>
-                  renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
+                  renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]", setLightboxUrl }),
                 )}
               </div>
             )}
             {/* Current turn — full opacity */}
             {currentSegments.map((seg, i) =>
-              renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
+              renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]", setLightboxUrl }),
             )}
           </>
         )}
