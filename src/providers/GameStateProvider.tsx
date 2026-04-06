@@ -33,12 +33,24 @@ export interface KnowledgeEntry {
   confidence: Confidence;
 }
 
+export interface ItemDepletion {
+  item_name: string;
+  remaining_before: number;
+}
+
+export interface ResourceAlert {
+  resource_name: string;
+  min_value: number;
+}
+
 export interface ClientGameState {
   characters: CharacterState[];
   location: string;
   quests: Record<string, string>;
   journal?: JournalEntry[];
   knowledge: KnowledgeEntry[];
+  depletions?: ItemDepletion[];
+  resourceAlerts?: ResourceAlert[];
 }
 
 export interface GameStateContextValue {

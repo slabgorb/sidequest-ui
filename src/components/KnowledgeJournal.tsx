@@ -7,9 +7,10 @@ type SortMode = 'chronological' | 'categorical';
 
 interface KnowledgeJournalProps {
   entries: KnowledgeEntry[];
+  onRequestJournal?: (category?: string) => void;
 }
 
-export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
+export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournalProps) {
   const [activeCategory, setActiveCategory] = useState<FactCategory | 'All'>('All');
   const [sortMode, setSortMode] = useState<SortMode>('chronological');
 
@@ -69,15 +70,26 @@ export function KnowledgeJournal({ entries }: KnowledgeJournalProps) {
         ))}
       </div>
 
-      <button
-        data-testid="sort-toggle"
-        onClick={() =>
-          setSortMode((m) => (m === 'chronological' ? 'categorical' : 'chronological'))
-        }
-        className="text-xs text-muted-foreground/50 hover:text-muted-foreground mb-3"
-      >
-        {sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}
-      </button>
+      <div className="flex gap-3 mb-3">
+        <button
+          data-testid="sort-toggle"
+          onClick={() =>
+            setSortMode((m) => (m === 'chronological' ? 'categorical' : 'chronological'))
+          }
+          className="text-xs text-muted-foreground/50 hover:text-muted-foreground"
+        >
+          {sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}
+        </button>
+        {onRequestJournal && (
+          <button
+            data-testid="refresh-journal"
+            onClick={() => onRequestJournal(activeCategory === 'All' ? undefined : activeCategory)}
+            className="text-xs text-muted-foreground/50 hover:text-muted-foreground"
+          >
+            Refresh from server
+          </button>
+        )}
+      </div>
 
       <div className="space-y-2">
         {sorted.map((entry) => (

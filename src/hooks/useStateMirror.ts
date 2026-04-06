@@ -1,6 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
-import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory } from '../providers/GameStateProvider';
+import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
+
+const VALID_CATEGORIES: string[] = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
+const VALID_SOURCES: string[] = ['Observation', 'Dialogue', 'Discovery', 'Backstory'];
+const VALID_CONFIDENCES: string[] = ['Certain', 'Suspected', 'Rumored'];
+
+function validateCategory(raw: string | undefined): FactCategory {
+  if (raw && VALID_CATEGORIES.includes(raw)) return raw as FactCategory;
+  if (raw) console.warn(`[useStateMirror] Unknown category "${raw}", falling back to "Lore"`);
+  return 'Lore';
+}
+
+function validateSource(raw: string | undefined): FactSource {
+  if (raw && VALID_SOURCES.includes(raw)) return raw as FactSource;
+  if (raw) console.warn(`[useStateMirror] Unknown source "${raw}", falling back to "Observation"`);
+  return 'Observation';
+}
+
+function validateConfidence(raw: string | undefined): Confidence {
+  if (raw && VALID_CONFIDENCES.includes(raw)) return raw as Confidence;
+  if (raw) console.warn(`[useStateMirror] Unknown confidence "${raw}", falling back to "Suspected"`);
+  return 'Suspected';
+}
 
 interface FootnoteData {
   marker?: number;
@@ -20,7 +42,13 @@ export function useStateMirror(messages: GameMessage[]): void {
   const prevLengthRef = useRef(0);
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (messages.length === 0) {
+      if (prevLengthRef.current > 0) {
+        prevLengthRef.current = 0;
+        setState({ ...EMPTY_GAME_STATE });
+      }
+      return;
+    }
 
     // Replay all messages to compute current state (idempotent)
     let current: ClientGameState = { ...EMPTY_GAME_STATE, characters: [], quests: {}, knowledge: [] };
@@ -28,6 +56,8 @@ export function useStateMirror(messages: GameMessage[]): void {
     const knowledge: KnowledgeEntry[] = [];
     const seenRenderIds = new Set<string>();
     const seenFactIds = new Set<string>();
+    const depletions: ItemDepletion[] = [];
+    const resourceAlerts: ResourceAlert[] = [];
     let myPlayerId = '';
     let turnCounter = 0;
 
@@ -56,6 +86,8 @@ export function useStateMirror(messages: GameMessage[]): void {
         }
         const initialState = msg.payload.initial_state as ClientGameState | undefined;
         if (initialState) {
+          depletions.length = 0;
+          resourceAlerts.length = 0;
           current = {
             characters: (initialState.characters ?? []).map(normalizeCharacter),
             location: initialState.location ?? '',
@@ -72,6 +104,54 @@ export function useStateMirror(messages: GameMessage[]): void {
         continue;
       }
 
+      // JOURNAL_RESPONSE: server returns accumulated journal/knowledge entries
+      if (msg.type === MessageType.JOURNAL_RESPONSE) {
+        const entries = msg.payload.entries as Array<{
+          fact_id: string;
+          content: string;
+          category: string;
+          source: string;
+          confidence: string;
+          learned_turn: number;
+        }> | undefined;
+        if (entries) {
+          for (const entry of entries) {
+            if (seenFactIds.has(entry.fact_id)) continue;
+            seenFactIds.add(entry.fact_id);
+            knowledge.push({
+              fact_id: entry.fact_id,
+              content: entry.content,
+              category: validateCategory(entry.category),
+              source: validateSource(entry.source),
+              confidence: validateConfidence(entry.confidence),
+              is_new: false,
+              learned_turn: entry.learned_turn,
+            });
+          }
+        }
+        continue;
+      }
+
+      // ITEM_DEPLETED: a consumable item was fully exhausted
+      if (msg.type === MessageType.ITEM_DEPLETED) {
+        const itemName = msg.payload.item_name as string;
+        const remainingBefore = msg.payload.remaining_before as number;
+        if (itemName) {
+          depletions.push({ item_name: itemName, remaining_before: remainingBefore ?? 0 });
+        }
+        continue;
+      }
+
+      // RESOURCE_MIN_REACHED: a resource decayed to its minimum
+      if (msg.type === MessageType.RESOURCE_MIN_REACHED) {
+        const resourceName = msg.payload.resource_name as string;
+        const minValue = msg.payload.min_value as number;
+        if (resourceName) {
+          resourceAlerts.push({ resource_name: resourceName, min_value: minValue ?? 0 });
+        }
+        continue;
+      }
+
       if (msg.type !== MessageType.NARRATION && msg.type !== MessageType.TURN_STATUS) {
         continue;
       }
@@ -84,12 +164,12 @@ export function useStateMirror(messages: GameMessage[]): void {
           const factId = `${turnCounter}-${fn.marker ?? knowledge.length}`;
           if (seenFactIds.has(factId)) continue;
           seenFactIds.add(factId);
-          const validCategories = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
-          const category = (validCategories.includes(fn.category ?? '') ? fn.category : 'Lore') as FactCategory;
           knowledge.push({
             fact_id: factId,
             content: fn.summary,
-            category,
+            category: validateCategory(fn.category),
+            source: 'Observation' as FactSource,
+            confidence: 'Suspected' as Confidence,
             is_new: fn.is_new ?? true,
             learned_turn: turnCounter,
           });
@@ -124,6 +204,14 @@ export function useStateMirror(messages: GameMessage[]): void {
     // Merge accumulated knowledge
     if (knowledge.length > 0) {
       current = { ...current, knowledge };
+    }
+
+    // Merge accumulated depletions and resource alerts
+    if (depletions.length > 0) {
+      current = { ...current, depletions };
+    }
+    if (resourceAlerts.length > 0) {
+      current = { ...current, resourceAlerts };
     }
 
     if (messages.length !== prevLengthRef.current) {

@@ -26,7 +26,7 @@ import type { MapState } from "@/components/MapOverlay";
 import { CombatOverlay, type CombatState } from "@/components/CombatOverlay";
 import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { JournalEntry } from "@/components/JournalView";
-import type { KnowledgeEntry } from "@/providers/GameStateProvider";
+import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { GameMessage } from "@/types/protocol";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
@@ -57,6 +57,9 @@ export interface GameLayoutProps {
   settingsProps?: SettingsPanelProps;
   resources?: Record<string, ResourcePool> | null;
   genreSlug?: string;
+  depletions?: ItemDepletion[];
+  resourceAlerts?: ResourceAlert[];
+  onRequestJournal?: (category?: string) => void;
   activeOverlay: OverlayType;
   onOverlayChange: (overlay: OverlayType) => void;
 }
@@ -87,6 +90,9 @@ export function GameLayout({
   settingsProps,
   resources,
   genreSlug,
+  depletions,
+  resourceAlerts,
+  onRequestJournal,
   activeOverlay,
   onOverlayChange,
 }: GameLayoutProps) {
@@ -262,6 +268,25 @@ export function GameLayout({
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Main content area */}
           <div className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+            {/* Item depletion and resource alerts */}
+            {depletions && depletions.length > 0 && (
+              <div data-testid="depletion-alerts" className="px-4 py-2 space-y-1 shrink-0">
+                {depletions.map((d, i) => (
+                  <div key={`depletion-${i}`} data-testid={`depletion-${d.item_name}`} className="text-sm px-3 py-1.5 rounded bg-destructive/15 text-destructive border border-destructive/30">
+                    <span className="font-medium">{d.item_name}</span> depleted
+                  </div>
+                ))}
+              </div>
+            )}
+            {resourceAlerts && resourceAlerts.length > 0 && (
+              <div data-testid="resource-alerts" className="px-4 py-2 space-y-1 shrink-0">
+                {resourceAlerts.map((r, i) => (
+                  <div key={`resource-${i}`} data-testid={`resource-alert-${r.resource_name}`} className="text-sm px-3 py-1.5 rounded bg-warning/15 text-warning border border-warning/30">
+                    <span className="font-medium">{r.resource_name}</span> at minimum ({r.min_value})
+                  </div>
+                ))}
+              </div>
+            )}
             <NarrativeView messages={messages} thinking={thinking} layoutMode={layoutMode} />
 
             {characters.length > 1 && activePlayerName && (
@@ -348,7 +373,7 @@ export function GameLayout({
                 <JournalView entries={journalEntries} />
               )}
               {activeOverlay === "knowledge" && knowledgeEntries && (
-                <KnowledgeJournal entries={knowledgeEntries} />
+                <KnowledgeJournal entries={knowledgeEntries} onRequestJournal={onRequestJournal} />
               )}
             </div>
           </div>
