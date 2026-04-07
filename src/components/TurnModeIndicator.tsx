@@ -19,7 +19,7 @@ const MODE_CONFIG: Record<GameMode, { label: string; color: string; tooltip: str
   },
 };
 
-export interface TurnModeIndicatorProps {
+interface TurnModeIndicatorProps {
   mode: GameMode;
 }
 
