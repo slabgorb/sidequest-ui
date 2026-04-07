@@ -22,7 +22,6 @@ import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
-import type { CombatState } from "@/components/CombatOverlay";
 import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 
@@ -149,8 +148,6 @@ function AppInner() {
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
 
-  // Combat state from COMBAT_EVENT messages
-  const [combatState, setCombatState] = useState<CombatState | null>(null);
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
 
@@ -494,11 +491,7 @@ function AppInner() {
       setMapData(msg.payload as unknown as MapState);
       return;
     }
-    if (msg.type === MessageType.COMBAT_EVENT) {
-      const payload = msg.payload as unknown as CombatState;
-      setCombatState(payload.in_combat ? payload : null);
-      return;
-    }
+    // COMBAT_EVENT handler removed in story 28-9
     if (msg.type === MessageType.CONFRONTATION) {
       const payload = msg.payload as unknown as ConfrontationData;
       setConfrontationData(payload.active !== false ? payload : null);
@@ -714,7 +707,6 @@ function AppInner() {
     setPartyMembers([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
-    setCombatState(null);
     setConfrontationData(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
@@ -883,7 +875,6 @@ function AppInner() {
               depletions={gameState.depletions}
               resourceAlerts={gameState.resourceAlerts}
               onRequestJournal={handleRequestJournal}
-              combatState={combatState}
               confrontationData={confrontationData}
               currentPlayerId={currentPlayerId ?? undefined}
               activePlayerId={activePlayerId}

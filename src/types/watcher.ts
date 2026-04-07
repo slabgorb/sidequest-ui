@@ -65,8 +65,6 @@ export interface PlayerStateView {
   region_id: string;
   display_location: string;
   inventory: InventoryView;
-  combat_state: CombatStateView;
-  chase_state: unknown | null;
 }
 
 export interface InventoryView {
@@ -82,13 +80,6 @@ export interface ItemView {
   state: string;
   source_turn: number;
   tags: string[];
-}
-
-export interface CombatStateView {
-  round: number;
-  in_combat: boolean;
-  damage_log: unknown[];
-  effects: Record<string, unknown[]>;
 }
 
 export interface TropeStateView {

@@ -23,7 +23,6 @@ import type { CharacterSummary } from "@/components/PartyPanel";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import { CombatOverlay, type CombatState } from "@/components/CombatOverlay";
 import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
@@ -46,7 +45,6 @@ export interface GameLayoutProps {
   nowPlaying?: NowPlaying | null;
   journalEntries?: JournalEntry[];
   knowledgeEntries?: KnowledgeEntry[];
-  combatState?: CombatState | null;
   confrontationData?: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
   currentPlayerId?: string;
@@ -79,7 +77,6 @@ export function GameLayout({
   nowPlaying = null,
   journalEntries,
   knowledgeEntries,
-  combatState = null,
   confrontationData,
   onBeatSelect,
   currentPlayerId,
@@ -346,7 +343,6 @@ export function GameLayout({
         </div>
 
         {/* Combat overlay — visible only during combat */}
-        {combatState && <CombatOverlay combat={combatState} />}
 
         {/* Confrontation overlay — structured encounters (standoff, chase, etc.) */}
         {confrontationData && <ConfrontationOverlay data={confrontationData} onBeatSelect={onBeatSelect} />}
