@@ -1,4 +1,4 @@
-export interface ExploredLocation {
+interface ExploredLocation {
   name: string;
   x: number;
   y: number;

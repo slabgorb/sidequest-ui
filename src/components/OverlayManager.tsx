@@ -10,7 +10,7 @@ import { SettingsPanel, type SettingsPanelProps } from './SettingsPanel';
 
 export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | 'settings' | null;
 
-export interface OverlayManagerProps {
+interface OverlayManagerProps {
   characterData: CharacterSheetData | null;
   inventoryData: InventoryData | null;
   mapData: MapState | null;

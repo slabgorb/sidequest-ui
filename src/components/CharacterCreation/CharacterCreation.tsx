@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { toRoman } from "@/lib/utils";
 
-export interface CreationChoice {
+interface CreationChoice {
   label: string;
   description: string;
 }
