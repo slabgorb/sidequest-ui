@@ -1,7 +1,7 @@
 // DungeonMapRenderer — Story 29-8: Multi-room SVG dungeon map with fog of war and zoom.
 // Renders a DungeonLayout as a global SVG grid with room-level visibility and zoom transitions.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   DungeonLayoutData,
   PlacedRoomData,
@@ -134,7 +134,10 @@ export function DungeonMapRenderer({
     discoveredRoomIds.includes(r.roomId)
   );
 
-  const sharedSkips = computeSharedWallSkips(discoveredRooms);
+  const sharedSkips = useMemo(
+    () => computeSharedWallSkips(discoveredRooms),
+    [discoveredRooms]
+  );
 
   // ViewBox: overview shows entire dungeon, zoom shows one room
   const overviewVB = `0 0 ${layout.globalWidth * cellSize} ${layout.globalHeight * cellSize}`;

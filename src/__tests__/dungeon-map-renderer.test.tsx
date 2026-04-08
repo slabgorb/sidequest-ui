@@ -5,26 +5,9 @@ import type {
   TacticalThemeConfig,
   TacticalCell,
   GridPos,
+  PlacedRoomData,
+  DungeonLayoutData,
 } from "@/types/tactical";
-
-// ── Types for DungeonMapRenderer ─────────────────────────────────────────────
-// These mirror what will be added to @/types/tactical by Dev.
-// Tests import from source once the types exist; for now, define locally
-// so the test file itself compiles.
-
-interface PlacedRoomData {
-  readonly roomId: string;
-  readonly roomName: string;
-  readonly grid: TacticalGridData;
-  readonly globalOffsetX: number;
-  readonly globalOffsetY: number;
-}
-
-interface DungeonLayoutData {
-  readonly rooms: readonly PlacedRoomData[];
-  readonly globalWidth: number;
-  readonly globalHeight: number;
-}
 
 // ── Test fixtures ────────────────────────────────────────────────────────────
 
