@@ -271,13 +271,6 @@ function PlayerCard({
           </table>
         </div>
       )}
-
-      {/* Combat */}
-      {player.combat_state.in_combat && (
-        <div style={{ fontSize: 11, color: THEME.red, fontWeight: "bold" }}>
-          IN COMBAT — Round {player.combat_state.round}
-        </div>
-      )}
     </Card>
   );
 }
