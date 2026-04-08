@@ -5,6 +5,7 @@ import type {
   TacticalGridData,
   TacticalThemeConfig,
   TacticalCell,
+  FeatureDef,
   FeatureType,
   GridPos,
 } from "@/types/tactical";
@@ -32,7 +33,7 @@ const FEATURE_MARKERS: Record<FeatureType, string> = {
 function cellFill(
   cell: TacticalCell,
   theme: TacticalThemeConfig,
-  legend: Record<string, { feature_type: FeatureType; label: string }>
+  legend: Record<string, FeatureDef>
 ): string {
   switch (cell.type) {
     case "floor":
