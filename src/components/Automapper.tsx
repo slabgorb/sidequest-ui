@@ -1,4 +1,8 @@
 // Automapper — Story 19-8: SVG room graph renderer for dungeon crawl UI
+// Delegates to TacticalGridRenderer when the current room has grid data (Story 29-4).
+
+import { TacticalGridRenderer } from "@/components/TacticalGridRenderer";
+import type { TacticalGridData, TacticalThemeConfig } from "@/types/tactical";
 
 export interface ExitInfo {
   direction: string;
@@ -13,6 +17,7 @@ export interface ExploredRoom {
   size: string;
   is_current: boolean;
   exits: ExitInfo[];
+  grid?: TacticalGridData;
 }
 
 export interface ThemeConfig {
@@ -117,7 +122,39 @@ const EXIT_ICONS: Record<string, string> = {
 
 // --- Component ---
 
+// Default tactical theme — used when Automapper delegates to TacticalGridRenderer
+// without an explicit tactical theme. Colors derived from the default schematic theme.
+const DEFAULT_TACTICAL_THEME: TacticalThemeConfig = {
+  floor: "#3a3a4a",
+  wall: "#1a1a2a",
+  water: "#1a3a5c",
+  difficultTerrain: "#5a4a3a",
+  door: "#4a4a5a",
+  gridLine: "#2a2a3a",
+  features: {
+    cover: "#5a5a6a",
+    hazard: "#8b2500",
+    difficult_terrain: "#5a4a3a",
+    atmosphere: "#4a4a5a",
+    interactable: "#e6c84c",
+    door: "#4a4a5a",
+  },
+};
+
 export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
+  // Delegate to TacticalGridRenderer if the current room has grid data
+  const currentRoom = rooms.find((r) => r.id === currentRoomId);
+  if (currentRoom?.grid) {
+    return (
+      <div style={{ maxWidth: "100%" }}>
+        <TacticalGridRenderer
+          grid={currentRoom.grid}
+          theme={DEFAULT_TACTICAL_THEME}
+        />
+      </div>
+    );
+  }
+
   const t = theme ?? DEFAULT_THEME;
   const positions = layoutRooms(rooms);
   const posMap = new Map(positions.map((p) => [p.id, p]));
