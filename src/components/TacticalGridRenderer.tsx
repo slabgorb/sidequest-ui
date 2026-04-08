@@ -15,8 +15,6 @@ export interface TacticalGridRendererProps {
   theme: TacticalThemeConfig;
   onCellClick?: (pos: GridPos) => void;
   onCellHover?: (pos: GridPos | null) => void;
-  entities?: unknown[];
-  zones?: unknown[];
 }
 
 const DEFAULT_CELL_SIZE = 24;
@@ -171,8 +169,8 @@ export function TacticalGridRenderer({
                 width={cellSize}
                 height={cellSize}
                 fill={fill}
-                stroke={cell.type === "void" ? undefined : stroke}
-                strokeWidth={cell.type === "void" ? undefined : 0.5}
+                stroke={stroke}
+                strokeWidth={stroke ? 0.5 : undefined}
                 onClick={() => handleClick(x, y)}
                 onMouseEnter={() => handleMouseEnter(x, y)}
                 onMouseLeave={handleMouseLeave}
