@@ -15,7 +15,7 @@ export interface ActionRevealEntry {
 }
 
 export interface NarrativeSegment {
-  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal" | "render-pending";
+  kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal" | "render-pending" | "gallery-notice";
   html?: string;
   url?: string;
   alt?: string;
@@ -108,37 +108,19 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         }
         break;
       case MessageType.RENDER_QUEUED:
-        flushChunks();
-        segments.push({
-          kind: "render-pending",
-          render_id: msg.payload.render_id as string,
-          tier: msg.payload.tier as string | undefined,
-          width: msg.payload.width as number | undefined,
-          height: msg.payload.height as number | undefined,
-        });
+        // Images are handled by ImageBusProvider — skip render placeholders
         break;
       case MessageType.IMAGE: {
+        // Images routed to gallery widget via ImageBusProvider.
+        // Emit a subtle gallery notice in the narrative stream.
         flushChunks();
         const renderId = msg.payload.render_id as string | undefined;
-        // Replace matching render-pending placeholder if one exists
-        const pendingIdx = renderId
-          ? segments.findIndex(s => s.kind === "render-pending" && s.render_id === renderId)
-          : -1;
-        const imgSeg: NarrativeSegment = {
-          kind: "image",
-          url: msg.payload.url as string,
-          alt: (msg.payload.alt ?? msg.payload.description) as string | undefined,
-          caption: (msg.payload.caption ?? msg.payload.description) as string | undefined,
-          width: msg.payload.width as number | undefined,
-          height: msg.payload.height as number | undefined,
-          tier: msg.payload.tier as string | undefined,
-          render_id: renderId,
-        };
-        if (pendingIdx >= 0) {
-          segments[pendingIdx] = imgSeg;
-        } else {
-          segments.push(imgSeg);
+        // Remove any stale render-pending placeholder
+        if (renderId) {
+          const pendingIdx = segments.findIndex(s => s.kind === "render-pending" && s.render_id === renderId);
+          if (pendingIdx >= 0) segments.splice(pendingIdx, 1);
         }
+        segments.push({ kind: "gallery-notice", text: "New image in gallery" });
         break;
       }
       case MessageType.SESSION_EVENT: {
@@ -245,25 +227,7 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   return segments;
 }
 
+/** @deprecated Images now route to gallery widget; portrait grouping is a no-op passthrough. */
 export function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[] {
-  const result: NarrativeSegment[] = [];
-  let i = 0;
-  while (i < segments.length) {
-    const seg = segments[i];
-    if (seg.kind === "image" && seg.tier === "portrait") {
-      const next = segments[i + 1];
-      if (next && next.kind === "text") {
-        result.push({
-          kind: "portrait-group",
-          portraitImage: seg,
-          adjacentText: next,
-        });
-        i += 2;
-        continue;
-      }
-    }
-    result.push(seg);
-    i++;
-  }
-  return result;
+  return segments;
 }

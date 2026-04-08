@@ -1,12 +1,14 @@
 import { useCallback } from 'react';
 import type { GameMessage } from '../types/protocol';
+import type { WidgetId } from '@/components/GameBoard/widgetRegistry';
 
-export type OverlayType = 'character' | 'inventory' | 'map' | 'journal' | 'knowledge' | 'settings' | null;
+/** @deprecated Use WidgetId instead */
+export type OverlayType = WidgetId | null;
 
 export interface SlashCommandResult {
   handled: boolean;
   messages: GameMessage[];
-  overlay?: OverlayType;
+  widget?: WidgetId;
 }
 
 export function useSlashCommands() {
@@ -18,22 +20,22 @@ export function useSlashCommands() {
 
     const cmd = trimmed.split(/\s+/)[0].toLowerCase();
 
-    // Overlay triggers — open the panel locally, no server round-trip.
-    // These use canonical data from dedicated WebSocket messages (INVENTORY,
-    // CHARACTER_SHEET, MAP_UPDATE), not the degraded state mirror.
+    // Widget triggers — toggle the widget locally, no server round-trip.
     switch (cmd) {
       case '/inventory':
-        return { handled: true, messages: [], overlay: 'inventory' };
+        return { handled: true, messages: [], widget: 'inventory' };
       case '/character':
-        return { handled: true, messages: [], overlay: 'character' };
+        return { handled: true, messages: [], widget: 'character' };
       case '/map':
-        return { handled: true, messages: [], overlay: 'map' };
+        return { handled: true, messages: [], widget: 'map' };
       case '/journal':
-        return { handled: true, messages: [], overlay: 'journal' };
+        return { handled: true, messages: [], widget: 'journal' };
       case '/knowledge':
-        return { handled: true, messages: [], overlay: 'knowledge' };
+        return { handled: true, messages: [], widget: 'knowledge' };
       case '/settings':
-        return { handled: true, messages: [], overlay: 'settings' };
+        return { handled: true, messages: [], widget: 'settings' };
+      case '/gallery':
+        return { handled: true, messages: [], widget: 'gallery' };
       default:
         // Unknown slash command — swallow it client-side. The backend cannot
         // receive slash text as PLAYER_ACTION without erroring. If a command

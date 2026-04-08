@@ -181,7 +181,7 @@ describe("CharacterPanel — AC-3: tab persistence", () => {
   it("restores previously selected tab from localStorage on mount", () => {
     localStorage.setItem(
       "sq-character-panel",
-      JSON.stringify({ activeTab: "backstory", sidebarWidth: 288 }),
+      JSON.stringify({ activeTab: "backstory" }),
     );
     render(<CharacterPanel character={CHARACTER} />);
     expect(screen.getByRole("tab", { name: /backstory/i })).toHaveAttribute(
@@ -215,9 +215,10 @@ describe("CharacterPanel — AC-4: always visible with resize", () => {
     expect(screen.getByRole("tabpanel")).toBeInTheDocument();
   });
 
-  it("renders a resize handle on the right edge", () => {
+  it("renders as a flexible panel (no fixed width)", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.getByTestId("sidebar-resize-handle")).toBeInTheDocument();
+    const panel = screen.getByTestId("character-panel");
+    expect(panel.style.width).toBe("");
   });
 });
 
