@@ -3,6 +3,7 @@ import { CharacterSheet, type CharacterSheetData } from './CharacterSheet';
 import { InventoryPanel, type InventoryData } from './InventoryPanel';
 import { MapOverlay, type MapState } from './MapOverlay';
 import { Automapper, type ExploredRoom, type ExitInfo } from './Automapper';
+import type { TacticalGridData, TacticalCell, TacticalCellType, FeatureDef } from '@/types/tactical';
 import { JournalView, type JournalEntry } from './JournalView';
 import { KnowledgeJournal } from './KnowledgeJournal';
 import type { KnowledgeEntry } from '@/providers/GameStateProvider';
@@ -34,6 +35,46 @@ function isTextInput(el: Element | null): boolean {
   return false;
 }
 
+const VALID_CELL_TYPES = new Set<string>([
+  "floor", "wall", "void", "door_closed", "door_open", "water", "difficult_terrain", "feature",
+]);
+
+/** Convert a wire-format tactical_grid payload to TacticalGridData. */
+function parseTacticalGridPayload(payload: Record<string, unknown>): TacticalGridData {
+  const width = payload.width as number;
+  const height = payload.height as number;
+  const rawCells = payload.cells as string[][];
+  const rawFeatures = (payload.features ?? []) as Array<{
+    glyph: string; feature_type: string; label: string; positions: number[][];
+  }>;
+
+  const cells: TacticalCell[][] = rawCells.map((row) =>
+    row.map((cellStr): TacticalCell => {
+      const cellType: TacticalCellType = VALID_CELL_TYPES.has(cellStr)
+        ? (cellStr as TacticalCellType)
+        : "floor";
+      return { type: cellType };
+    })
+  );
+
+  // Build legend from features array
+  const legend: Record<string, FeatureDef> = {};
+  for (const feat of rawFeatures) {
+    legend[feat.glyph] = {
+      feature_type: feat.feature_type as FeatureDef["feature_type"],
+      label: feat.label,
+    };
+    // Mark feature cells with their glyph
+    for (const [x, y] of feat.positions) {
+      if (cells[y]?.[x]) {
+        cells[y][x] = { type: "feature", glyph: feat.glyph };
+      }
+    }
+  }
+
+  return { width, height, cells, legend, exits: [] };
+}
+
 /** Bridge MapState → Automapper props when room graph data is present */
 function useAutomapperData(mapData: MapState | null) {
   return useMemo(() => {
@@ -51,6 +92,9 @@ function useAutomapperData(mapData: MapState | null) {
         exit_type: re.exit_type.replace("_down", "").replace("_up", ""),
         to_room_id: re.target || undefined,
       }));
+      const tacticalGrid = (loc as Record<string, unknown>).tactical_grid as Record<string, unknown> | undefined;
+      const grid = tacticalGrid ? parseTacticalGridPayload(tacticalGrid) : undefined;
+
       return {
         id: (loc as Record<string, unknown>).name as string,
         name: (loc as Record<string, unknown>).name as string,
@@ -58,6 +102,7 @@ function useAutomapperData(mapData: MapState | null) {
         size: "medium",
         is_current: (loc as Record<string, unknown>).name === mapData.current_location,
         exits,
+        grid,
       };
     });
 
