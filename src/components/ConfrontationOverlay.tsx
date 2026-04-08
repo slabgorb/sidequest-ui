@@ -51,6 +51,8 @@ export interface ConfrontationData {
 interface ConfrontationOverlayProps {
   data: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
+  /** When true, renders inline (no fixed positioning) for use inside a widget. */
+  inline?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -187,13 +189,15 @@ function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
 // Main component
 // ═══════════════════════════════════════════════════════════
 
-export function ConfrontationOverlay({ data, onBeatSelect }: ConfrontationOverlayProps) {
+export function ConfrontationOverlay({ data, onBeatSelect, inline }: ConfrontationOverlayProps) {
   if (!data) return null;
 
   const isStandoff = data.type === 'standoff';
 
   const overlayClasses = [
-    'fixed inset-x-0 bottom-0 z-30 bg-card border-t border-border shadow-lg p-4',
+    inline
+      ? 'bg-card p-4'
+      : 'fixed inset-x-0 bottom-0 z-30 bg-card border-t border-border shadow-lg p-4',
     isStandoff ? 'letterbox' : '',
   ]
     .filter(Boolean)

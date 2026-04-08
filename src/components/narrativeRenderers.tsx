@@ -1,51 +1,4 @@
-import { useState } from "react";
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
-
-function NarrativeImage({
-  seg,
-  onLightbox,
-}: {
-  seg: NarrativeSegment;
-  onLightbox?: (url: string) => void;
-}) {
-  const [loaded, setLoaded] = useState(false);
-  const [errored, setErrored] = useState(false);
-  const aspectRatio = seg.width && seg.height
-    ? `${seg.width} / ${seg.height}`
-    : undefined;
-
-  const isClickable = !errored && !!onLightbox && !!seg.url;
-
-  return (
-    <div
-      className={`overflow-hidden transition-opacity hover:opacity-90 relative rounded-sm shadow-md shadow-black/20 ${isClickable ? "cursor-pointer" : ""}`}
-      style={aspectRatio ? { aspectRatio } : undefined}
-      onClick={() => {
-        if (isClickable) onLightbox!(seg.url!);
-      }}
-      role={isClickable ? "button" : undefined}
-      tabIndex={isClickable ? 0 : undefined}
-      onKeyDown={isClickable ? (e) => { if (e.key === "Enter") onLightbox!(seg.url!); } : undefined}
-    >
-      {!loaded && !errored && (
-        <div className="absolute inset-0 bg-muted/20 animate-pulse rounded" />
-      )}
-      {errored ? (
-        <div className="flex items-center justify-center h-full min-h-[4rem] bg-muted/10 rounded text-muted-foreground/40 text-xs italic">
-          Image unavailable
-        </div>
-      ) : (
-        <img
-          src={seg.url}
-          alt={seg.alt ?? ""}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-          onLoad={() => setLoaded(true)}
-          onError={() => setErrored(true)}
-        />
-      )}
-    </div>
-  );
-}
 
 function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] }) {
   if (!footnotes || footnotes.length === 0) return null;
@@ -101,63 +54,20 @@ export function renderSegment(
           <FootnoteList footnotes={seg.footnotes} />
         </div>
       );
-    case "portrait-group": {
-      const img = seg.portraitImage!;
-      const txt = seg.adjacentText!;
-      return (
-        <div key={i} className={`${maxTextWidth} mx-auto my-4`}>
-          <div className="flex gap-4">
-            <div
-              className="prose dark:prose-invert text-xl leading-[1.45] flex-1 min-w-0"
-              dangerouslySetInnerHTML={{ __html: txt.html! }}
-            />
-            <figure className="w-48 shrink-0">
-              <NarrativeImage seg={img} onLightbox={setLightboxUrl ? (url) => setLightboxUrl(url) : undefined} />
-              {img.caption && (
-                <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
-                  {img.caption}
-                </figcaption>
-              )}
-            </figure>
-          </div>
-          <FootnoteList footnotes={txt.footnotes} />
-        </div>
-      );
-    }
-    case "image": {
-      const isPortrait = seg.tier === "portrait";
-      const tierClass = isPortrait
-        ? "my-4 max-w-[12rem] mx-auto"
-        : "my-4 max-w-sm mx-auto rounded-sm";
-      return (
-        <figure key={i} className={tierClass}>
-          <NarrativeImage seg={seg} onLightbox={setLightboxUrl ? (url) => setLightboxUrl(url) : undefined} />
-          {seg.caption && (
-            <figcaption className="text-xs text-muted-foreground/50 mt-2 italic text-center">
-              {seg.caption}
-            </figcaption>
-          )}
-        </figure>
-      );
-    }
-    case "render-pending": {
-      const isPortrait = seg.tier === "portrait";
-      const pendingClass = isPortrait
-        ? "my-4 max-w-[12rem] mx-auto"
-        : "my-4 max-w-sm mx-auto rounded-sm";
-      const aspectRatio = seg.width && seg.height
-        ? `${seg.width} / ${seg.height}`
-        : undefined;
+    case "gallery-notice":
       return (
         <div
           key={i}
-          className={`${pendingClass} overflow-hidden rounded-sm`}
-          style={aspectRatio ? { aspectRatio } : undefined}
+          className="text-xs text-muted-foreground/40 italic py-1 text-center"
         >
-          <div className="w-full h-full min-h-[8rem] bg-muted/20 animate-pulse rounded" />
+          {seg.text}
         </div>
       );
-    }
+    case "portrait-group":
+    case "image":
+    case "render-pending":
+      // Images now route to gallery widget — these segment kinds should not appear.
+      return null;
     case "separator":
       return (
         <hr

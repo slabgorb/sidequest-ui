@@ -21,7 +21,7 @@ describe("useSlashCommands", () => {
 
     expect(out.handled).toBe(false);
     expect(out.messages).toEqual([]);
-    expect(out.overlay).toBeUndefined();
+    expect(out.widget).toBeUndefined();
   });
 
   it("/inventory returns overlay trigger, no messages", () => {
@@ -29,7 +29,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/inventory");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("inventory");
+    expect(out.widget).toBe("inventory");
     expect(out.messages).toEqual([]);
   });
 
@@ -38,7 +38,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/character");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("character");
+    expect(out.widget).toBe("character");
     expect(out.messages).toEqual([]);
   });
 
@@ -47,7 +47,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/map");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("map");
+    expect(out.widget).toBe("map");
     expect(out.messages).toEqual([]);
   });
 
@@ -56,7 +56,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/journal");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("journal");
+    expect(out.widget).toBe("journal");
     expect(out.messages).toEqual([]);
   });
 
@@ -65,7 +65,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/knowledge");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("knowledge");
+    expect(out.widget).toBe("knowledge");
     expect(out.messages).toEqual([]);
   });
 
@@ -74,7 +74,7 @@ describe("useSlashCommands", () => {
     const out = result.current.execute("/INVENTORY");
 
     expect(out.handled).toBe(true);
-    expect(out.overlay).toBe("inventory");
+    expect(out.widget).toBe("inventory");
   });
 
   it("unknown slash commands are swallowed client-side (handled=true, no overlay)", () => {
@@ -83,7 +83,7 @@ describe("useSlashCommands", () => {
 
     expect(out.handled).toBe(true);
     expect(out.messages).toEqual([]);
-    expect(out.overlay).toBeUndefined();
+    expect(out.widget).toBeUndefined();
   });
 
   it("/help is swallowed client-side", () => {

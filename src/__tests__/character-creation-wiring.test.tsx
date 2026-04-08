@@ -283,7 +283,7 @@ describe("AC-1: new player enters character creation", () => {
     expect(
       screen.getByTestId("character-creation"),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId("game-layout")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-board")).not.toBeInTheDocument();
   });
 
   it("displays the first scene narration text", async () => {
@@ -599,7 +599,7 @@ describe("AC-4: complete transitions to game view", () => {
 
     // GameView should now be rendered, creation should be gone
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 
   it("integrates character into GameState after completion", async () => {
@@ -676,7 +676,7 @@ describe("AC-5: returning player skips creation", () => {
 
     // Should go straight to game view — no creation
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 
   it("does not receive CHARACTER_CREATION messages for returning player", async () => {
@@ -701,7 +701,7 @@ describe("AC-5: returning player skips creation", () => {
     });
 
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 });
 

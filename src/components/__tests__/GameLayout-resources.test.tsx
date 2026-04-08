@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { GameLayout, type GameLayoutProps } from "../GameLayout";
-import type { OverlayType } from "@/hooks/useSlashCommands";
+import { GameBoard, type GameBoardProps } from "../GameBoard/GameBoard";
+import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "../CharacterPanel";
 import type { ResourceThreshold } from "../GenericResourceBar";
 
@@ -73,27 +73,30 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function renderLayout(overrides: Partial<GameLayoutProps> = {}) {
-  const defaults: GameLayoutProps = {
+function renderLayout(overrides: Partial<GameBoardProps> = {}) {
+  const defaults: GameBoardProps = {
     messages: [],
     characters: [{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }],
     onSend: vi.fn(),
     disabled: false,
     characterSheet: CHARACTER_SHEET,
-    activeOverlay: null as OverlayType,
-    onOverlayChange: vi.fn(),
-    audio: mockAudio as unknown as GameLayoutProps["audio"],
+    audio: mockAudio as unknown as GameBoardProps["audio"],
   };
-  return render(<GameLayout {...defaults} {...overrides} />);
+  const props = { ...defaults, ...overrides };
+  return render(
+    <ImageBusProvider messages={props.messages ?? []}>
+      <GameBoard {...props} />
+    </ImageBusProvider>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════
-// AC-2: GameLayout passes resources and genreSlug to CharacterPanel
+// AC-2: GameBoard passes resources and genreSlug to CharacterPanel
 // ═══════════════════════════════════════════════════════════
 
-describe("25-11 AC-2: GameLayout passes resources to CharacterPanel", () => {
-  it("GameLayoutProps accepts resources prop", () => {
-    // This test fails if GameLayoutProps doesn't include resources
+describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
+  it("GameBoardProps accepts resources prop", () => {
+    // This test fails if GameBoardProps doesn't include resources
     renderLayout({
       resources: MOCK_RESOURCES,
       genreSlug: "spaghetti_western",
@@ -101,7 +104,7 @@ describe("25-11 AC-2: GameLayout passes resources to CharacterPanel", () => {
     expect(screen.getByTestId("character-panel")).toBeInTheDocument();
   });
 
-  it("GameLayoutProps accepts genreSlug prop", () => {
+  it("GameBoardProps accepts genreSlug prop", () => {
     renderLayout({
       genreSlug: "spaghetti_western",
     });
@@ -155,7 +158,7 @@ describe("25-11 AC-2: GameLayout passes resources to CharacterPanel", () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// AC-3: GameLayout wires onResourceThresholdCrossed to audio
+// AC-3: GameBoard wires onResourceThresholdCrossed to audio
 // ═══════════════════════════════════════════════════════════
 
 describe("25-11 AC-3: Threshold crossing routes to AudioEngine", () => {
@@ -167,7 +170,7 @@ describe("25-11 AC-3: Threshold crossing routes to AudioEngine", () => {
     });
     fireEvent.click(screen.getByRole("tab", { name: /status/i }));
     // GenericResourceBar fires onThresholdCrossed via useEffect on mount
-    // when value <= threshold. GameLayout should route this to audio.playSfx
+    // when value <= threshold. GameBoard should route this to audio.playSfx
     expect(mockPlaySfx).toHaveBeenCalled();
   });
 
@@ -216,7 +219,7 @@ describe("25-11 AC-5: No silent fallbacks", () => {
 // ═══════════════════════════════════════════════════════════
 
 describe("25-11 AC-4: End-to-end pipeline verification", () => {
-  it("full pipeline: resources in GameLayout props → CharacterPanel → GenericResourceBar renders with correct values", () => {
+  it("full pipeline: resources in GameBoard props → CharacterPanel → GenericResourceBar renders with correct values", () => {
     renderLayout({
       resources: {
         Luck: { value: 3, max: 6, thresholds: [{ value: 1, label: "Snake Eyes", direction: "low" as const }] },
@@ -232,7 +235,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
     expect(screen.getAllByTestId("threshold-marker")).toHaveLength(1);
   });
 
-  it("full pipeline: multiple resources render independently through GameLayout", () => {
+  it("full pipeline: multiple resources render independently through GameBoard", () => {
     renderLayout({
       resources: MOCK_RESOURCES,
       genreSlug: "spaghetti_western",
@@ -248,7 +251,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
     });
   });
 
-  it("full pipeline: resource updates propagate through GameLayout to rendered bars", () => {
+  it("full pipeline: resource updates propagate through GameBoard to rendered bars", () => {
     const { rerender } = renderLayout({
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
@@ -258,7 +261,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
 
     // Simulate resource update via new props (as would happen from PARTY_STATUS)
     rerender(
-      <GameLayout
+      <GameBoard
         messages={[]}
         characters={[{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }]}
         onSend={vi.fn()}
@@ -266,7 +269,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
         characterSheet={CHARACTER_SHEET}
         activeOverlay={null as OverlayType}
         onOverlayChange={vi.fn()}
-        audio={mockAudio as unknown as GameLayoutProps["audio"]}
+        audio={mockAudio as unknown as GameBoardProps["audio"]}
         resources={{ Luck: { ...LUCK_RESOURCE, value: 1 } }}
         genreSlug="spaghetti_western"
       />,
@@ -276,19 +279,19 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// Wiring verification — GameLayout is non-test consumer
+// Wiring verification — GameBoard is non-test consumer
 // ═══════════════════════════════════════════════════════════
 
-describe("25-11 Wiring: resources flow through GameLayout", () => {
-  it("GameLayout imports and passes resources to CharacterPanel (non-test consumer)", () => {
-    // This is the critical wiring test — resources must flow through GameLayout,
+describe("25-11 Wiring: resources flow through GameBoard", () => {
+  it("GameBoard imports and passes resources to CharacterPanel (non-test consumer)", () => {
+    // This is the critical wiring test — resources must flow through GameBoard,
     // not just be accepted by CharacterPanel in isolation
     renderLayout({
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
     });
     fireEvent.click(screen.getByRole("tab", { name: /status/i }));
-    // If GameLayout doesn't pass resources to CharacterPanel, no resource bar renders
+    // If GameBoard doesn't pass resources to CharacterPanel, no resource bar renders
     expect(screen.getByTestId("resource-bar")).toBeInTheDocument();
     expect(screen.getByText("Luck")).toBeInTheDocument();
   });

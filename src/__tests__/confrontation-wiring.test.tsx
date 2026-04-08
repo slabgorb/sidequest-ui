@@ -1,9 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { GameLayout, type GameLayoutProps } from "@/components/GameLayout";
+import { GameBoard, type GameBoardProps } from "@/components/GameBoard/GameBoard";
+import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ConfrontationData } from "@/components/ConfrontationOverlay";
-import type { OverlayType } from "@/hooks/useSlashCommands";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -76,23 +76,26 @@ const CHARACTER_SUMMARY = {
   portrait_url: "/renders/sam.png",
 };
 
-function renderLayout(overrides: Partial<GameLayoutProps> = {}) {
-  const defaults: GameLayoutProps = {
+function renderLayout(overrides: Partial<GameBoardProps> = {}) {
+  const defaults: GameBoardProps = {
     messages: [],
     characters: [CHARACTER_SUMMARY],
     onSend: vi.fn(),
     disabled: false,
-    activeOverlay: null as OverlayType,
-    onOverlayChange: vi.fn(),
   };
-  return render(<GameLayout {...defaults} {...overrides} />);
+  const props = { ...defaults, ...overrides };
+  return render(
+    <ImageBusProvider messages={props.messages}>
+      <GameBoard {...props} />
+    </ImageBusProvider>
+  );
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC1: GameLayout renders ConfrontationOverlay when data is provided
+// AC1: GameBoard renders ConfrontationOverlay when data is provided
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC1: ConfrontationOverlay renders in GameLayout", () => {
+describe("AC1: ConfrontationOverlay renders in GameBoard", () => {
   it("renders confrontation overlay when confrontationData is provided", () => {
     renderLayout({ confrontationData: STANDOFF_DATA });
 
@@ -148,7 +151,7 @@ describe("AC2: Confrontation type rendering", () => {
 // AC3: Metric bar renders correctly
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC3: Metric bar in GameLayout context", () => {
+describe("AC3: Metric bar in GameBoard context", () => {
   it("renders the metric bar with correct name", () => {
     renderLayout({ confrontationData: STANDOFF_DATA });
 
@@ -215,7 +218,7 @@ describe("AC5: Overlay lifecycle", () => {
 
   it("hides overlay when confrontationData becomes null (resolution)", () => {
     const { rerender } = render(
-      <GameLayout
+      <GameBoard
         messages={[]}
         characters={[CHARACTER_SUMMARY]}
         onSend={vi.fn()}
@@ -229,7 +232,7 @@ describe("AC5: Overlay lifecycle", () => {
     expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
 
     rerender(
-      <GameLayout
+      <GameBoard
         messages={[]}
         characters={[CHARACTER_SUMMARY]}
         onSend={vi.fn()}
@@ -248,14 +251,14 @@ describe("AC5: Overlay lifecycle", () => {
 // Wiring tests — verify ConfrontationOverlay is imported and connected
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("Wiring: ConfrontationOverlay in GameLayout", () => {
-  it("GameLayout accepts confrontationData prop", () => {
+describe("Wiring: ConfrontationOverlay in GameBoard", () => {
+  it("GameBoard accepts confrontationData prop", () => {
     // TypeScript ensures prop exists — this tests runtime acceptance
     const { container } = renderLayout({ confrontationData: STANDOFF_DATA });
     expect(container).toBeInTheDocument();
   });
 
-  it("GameLayout accepts onBeatSelect callback prop", () => {
+  it("GameBoard accepts onBeatSelect callback prop", () => {
     const onBeatSelect = vi.fn();
     const { container } = renderLayout({
       confrontationData: STANDOFF_DATA,

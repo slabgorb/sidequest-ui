@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useRef } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
 import type { InventoryData, InventoryItem } from "./InventoryPanel";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
@@ -17,16 +17,10 @@ export interface ResourcePool {
 
 interface CharacterPanelPrefs {
   activeTab: TabId;
-  sidebarWidth: number;
 }
-
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 500;
-const DEFAULT_WIDTH = 288; // 72 * 4 = w-72
 
 const DEFAULTS: CharacterPanelPrefs = {
   activeTab: "stats",
-  sidebarWidth: DEFAULT_WIDTH,
 };
 
 export interface CharacterPanelProps {
@@ -69,7 +63,6 @@ export function CharacterPanel({
   );
 
   const activeTab = prefs.activeTab;
-  const sidebarWidth = prefs.sidebarWidth ?? DEFAULT_WIDTH;
 
   const hasResources = resources != null && Object.keys(resources).length > 0;
 
@@ -82,41 +75,13 @@ export function CharacterPanel({
     ...(knowledgeEntries && knowledgeEntries.length > 0 ? [{ id: "journal" as TabId, label: "Journal" }] : []),
   ];
 
-  // Drag-to-resize state
   const panelRef = useRef<HTMLDivElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const dragStartX = useRef(0);
-  const dragStartWidth = useRef(sidebarWidth);
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setDragging(true);
-    dragStartX.current = e.clientX;
-    dragStartWidth.current = sidebarWidth;
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (!dragging) return;
-    const onMouseMove = (e: MouseEvent) => {
-      const delta = dragStartX.current - e.clientX;
-      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, dragStartWidth.current + delta));
-      setPref({ sidebarWidth: newWidth });
-    };
-    const onMouseUp = () => setDragging(false);
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    return () => {
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [dragging, setPref]);
 
   return (
     <div
       data-testid="character-panel"
       ref={panelRef}
-      className="character-panel flex flex-col border-l border-border/50 bg-card/50 shrink-0 h-full overflow-y-auto relative"
-      style={{ width: sidebarWidth }}
+      className="character-panel flex flex-col bg-card/50 h-full overflow-y-auto"
     >
       {/* Header: portrait + name */}
       <div className="flex items-start gap-3 p-4">
@@ -244,15 +209,6 @@ export function CharacterPanel({
         </div>
       )}
 
-      {/* Resize handle */}
-      <div
-        data-testid="sidebar-resize-handle"
-        onMouseDown={onMouseDown}
-        className={[
-          "absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-primary/30 transition-colors",
-          dragging ? "bg-primary/50" : "",
-        ].filter(Boolean).join(" ")}
-      />
     </div>
   );
 }

@@ -328,7 +328,7 @@ describe("AC-4: graceful handling", () => {
     });
 
     // No crash — component still renders
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 
   it("does not crash when VOICE_SIGNAL has empty signal payload", async () => {
@@ -344,7 +344,7 @@ describe("AC-4: graceful handling", () => {
       });
     });
 
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 });
 

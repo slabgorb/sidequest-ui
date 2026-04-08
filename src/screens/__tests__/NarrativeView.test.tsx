@@ -79,8 +79,8 @@ describe("NarrativeView", () => {
     expect(proseBlocks.length).toBeGreaterThanOrEqual(2);
   });
 
-  // -- inline images ---------------------------------------------------------
-  it("renders inline images from IMAGE messages within narrative flow", () => {
+  // -- images route to gallery -----------------------------------------------
+  it("shows gallery notice instead of inline images (images route to gallery widget)", () => {
     render(
       <NarrativeView
         messages={[
@@ -90,9 +90,9 @@ describe("NarrativeView", () => {
         ]}
       />,
     );
-    const img = screen.getByAltText("A dark chamber");
-    expect(img).toBeInTheDocument();
-    expect(img).toHaveAttribute("src", "https://example.com/chamber.png");
+    // Images no longer render inline — they go to the ImageGalleryWidget
+    expect(screen.queryByAltText("A dark chamber")).not.toBeInTheDocument();
+    expect(screen.getByText("New image in gallery")).toBeInTheDocument();
   });
 
   // -- auto-scroll -----------------------------------------------------------

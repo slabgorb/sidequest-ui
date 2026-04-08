@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
-import { GameLayout } from "@/components/GameLayout";
+import { GameBoard } from "@/components/GameBoard/GameBoard";
+import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/providers/ThemeProvider";
@@ -14,7 +15,8 @@ import { useAudio } from "@/hooks/useAudio";
 import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useTtsMicGating } from "@/hooks/useTtsMicGating";
 import { useStateMirror } from "@/hooks/useStateMirror";
-import { useSlashCommands, type OverlayType } from "@/hooks/useSlashCommands";
+import { useSlashCommands } from "@/hooks/useSlashCommands";
+import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
 import { MessageType, type GameMessage, type NarratorVerbosity, type NarratorVocabulary } from "@/types/protocol";
@@ -120,8 +122,8 @@ function AppInner() {
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [mapData, setMapData] = useState<MapState | null>(null);
 
-  // Active overlay panel — lifted from OverlayManager so slash commands can trigger it
-  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
+  // GameBoard layout — widget visibility managed internally by useGameBoardLayout
+  const { toggleWidget } = useGameBoardLayout(currentGenre ?? undefined);
 
   // Layout mode — client-only, persisted to localStorage
   const { mode: layoutMode, setMode: setLayoutMode } = useLayoutMode();
@@ -404,7 +406,7 @@ function AppInner() {
 
     // Track whose turn it is — gates input in multiplayer.
     // TURN_STATUS is state-only, not rendered in narration feed.
-    // The turn strip in GameLayout shows whose turn it is.
+    // The turn strip in GameBoard shows whose turn it is.
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
@@ -590,8 +592,8 @@ function AppInner() {
       // Try slash commands first — overlay triggers resolve locally
       const slashResult = executeSlashCommand(text);
       if (slashResult.handled) {
-        if (slashResult.overlay) {
-          setActiveOverlay(slashResult.overlay);
+        if (slashResult.widget) {
+          toggleWidget(slashResult.widget);
         }
         if (slashResult.messages.length > 0) {
           setMessages((prev) => [...prev, ...slashResult.messages]);
@@ -703,7 +705,6 @@ function AppInner() {
     setCharacterSheet(null);
     setInventoryData(null);
     setMapData(null);
-    setActiveOverlay(null);
     setPartyMembers([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
@@ -858,36 +859,36 @@ function AppInner() {
         )}
         {sessionPhase === "game" && (
           <ErrorBoundary name="Game">
-            <GameLayout
-              messages={gameMessages}
-              characters={characters}
-              onSend={handleSend}
-              onLeave={handleLeave}
-              disabled={readyState !== WebSocket.OPEN || thinking || (isMultiplayer && !isMyTurn)}
-              thinking={thinking}
-              characterSheet={characterSheet}
-              inventoryData={inventoryData}
-              mapData={mapData}
-              audio={audio}
-              nowPlaying={nowPlaying}
-              journalEntries={gameState.journal}
-              knowledgeEntries={gameState.knowledge}
-              depletions={gameState.depletions}
-              resourceAlerts={gameState.resourceAlerts}
-              onRequestJournal={handleRequestJournal}
-              confrontationData={confrontationData}
-              currentPlayerId={currentPlayerId ?? undefined}
-              activePlayerId={activePlayerId}
-              activePlayerName={activePlayerName}
-              waitingForPlayer={waitingForPlayer}
-              settingsProps={settingsProps}
-              resources={partyResources}
-              genreSlug={currentGenre ?? undefined}
-              turnStatusEntries={turnStatusEntries}
-              layoutMode={layoutMode}
-              activeOverlay={activeOverlay}
-              onOverlayChange={setActiveOverlay}
-            />
+            <ImageBusProvider messages={gameMessages}>
+              <GameBoard
+                messages={gameMessages}
+                characters={characters}
+                onSend={handleSend}
+                onLeave={handleLeave}
+                disabled={readyState !== WebSocket.OPEN || thinking || (isMultiplayer && !isMyTurn)}
+                thinking={thinking}
+                characterSheet={characterSheet}
+                inventoryData={inventoryData}
+                mapData={mapData}
+                audio={audio}
+                nowPlaying={nowPlaying}
+                journalEntries={gameState.journal}
+                knowledgeEntries={gameState.knowledge}
+                depletions={gameState.depletions}
+                resourceAlerts={gameState.resourceAlerts}
+                onRequestJournal={handleRequestJournal}
+                confrontationData={confrontationData}
+                currentPlayerId={currentPlayerId ?? undefined}
+                activePlayerId={activePlayerId}
+                activePlayerName={activePlayerName}
+                waitingForPlayer={waitingForPlayer}
+                settingsProps={settingsProps}
+                resources={partyResources}
+                genreSlug={currentGenre ?? undefined}
+                turnStatusEntries={turnStatusEntries}
+                layoutMode={layoutMode}
+              />
+            </ImageBusProvider>
           </ErrorBoundary>
         )}
       </main>

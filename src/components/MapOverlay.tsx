@@ -36,7 +36,7 @@ export interface MapState {
 
 export interface MapOverlayProps {
   mapData: MapState;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
@@ -51,9 +51,11 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
     <div data-testid="map-overlay" className="p-6 space-y-4 relative">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-[var(--primary)]">{mapData.region || "Explored Locations"}</h2>
-        <button onClick={onClose} aria-label="Close" className="text-sm px-2 py-1 rounded">
-          Close
-        </button>
+        {onClose && (
+          <button onClick={onClose} aria-label="Close" className="text-sm px-2 py-1 rounded">
+            Close
+          </button>
+        )}
       </div>
 
       {cartography && (
