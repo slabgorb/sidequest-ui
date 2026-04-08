@@ -1,8 +1,14 @@
 // Automapper — Story 19-8: SVG room graph renderer for dungeon crawl UI
 // Delegates to TacticalGridRenderer when the current room has grid data (Story 29-4).
 
+import { DungeonMapRenderer } from "@/components/DungeonMapRenderer";
 import { TacticalGridRenderer } from "@/components/TacticalGridRenderer";
-import type { TacticalGridData, TacticalThemeConfig } from "@/types/tactical";
+import type {
+  TacticalGridData,
+  TacticalThemeConfig,
+  DungeonLayoutData,
+  PlacedRoomData,
+} from "@/types/tactical";
 
 export interface ExitInfo {
   direction: string;
@@ -120,6 +126,86 @@ const EXIT_ICONS: Record<string, string> = {
   chute: "↓",
 };
 
+// --- Dungeon layout builder ---
+// Converts ExploredRoom[] to DungeonLayoutData for multi-room rendering.
+// Places rooms via BFS using exit directions and grid dimensions.
+
+function buildDungeonLayout(rooms: ExploredRoom[]): DungeonLayoutData {
+  const gridRooms = rooms.filter(
+    (r): r is ExploredRoom & { grid: TacticalGridData } => !!r.grid
+  );
+  if (gridRooms.length === 0)
+    return { rooms: [], globalWidth: 0, globalHeight: 0 };
+
+  const placed = new Map<string, { x: number; y: number }>();
+  const roomMap = new Map(gridRooms.map((r) => [r.id, r]));
+  const queue: string[] = [gridRooms[0].id];
+  placed.set(gridRooms[0].id, { x: 0, y: 0 });
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const current = roomMap.get(currentId)!;
+    const currentPos = placed.get(currentId)!;
+
+    for (const exit of current.exits) {
+      if (!exit.to_room_id || placed.has(exit.to_room_id)) continue;
+      const neighbor = roomMap.get(exit.to_room_id);
+      if (!neighbor) continue;
+
+      let nx = currentPos.x;
+      let ny = currentPos.y;
+      switch (exit.direction) {
+        case "east":
+          nx = currentPos.x + current.grid!.width;
+          break;
+        case "west":
+          nx = currentPos.x - neighbor.grid!.width;
+          break;
+        case "south":
+          ny = currentPos.y + current.grid!.height;
+          break;
+        case "north":
+          ny = currentPos.y - neighbor.grid!.height;
+          break;
+      }
+
+      placed.set(exit.to_room_id, { x: nx, y: ny });
+      queue.push(exit.to_room_id);
+    }
+  }
+
+  // Normalize to non-negative offsets
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [id, pos] of placed) {
+    const room = roomMap.get(id)!;
+    minX = Math.min(minX, pos.x);
+    minY = Math.min(minY, pos.y);
+    maxX = Math.max(maxX, pos.x + room.grid!.width);
+    maxY = Math.max(maxY, pos.y + room.grid!.height);
+  }
+
+  const placedRooms: PlacedRoomData[] = [];
+  for (const [id, pos] of placed) {
+    const room = roomMap.get(id)!;
+    placedRooms.push({
+      roomId: room.id,
+      roomName: room.name,
+      grid: room.grid!,
+      globalOffsetX: pos.x - minX,
+      globalOffsetY: pos.y - minY,
+    });
+  }
+
+  return {
+    rooms: placedRooms,
+    globalWidth: maxX - minX,
+    globalHeight: maxY - minY,
+  };
+}
+
 // --- Component ---
 
 // Default tactical theme — used when Automapper delegates to TacticalGridRenderer
@@ -142,7 +228,26 @@ const DEFAULT_TACTICAL_THEME: TacticalThemeConfig = {
 };
 
 export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
-  // Delegate to TacticalGridRenderer if the current room has grid data
+  const roomsWithGrids = rooms.filter((r) => r.grid);
+
+  // Three-way delegation:
+  // 1. Multiple rooms with grids → DungeonMapRenderer (multi-room dungeon map)
+  if (roomsWithGrids.length > 1) {
+    const layout = buildDungeonLayout(rooms);
+    const discoveredRoomIds = rooms.map((r) => r.id);
+    return (
+      <div style={{ maxWidth: "100%" }}>
+        <DungeonMapRenderer
+          layout={layout}
+          currentRoomId={currentRoomId}
+          discoveredRoomIds={discoveredRoomIds}
+          theme={DEFAULT_TACTICAL_THEME}
+        />
+      </div>
+    );
+  }
+
+  // 2. Single room with grid → TacticalGridRenderer (single-room tactical view)
   const currentRoom = rooms.find((r) => r.id === currentRoomId);
   if (currentRoom?.grid) {
     return (
@@ -155,6 +260,7 @@ export function Automapper({ rooms, currentRoomId, theme }: AutomapperProps) {
     );
   }
 
+  // 3. No grids → schematic view (room graph)
   const t = theme ?? DEFAULT_THEME;
   const positions = layoutRooms(rooms);
   const posMap = new Map(positions.map((p) => [p.id, p]));
