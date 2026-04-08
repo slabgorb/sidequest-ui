@@ -70,6 +70,40 @@ export interface TacticalGridData {
 }
 
 /**
+ * An entity positioned on the tactical grid (player, NPC, creature).
+ * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/entity.rs
+ */
+export interface TacticalEntity {
+  readonly id: string;
+  readonly name: string;
+  readonly position: GridPos;
+  readonly size: number;
+  readonly faction: "player" | "ally" | "enemy" | "neutral";
+}
+
+/**
+ * A room placed in global dungeon coordinates by the layout engine.
+ * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/layout.rs PlacedRoom
+ */
+export interface PlacedRoomData {
+  readonly roomId: string;
+  readonly roomName: string;
+  readonly grid: TacticalGridData;
+  readonly globalOffsetX: number;
+  readonly globalOffsetY: number;
+}
+
+/**
+ * Complete dungeon layout — all rooms positioned in a global coordinate system.
+ * Mirrors: sidequest-api/crates/sidequest-game/src/tactical/layout.rs DungeonLayout
+ */
+export interface DungeonLayoutData {
+  readonly rooms: readonly PlacedRoomData[];
+  readonly globalWidth: number;
+  readonly globalHeight: number;
+}
+
+/**
  * Genre-themed palette for tactical grid rendering.
  * Maps cell types to visual styles. Derived from theme.yaml colors section.
  */

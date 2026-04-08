@@ -670,7 +670,7 @@ describe("DungeonMapRenderer — room click (AC-9)", () => {
 
 describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
   it("delegates to DungeonMapRenderer when multiple rooms have grids", async () => {
-    const Automapper = (await importAutomapper()).Automapper;
+    const Automapper = await importAutomapper();
     const rooms = [
       {
         id: "r1",
@@ -702,7 +702,7 @@ describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
   });
 
   it("still delegates to TacticalGridRenderer for single grid room", async () => {
-    const Automapper = (await importAutomapper()).Automapper;
+    const Automapper = await importAutomapper();
     const rooms = [
       {
         id: "r1",
@@ -728,7 +728,7 @@ describe("Automapper — three-way delegation (AC-10, story 29-8)", () => {
   });
 
   it("falls back to schematic view when no rooms have grids", async () => {
-    const Automapper = (await importAutomapper()).Automapper;
+    const Automapper = await importAutomapper();
     const rooms = [
       {
         id: "r1",
