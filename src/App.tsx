@@ -814,6 +814,12 @@ function AppInner() {
           <ErrorBoundary name="Game">
             <ImageBusProvider messages={gameMessages}>
               <GameBoard
+                // `key` forces React to unmount + remount GameBoard (and with
+                // it the Dockview instance) on genre switch, so the canonical
+                // layout built in onDockviewReady always runs fresh instead
+                // of reusing a dragged/reordered in-memory state. Fixes tab
+                // order drift between genres per sq-playtest 2026-04-09.
+                key={currentGenre ?? "no-genre"}
                 messages={gameMessages}
                 characters={characters}
                 onSend={handleSend}

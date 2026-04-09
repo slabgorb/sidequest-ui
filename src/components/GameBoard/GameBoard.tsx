@@ -345,6 +345,14 @@ export function GameBoard({
 
   // Build the initial dockview layout when the API is ready.
   // Two-region default: narrative on the left, supporting panels (character/map/gallery/audio) tabbed on the right.
+  //
+  // Canonical entry-point per the sq-playtest 2026-04-09 bug report:
+  //   - Narrative: left panel, focused.
+  //   - Right tab group: `character` is the active tab on mount.
+  //     Previously the last-added tab (`audio`) was active by default because
+  //     dockview's `addPanel` activates the newly-added panel. Landing on
+  //     Audio broke spatial orientation on turn 1 — audio is background, the
+  //     player needs the character sheet and the narrative in view.
   const onDockviewReady = useCallback((event: DockviewReadyEvent) => {
     const api = event.api;
     dockviewApiRef.current = api;
@@ -392,6 +400,16 @@ export function GameBoard({
         });
       }
     }
+
+    // Canonical active-panel state:
+    // 1. Right group's active tab must be `character` (first in rightGroupOrder),
+    //    not `audio` (last added and therefore dockview's default active).
+    // 2. Narrative panel gets focus so keyboard input and visual emphasis
+    //    land on the storytelling column, not the supporting dock.
+    if (rightFirst) {
+      api.setActivePanel(rightFirst);
+    }
+    narrative.focus();
   }, [availableWidgets]);
 
   // Sync widget visibility with dockview panels (add/remove as data-gates change).
