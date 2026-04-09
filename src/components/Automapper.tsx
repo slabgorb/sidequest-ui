@@ -66,6 +66,18 @@ const PADDING = 80;
 function layoutRooms(rooms: ExploredRoom[]): RoomPosition[] {
   if (rooms.length === 0) return [];
 
+  // If no exit anywhere has a known compass direction (e.g. topological room
+  // graphs from room_graph navigation mode — ADR-055), fall back to layered
+  // BFS placement: rooms at BFS depth N form column N, siblings stacked
+  // vertically. Without this, the directional layout collapses every child
+  // onto the same point because unknown directions all default to east.
+  const hasAnyDirection = rooms.some((r) =>
+    r.exits.some((e) => DIRECTION_OFFSETS[e.direction] !== undefined)
+  );
+  if (!hasAnyDirection && rooms.length > 1) {
+    return layoutRoomsLayered(rooms);
+  }
+
   const positions = new Map<string, { x: number; y: number }>();
   const roomMap = new Map(rooms.map((r) => [r.id, r]));
 
@@ -104,6 +116,70 @@ function layoutRooms(rooms: ExploredRoom[]): RoomPosition[] {
   return rooms.map((r) => {
     const pos = positions.get(r.id)!;
     return { id: r.id, x: pos.x * GRID_SPACING, y: pos.y * GRID_SPACING };
+  });
+}
+
+/**
+ * Layered BFS placement for direction-less room graphs.
+ *
+ * Breadth-first traversal from the first room (or the current room if
+ * designated by is_current flag); each BFS depth becomes a column, and
+ * siblings within a column are stacked vertically, centered on y=0.
+ * Produces a clean left-to-right tree view that's legible without any
+ * compass orientation data.
+ */
+function layoutRoomsLayered(rooms: ExploredRoom[]): RoomPosition[] {
+  // Seed BFS from the current room if one exists — keeps "here" on the left
+  // and makes the layout feel oriented around the player.
+  const seedId =
+    rooms.find((r) => r.is_current)?.id ?? rooms[0].id;
+
+  const depth = new Map<string, number>();
+  const roomMap = new Map(rooms.map((r) => [r.id, r]));
+  const queue: string[] = [seedId];
+  depth.set(seedId, 0);
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const r = roomMap.get(id);
+    if (!r) continue;
+    const d = depth.get(id)!;
+    for (const ex of r.exits) {
+      if (!ex.to_room_id || depth.has(ex.to_room_id)) continue;
+      if (!roomMap.has(ex.to_room_id)) continue;
+      depth.set(ex.to_room_id, d + 1);
+      queue.push(ex.to_room_id);
+    }
+  }
+
+  // Place any disconnected rooms in a final column past the deepest reachable.
+  let maxDepth = 0;
+  for (const d of depth.values()) if (d > maxDepth) maxDepth = d;
+  for (const r of rooms) {
+    if (!depth.has(r.id)) depth.set(r.id, maxDepth + 2);
+  }
+
+  // Group by depth and assign vertical slots.
+  const byDepth = new Map<number, string[]>();
+  for (const r of rooms) {
+    const d = depth.get(r.id)!;
+    if (!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d)!.push(r.id);
+  }
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const [d, ids] of byDepth) {
+    const count = ids.length;
+    ids.forEach((id, i) => {
+      const y = (i - (count - 1) / 2) * GRID_SPACING;
+      const x = d * GRID_SPACING;
+      positions.set(id, { x, y });
+    });
+  }
+
+  return rooms.map((r) => {
+    const pos = positions.get(r.id)!;
+    return { id: r.id, x: pos.x, y: pos.y };
   });
 }
 

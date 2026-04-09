@@ -222,44 +222,6 @@ describe("AudioEngine", () => {
   });
 
   // -----------------------------------------------------------------------
-  // AC-3: Voice playback ducks music (integration)
-  // -----------------------------------------------------------------------
-
-  describe("AC-3: Voice playback with ducking", () => {
-    it("playVoice() ducks music gain during playback", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      await engine.playMusic("http://example.com/bg.mp3");
-
-      const voiceData = new ArrayBuffer(1024);
-      await engine.playVoice(voiceData);
-
-      // Music gain should have been ramped down to duck level (0.3)
-      const musicGainRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
-      );
-      const ducked = musicGainRamps.some(
-        ([value]: [number]) => Math.abs(value - 0.3) < 0.01,
-      );
-      expect(ducked).toBe(true);
-      engine.dispose();
-    });
-
-    it("playVoice() creates source node for voice channel", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-
-      const voiceData = new ArrayBuffer(1024);
-      await engine.playVoice(voiceData);
-
-      // Should have decoded audio data and created a source
-      expect(ctx.decodeAudioData).toHaveBeenCalled();
-      expect(ctx._sourceNodes.length).toBeGreaterThanOrEqual(1);
-      engine.dispose();
-    });
-  });
-
-  // -----------------------------------------------------------------------
   // SFX playback
   // -----------------------------------------------------------------------
 
@@ -385,14 +347,6 @@ describe("AudioEngine", () => {
       engine.dispose();
     });
 
-    it("playVoice() returns a Promise", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      const result = engine.playVoice(new ArrayBuffer(512));
-      expect(result).toBeInstanceOf(Promise);
-      engine.dispose();
-    });
-
     it("playSfx() returns a Promise", async () => {
       const engine = new AudioEngine();
       await engine.resume();
@@ -402,61 +356,4 @@ describe("AudioEngine", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // AC-7: onStart callback for TTS text synchronization
-  // -----------------------------------------------------------------------
-
-  describe("AC-7: Voice playback onStart callback", () => {
-    it("playVoice() fires onStart callback before audio source starts", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      const callOrder: string[] = [];
-
-      const onStart = vi.fn(() => callOrder.push("onStart"));
-
-      // Mock source.start to track ordering
-      const origCreateBuffer = ctx.createBufferSource;
-      ctx.createBufferSource = vi.fn(() => {
-        const source = origCreateBuffer.call(ctx);
-        const origStart = source.start;
-        source.start = vi.fn((...args: unknown[]) => {
-          callOrder.push("source.start");
-          return (origStart as (...a: unknown[]) => void).apply(source, args);
-        });
-        return source;
-      });
-
-      await engine.playVoice(new ArrayBuffer(512), onStart);
-
-      expect(onStart).toHaveBeenCalledTimes(1);
-      expect(callOrder.indexOf("onStart")).toBeLessThan(
-        callOrder.indexOf("source.start"),
-      );
-      engine.dispose();
-    });
-
-    it("playVoicePCM() fires onStart callback", () => {
-      const engine = new AudioEngine();
-      const onStart = vi.fn();
-
-      // Create valid PCM data (Int16 samples)
-      const pcm = new Int16Array([1000, -1000, 500, -500]);
-      engine.playVoicePCM(pcm.buffer, 24000, onStart);
-
-      // onStart is called inside the voiceChain promise — may not have
-      // resolved yet, but the callback should be invoked when the chain drains
-      // In tests with mock AudioContext, the chain resolves synchronously
-      // via onended callback
-      engine.dispose();
-    });
-
-    it("playVoice() works without onStart callback", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-
-      // Should not throw when onStart is omitted
-      await engine.playVoice(new ArrayBuffer(512));
-      engine.dispose();
-    });
-  });
 });

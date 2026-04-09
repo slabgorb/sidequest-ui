@@ -1,20 +1,16 @@
-import { useState, useCallback, useEffect, type ChangeEvent } from "react";
+import { useCallback, useEffect, type ChangeEvent } from "react";
 
 const STORAGE_KEY = "sq-audio-volumes";
 
 export interface AudioStatusProps {
   nowPlaying: { title: string; mood: string } | null;
-  volumes: { music: number; sfx: number; voice: number };
-  muted: { music: boolean; sfx: boolean; voice: boolean };
+  volumes: { music: number; sfx: number };
+  muted: { music: boolean; sfx: boolean };
   onVolumeChange: (channel: string, value: number) => void;
   onMuteToggle: (channel: string) => void;
-  voicePlaybackRate?: number;
-  onPlaybackRateChange?: (rate: number) => void;
-  selectedVoice?: string;
-  onVoiceChange?: (voice: string) => void;
 }
 
-const CHANNELS = ["music", "sfx", "voice"] as const;
+const CHANNELS = ["music", "sfx"] as const;
 type Channel = (typeof CHANNELS)[number];
 
 function persistToStorage(
@@ -30,24 +26,7 @@ export function AudioStatus({
   muted,
   onVolumeChange,
   onMuteToggle,
-  voicePlaybackRate = 1.0,
-  onPlaybackRateChange,
-  selectedVoice,
-  onVoiceChange,
 }: AudioStatusProps) {
-  const [availableVoices, setAvailableVoices] = useState<string[]>([]);
-
-  // Fetch voice list from daemon (lazy load)
-  useEffect(() => {
-    if (!onVoiceChange || availableVoices.length > 0) return;
-    fetch("/api/voices")
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.voices)) setAvailableVoices(data.voices);
-      })
-      .catch(() => {}); // daemon may be offline
-  }, [onVoiceChange, availableVoices.length]);
-
   // Restore persisted volumes on mount
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -123,39 +102,6 @@ export function AudioStatus({
           </button>
         </div>
       ))}
-
-      {onPlaybackRateChange && (
-        <div data-testid="playback-rate-slider" className="flex items-center gap-2 pt-2 border-t border-border/20">
-          <span className="text-xs text-muted-foreground/60 w-12">speed</span>
-          <input
-            type="range"
-            min="50"
-            max="200"
-            step="10"
-            value={Math.round(voicePlaybackRate * 100)}
-            className="flex-1 h-1 accent-primary/60"
-            aria-label="Voice playback speed"
-            onChange={(e) => onPlaybackRateChange(Number(e.target.value) / 100)}
-          />
-          <span className="text-xs text-muted-foreground/50 w-8 text-right">{voicePlaybackRate.toFixed(1)}×</span>
-        </div>
-      )}
-
-      {onVoiceChange && availableVoices.length > 0 && (
-        <div data-testid="voice-selector" className="flex items-center gap-2 pt-2 border-t border-border/20">
-          <span className="text-xs text-muted-foreground/60 w-12">voice</span>
-          <select
-            value={selectedVoice ?? ""}
-            className="flex-1 text-xs bg-background/50 border border-border/30 rounded px-2 py-1 text-foreground"
-            aria-label="Narrator voice"
-            onChange={(e) => onVoiceChange(e.target.value)}
-          >
-            {availableVoices.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-        </div>
-      )}
     </div>
   );
 }

@@ -62,9 +62,13 @@ describe("GameBoard wiring", () => {
 
   it("widgetRegistry exports all required widgets", async () => {
     const mod = await import("@/components/GameBoard/widgetRegistry");
+    // `settings` was removed during the dockview migration (the old
+    // SettingsOverlay is gone — settings live in their own screen now).
+    // `lore` was absorbed into `knowledge` (backstory now renders as a
+    // header section inside KnowledgeJournal).
     const requiredIds = [
       "narrative", "character", "inventory", "map",
-      "journal", "knowledge", "settings", "gallery",
+      "journal", "knowledge", "gallery",
       "confrontation", "audio",
     ];
     for (const id of requiredIds) {
@@ -78,6 +82,43 @@ describe("GameBoard wiring", () => {
     expect(mod.PRESET_LAYOUTS.tactician).toBeDefined();
     expect(mod.PRESET_LAYOUTS.explorer).toBeDefined();
     expect(mod.PRESET_LAYOUTS.minimalist).toBeDefined();
+  });
+
+  // Source-level regression guards for the sq-playtest 2026-04-09 fix:
+  // the right tab group must land on `character`, not `audio`, and the
+  // narrative panel must get focus on mount.
+  describe("initial active-panel state (Dockview layout drift fix)", () => {
+    it("character is the first entry in rightGroupOrder", async () => {
+      const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+        default: string;
+      };
+      // Match the literal array declaration with whitespace tolerance.
+      const arrayMatch = src.default.match(
+        /rightGroupOrder:\s*WidgetId\[\]\s*=\s*\[([\s\S]*?)\]/
+      );
+      expect(arrayMatch).not.toBeNull();
+      const firstEntry = arrayMatch![1]
+        .split(",")
+        .map((s) => s.trim().replace(/["']/g, ""))
+        .filter((s) => s.length > 0)[0];
+      expect(firstEntry).toBe("character");
+    });
+
+    it("GameBoard explicitly activates rightFirst (character tab)", async () => {
+      // Without this call, dockview activates the last-added panel, which
+      // meant the right group landed on `audio` on every fresh game load.
+      const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+        default: string;
+      };
+      expect(src.default).toContain("api.setActivePanel(rightFirst)");
+    });
+
+    it("GameBoard focuses the narrative panel on mount", async () => {
+      const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
+        default: string;
+      };
+      expect(src.default).toContain("narrative.focus()");
+    });
   });
 
   it("deleted files do not exist (GameLayout, OverlayManager, SettingsOverlay)", async () => {

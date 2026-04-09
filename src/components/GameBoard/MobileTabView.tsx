@@ -29,7 +29,7 @@ export function MobileTabView({ renderWidget, availableWidgets, children }: Mobi
   const visibleTabs = TABS.filter(t => t.id === "narrative" || availableWidgets.has(t.id));
 
   return (
-    <div className="flex flex-col h-screen">
+    <div data-testid="game-board" className="flex flex-col h-screen">
       {/* Content area */}
       <div className="flex-1 min-h-0 overflow-auto">
         {renderWidget(activeTab)}
