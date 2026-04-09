@@ -53,7 +53,7 @@ export function WidgetWrapper({
 
       {/* Body */}
       {!minimized && (
-        <div className="flex-1 overflow-auto min-h-0" role="region" aria-label={title}>
+        <div className="flex-1 overflow-auto min-h-0 overscroll-contain" role="region" aria-label={title}>
           {children}
         </div>
       )}

@@ -5,7 +5,6 @@ export type WidgetId =
   | "map"
   | "journal"
   | "knowledge"
-  | "settings"
   | "gallery"
   | "confrontation"
   | "audio";
@@ -88,17 +87,6 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     defaultH: 4,
     closable: true,
     dataGated: true,
-  },
-  settings: {
-    id: "settings",
-    label: "Settings",
-    hotkey: "s",
-    minW: 2,
-    minH: 2,
-    defaultW: 3,
-    defaultH: 3,
-    closable: true,
-    dataGated: false,
   },
   gallery: {
     id: "gallery",

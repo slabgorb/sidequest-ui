@@ -42,7 +42,6 @@ describe("GameBoard wiring", () => {
       "@/components/GameBoard/widgets/ImageGalleryWidget",
       "@/components/GameBoard/widgets/ConfrontationWidget",
       "@/components/GameBoard/widgets/AudioWidget",
-      "@/components/GameBoard/widgets/SettingsWidget",
     ];
     for (const path of widgets) {
       const mod = await import(path);

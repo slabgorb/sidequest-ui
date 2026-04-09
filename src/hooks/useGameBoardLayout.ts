@@ -67,11 +67,32 @@ export function useGameBoardLayout(genre?: string, world?: string) {
     setPref({ layouts: allLayouts, activePreset: "custom" });
   }, [setPref]);
 
-  /** Get visible layout items — filters out hidden widgets */
+  /** Get visible layout items — filters out hidden widgets.
+   *  Widgets that are visible but have no layout entry (e.g., data-gated widgets
+   *  that appeared after preset was chosen) get a fallback position appended
+   *  below existing content to avoid pile-ups at (0,0).
+   */
   const visibleLayouts = useMemo((): Layouts => {
     const result: Layouts = {};
     for (const [bp, items] of Object.entries(prefs.layouts)) {
-      result[bp] = (items as Layout[]).filter(item => visibleWidgets.has(item.i as WidgetId));
+      const filtered = (items as Layout[]).filter(item => visibleWidgets.has(item.i as WidgetId));
+      const existingIds = new Set(filtered.map(item => item.i));
+
+      // Find the bottom edge of existing items to stack new ones below
+      let maxY = 0;
+      for (const item of filtered) {
+        maxY = Math.max(maxY, item.y + item.h);
+      }
+
+      // Add fallback positions for visible widgets missing from this breakpoint
+      for (const id of visibleWidgets) {
+        if (!existingIds.has(id)) {
+          filtered.push({ i: id, x: 0, y: maxY, w: 4, h: 3, minW: 2, minH: 2 });
+          maxY += 3;
+        }
+      }
+
+      result[bp] = filtered;
     }
     return result;
   }, [prefs.layouts, visibleWidgets]);

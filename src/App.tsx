@@ -19,7 +19,7 @@ import { useSlashCommands } from "@/hooks/useSlashCommands";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useLayoutMode } from "@/hooks/useLayoutMode";
 import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
-import { MessageType, type GameMessage, type NarratorVerbosity, type NarratorVocabulary } from "@/types/protocol";
+import { MessageType, type GameMessage } from "@/types/protocol";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
@@ -128,14 +128,6 @@ function AppInner() {
   // Layout mode — client-only, persisted to localStorage
   const { mode: layoutMode, setMode: setLayoutMode } = useLayoutMode();
 
-  // Narrator settings — per-session, sent to server via SESSION_EVENT{settings}
-  const [narratorVerbosity, setNarratorVerbosity] = useState<NarratorVerbosity>(
-    () => (localStorage.getItem("sq-narrator-verbosity") as NarratorVerbosity) || "standard"
-  );
-  const [narratorVocabulary, setNarratorVocabulary] = useState<NarratorVocabulary>(
-    () => (localStorage.getItem("sq-narrator-vocabulary") as NarratorVocabulary) || "literary"
-  );
-  const [imageCooldown, setImageCooldown] = useState<number>(30);
 
   // Party status — richer than state_delta (includes portrait_url)
   const [partyMembers, setPartyMembers] = useState<CharacterSummary[]>([]);
@@ -375,12 +367,6 @@ function AppInner() {
           buf.watchdogTimer = null;
         }
       }
-      if (event === "settings_updated") {
-        if (msg.payload.narrator_verbosity) setNarratorVerbosity(msg.payload.narrator_verbosity as NarratorVerbosity);
-        if (msg.payload.narrator_vocabulary) setNarratorVocabulary(msg.payload.narrator_vocabulary as NarratorVocabulary);
-        if (msg.payload.image_cooldown_seconds != null) setImageCooldown(msg.payload.image_cooldown_seconds as number);
-        return;
-      }
       // Let theme_css events through to the messages array for useGenreTheme
       if (event !== "theme_css") return;
     }
@@ -619,52 +605,6 @@ function AppInner() {
     [send, executeSlashCommand],
   );
 
-  // Narrator settings change — optimistic update + send to server
-  const sendSettings = useCallback(
-    (overrides: { verbosity?: NarratorVerbosity; vocabulary?: NarratorVocabulary; cooldown?: number }) => {
-      const v = overrides.verbosity ?? narratorVerbosity;
-      const vocab = overrides.vocabulary ?? narratorVocabulary;
-      const cd = overrides.cooldown ?? imageCooldown;
-      send({
-        type: MessageType.SESSION_EVENT,
-        payload: {
-          event: "settings",
-          narrator_verbosity: v,
-          narrator_vocabulary: vocab,
-          image_cooldown_seconds: cd,
-        },
-        player_id: "",
-      });
-    },
-    [send, narratorVerbosity, narratorVocabulary, imageCooldown],
-  );
-
-  const handleVerbosityChange = useCallback(
-    (value: NarratorVerbosity) => {
-      setNarratorVerbosity(value);
-      localStorage.setItem("sq-narrator-verbosity", value);
-      sendSettings({ verbosity: value });
-    },
-    [sendSettings],
-  );
-
-  const handleVocabularyChange = useCallback(
-    (value: NarratorVocabulary) => {
-      setNarratorVocabulary(value);
-      localStorage.setItem("sq-narrator-vocabulary", value);
-      sendSettings({ vocabulary: value });
-    },
-    [sendSettings],
-  );
-
-  const handleImageCooldownChange = useCallback(
-    (value: number) => {
-      setImageCooldown(value);
-      sendSettings({ cooldown: value });
-    },
-    [sendSettings],
-  );
-
   const handleRequestJournal = useCallback(
     (category?: string) => {
       send({
@@ -677,20 +617,6 @@ function AppInner() {
       });
     },
     [send],
-  );
-
-  const settingsProps = useMemo(
-    () => ({
-      verbosity: narratorVerbosity,
-      vocabulary: narratorVocabulary,
-      imageCooldown,
-      onVerbosityChange: handleVerbosityChange,
-      onVocabularyChange: handleVocabularyChange,
-      onImageCooldownChange: handleImageCooldownChange,
-      layoutMode,
-      onLayoutModeChange: setLayoutMode,
-    }),
-    [narratorVerbosity, narratorVocabulary, imageCooldown, handleVerbosityChange, handleVocabularyChange, handleImageCooldownChange, layoutMode, setLayoutMode],
   );
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby
@@ -882,7 +808,6 @@ function AppInner() {
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
                 waitingForPlayer={waitingForPlayer}
-                settingsProps={settingsProps}
                 resources={partyResources}
                 genreSlug={currentGenre ?? undefined}
                 turnStatusEntries={turnStatusEntries}

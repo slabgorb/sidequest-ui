@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, type ChangeEvent } from "react";
+import { useState, useCallback, useEffect, type ChangeEvent } from "react";
 
 const STORAGE_KEY = "sq-audio-volumes";
 
@@ -24,16 +24,6 @@ function persistToStorage(
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...volumes, muted }));
 }
 
-function EqualizerBars() {
-  return (
-    <div className="flex items-end gap-[2px] h-3">
-      <span className="w-[2px] bg-muted-foreground/50 animate-pulse h-2" />
-      <span className="w-[2px] bg-muted-foreground/50 animate-pulse h-3 [animation-delay:150ms]" />
-      <span className="w-[2px] bg-muted-foreground/50 animate-pulse h-1.5 [animation-delay:300ms]" />
-    </div>
-  );
-}
-
 export function AudioStatus({
   nowPlaying,
   volumes,
@@ -45,21 +35,20 @@ export function AudioStatus({
   selectedVoice,
   onVoiceChange,
 }: AudioStatusProps) {
-  const [expanded, setExpanded] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
   const [availableVoices, setAvailableVoices] = useState<string[]>([]);
 
-  // Fetch voice list from daemon when panel expands (lazy load)
+  // Fetch voice list from daemon (lazy load)
   useEffect(() => {
-    if (!expanded || !onVoiceChange || availableVoices.length > 0) return;
+    if (!onVoiceChange || availableVoices.length > 0) return;
     fetch("/api/voices")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.voices)) setAvailableVoices(data.voices);
       })
       .catch(() => {}); // daemon may be offline
-  }, [expanded, onVoiceChange, availableVoices.length]);
+  }, [onVoiceChange, availableVoices.length]);
 
+  // Restore persisted volumes on mount
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -72,27 +61,6 @@ export function AudioStatus({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Close on Escape or click outside
-  useEffect(() => {
-    if (!expanded) return;
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpanded(false);
-    };
-    const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setExpanded(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKey);
-    document.addEventListener("mousedown", handleClick);
-    return () => {
-      document.removeEventListener("keydown", handleKey);
-      document.removeEventListener("mousedown", handleClick);
-    };
-  }, [expanded]);
 
   const handleVolumeInput = useCallback(
     (channel: Channel, e: ChangeEvent<HTMLInputElement>) => {
@@ -112,35 +80,14 @@ export function AudioStatus({
     [onMuteToggle, volumes, muted],
   );
 
-  if (!expanded) {
-    return (
-      <button
-        data-testid="audio-toggle"
-        className="fixed bottom-20 left-4 z-20 w-11 h-11 flex items-center justify-center
-                   rounded-full bg-background/80 backdrop-blur-sm border border-border/20
-                   text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors"
-        onClick={() => setExpanded(true)}
-        aria-label="Audio controls"
-      >
-        {nowPlaying ? <EqualizerBars /> : <span className="text-xs">♪</span>}
-      </button>
-    );
-  }
-
   return (
-    <div
-      ref={panelRef}
-      data-testid="audio-status"
-      data-expanded="true"
-      className="fixed bottom-20 left-4 z-20 w-56 rounded-lg bg-background/95 backdrop-blur-md
-                 border border-border/20 shadow-lg p-3 flex flex-col gap-2"
-    >
+    <div data-testid="audio-status" className="p-4 flex flex-col gap-3">
       {nowPlaying && (
-        <div data-testid="now-playing" className="text-xs text-muted-foreground/60 truncate mb-1">
+        <div data-testid="now-playing" className="text-xs text-muted-foreground/70 truncate">
           ♪{" "}
           <span className="font-semibold">{nowPlaying.title}</span>
           {" — "}
-          <span data-testid="mood-badge" className="text-muted-foreground/40 capitalize">
+          <span data-testid="mood-badge" className="text-muted-foreground/50 capitalize">
             {nowPlaying.mood.replace(/_/g, " ")}
           </span>
         </div>
@@ -152,29 +99,25 @@ export function AudioStatus({
           data-testid={`volume-slider-${ch}`}
           className="flex items-center gap-2"
         >
-          <span className="text-[10px] text-muted-foreground/50 w-8 capitalize">{ch}</span>
+          <span className="text-xs text-muted-foreground/60 w-12 capitalize">{ch}</span>
           <input
             type="range"
             min="0"
             max="100"
             value={Math.round(volumes[ch] * 100)}
-            className="flex-1 h-1 accent-muted-foreground/40"
+            className="flex-1 h-1 accent-primary/60"
             aria-label={`${ch} volume`}
             onChange={(e) => handleVolumeInput(ch, e)}
             onInput={(e) =>
               handleVolumeInput(ch, e as ChangeEvent<HTMLInputElement>)
             }
-            onClick={(e) => e.stopPropagation()}
           />
           <button
             data-testid={`mute-btn-${ch}`}
             data-muted={String(muted[ch])}
-            className="text-muted-foreground/40 hover:text-muted-foreground/70 text-xs w-4"
+            className="text-muted-foreground/50 hover:text-muted-foreground text-sm w-5"
             aria-label={`Mute ${ch}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMuteClick(ch);
-            }}
+            onClick={() => handleMuteClick(ch)}
           >
             {muted[ch] ? "○" : "●"}
           </button>
@@ -182,32 +125,30 @@ export function AudioStatus({
       ))}
 
       {onPlaybackRateChange && (
-        <div data-testid="playback-rate-slider" className="flex items-center gap-2 pt-1 border-t border-border/10">
-          <span className="text-[10px] text-muted-foreground/50 w-8">speed</span>
+        <div data-testid="playback-rate-slider" className="flex items-center gap-2 pt-2 border-t border-border/20">
+          <span className="text-xs text-muted-foreground/60 w-12">speed</span>
           <input
             type="range"
             min="50"
             max="200"
             step="10"
             value={Math.round(voicePlaybackRate * 100)}
-            className="flex-1 h-1 accent-muted-foreground/40"
+            className="flex-1 h-1 accent-primary/60"
             aria-label="Voice playback speed"
             onChange={(e) => onPlaybackRateChange(Number(e.target.value) / 100)}
-            onClick={(e) => e.stopPropagation()}
           />
-          <span className="text-[10px] text-muted-foreground/40 w-6 text-right">{voicePlaybackRate.toFixed(1)}×</span>
+          <span className="text-xs text-muted-foreground/50 w-8 text-right">{voicePlaybackRate.toFixed(1)}×</span>
         </div>
       )}
 
       {onVoiceChange && availableVoices.length > 0 && (
-        <div data-testid="voice-selector" className="flex items-center gap-2 pt-1 border-t border-border/10">
-          <span className="text-[10px] text-muted-foreground/50 w-8">voice</span>
+        <div data-testid="voice-selector" className="flex items-center gap-2 pt-2 border-t border-border/20">
+          <span className="text-xs text-muted-foreground/60 w-12">voice</span>
           <select
             value={selectedVoice ?? ""}
-            className="flex-1 text-[10px] bg-background/50 border border-border/20 rounded px-1 py-0.5 text-muted-foreground/70"
+            className="flex-1 text-xs bg-background/50 border border-border/30 rounded px-2 py-1 text-foreground"
             aria-label="Narrator voice"
             onChange={(e) => onVoiceChange(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
           >
             {availableVoices.map((v) => (
               <option key={v} value={v}>{v}</option>
