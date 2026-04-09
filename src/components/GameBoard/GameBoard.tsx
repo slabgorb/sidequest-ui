@@ -35,6 +35,7 @@ import { BackgroundCanvas } from "./BackgroundCanvas";
 import { MobileTabView } from "./MobileTabView";
 import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
+import { LoreWidget } from "./widgets/LoreWidget";
 import { MapWidget } from "./widgets/MapWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
 import { JournalWidget } from "./widgets/JournalWidget";
@@ -117,20 +118,26 @@ export function GameBoard({
 
   const dockviewApiRef = useRef<DockviewApi | null>(null);
 
-  // Build available widgets set (data-gated widgets only visible when data exists)
+  // Build available widgets set. Tabs are deterministic per-session — they
+  // appear once the game is loaded (we're already past chargen by the time
+  // GameBoard mounts), regardless of whether the player has accumulated any
+  // entries yet. Per-player gating caused inconsistent panel sets between
+  // players in the same session (e.g. Kael had Knowledge but Mira did not
+  // because Mira had not yet had her first turn).
   const availableWidgets = useMemo(() => {
     const available = new Set<WidgetId>();
     available.add("narrative");
     available.add("gallery");
     available.add("audio");
+    available.add("knowledge");
+    available.add("journal");
+    available.add("lore");
     if (characterSheet) available.add("character");
     if (inventoryData) available.add("inventory");
     if (mapData) available.add("map");
-    if (journalEntries && journalEntries.length > 0) available.add("journal");
-    if (knowledgeEntries && knowledgeEntries.length > 0) available.add("knowledge");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [characterSheet, inventoryData, mapData, journalEntries, knowledgeEntries, confrontationData]);
+  }, [characterSheet, inventoryData, mapData, confrontationData]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -234,7 +241,6 @@ export function GameBoard({
         return characterSheet ? (
           <CharacterWidget
             character={characterSheet}
-            inventory={inventoryData}
             resources={resources}
             genreSlug={genreSlug}
             knowledgeEntries={knowledgeEntries}
@@ -247,6 +253,13 @@ export function GameBoard({
         ) : null;
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
+      case "lore":
+        return (
+          <LoreWidget
+            character={characterSheet ?? null}
+            knowledgeEntries={knowledgeEntries ?? []}
+          />
+        );
       case "map":
         return mapData ? <MapWidget mapData={mapData} /> : null;
       case "journal":

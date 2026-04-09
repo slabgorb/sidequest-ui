@@ -16,10 +16,17 @@ export function NarrationScroll({ messages, thinking, setLightboxUrl }: Narratio
     [messages],
   );
 
-  // Find the last separator index to split history from current turn
+  // Find the boundary index that splits history from the current (most recent) turn.
+  // Each NARRATION_END appends a separator, so a freshly-completed turn ends with a
+  // trailing separator. If we used that as the split, the new turn's text would be
+  // placed in "history" (dimmed) the moment the turn ends — making it look like the
+  // panel never updated. Skip the trailing separator when searching for the split.
   const lastSeparatorIdx = useMemo(() => {
-    for (let i = segments.length - 1; i >= 0; i--) {
+    let i = segments.length - 1;
+    if (i >= 0 && segments[i].kind === "separator") i--; // skip trailing separator
+    while (i >= 0) {
       if (segments[i].kind === "separator") return i;
+      i--;
     }
     return -1;
   }, [segments]);
