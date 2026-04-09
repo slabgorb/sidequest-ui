@@ -26,10 +26,6 @@ function narration(text: string): GameMessage {
   return msg(MessageType.NARRATION, { text });
 }
 
-function narrationChunk(text: string): GameMessage {
-  return msg(MessageType.NARRATION_CHUNK, { text });
-}
-
 function narrationEnd(): GameMessage {
   return msg(MessageType.NARRATION_END);
 }
@@ -109,10 +105,10 @@ describe('ActionReveal — AC-4: renders in narration sequence', () => {
     render(
       <NarrativeView
         messages={[
-          narrationChunk('The turn resolves.'),
+          narration('The turn resolves.'),
           narrationEnd(),
           actionReveal(TWO_ACTIONS),
-          narrationChunk('The narrator describes the outcome.'),
+          narration('The narrator describes the outcome.'),
           narrationEnd(),
         ]}
       />,
@@ -228,9 +224,9 @@ describe('ActionReveal — edge cases', () => {
     render(
       <NarrativeView
         messages={[
-          narrationChunk('Before the reveal.'),
+          narration('Before the reveal.'),
           actionReveal(TWO_ACTIONS),
-          narrationChunk('After the reveal.'),
+          narration('After the reveal.'),
         ]}
       />,
     );

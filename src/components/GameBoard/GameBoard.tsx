@@ -162,30 +162,13 @@ export function GameBoard({
   }, [confrontationData, visibleWidgets, showWidget, hideWidget]);
 
   // Audio state (migrated from GameLayout)
-  const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5, voice: 0.5 });
-  const [muted, setMuted] = useState({ music: false, sfx: false, voice: false });
-  const [voicePlaybackRate, setVoicePlaybackRate] = useState(1.0);
-  const [selectedVoice, setSelectedVoice] = useState(() =>
-    localStorage.getItem("sq-selected-voice") ?? ""
-  );
-
-  const handleVoiceChange = useCallback((voice: string) => {
-    setSelectedVoice(voice);
-    localStorage.setItem("sq-selected-voice", voice);
-  }, []);
+  const [volumes, setVolumes] = useState({ music: 0.5, sfx: 0.5 });
+  const [muted, setMuted] = useState({ music: false, sfx: false });
 
   const handleVolumeChange = useCallback(
     (channel: string, value: number) => {
       setVolumes((prev) => ({ ...prev, [channel]: value }));
-      audio?.setVolume(channel as "music" | "sfx" | "voice", value);
-    },
-    [audio],
-  );
-
-  const handlePlaybackRateChange = useCallback(
-    (rate: number) => {
-      setVoicePlaybackRate(rate);
-      if (audio) audio.voicePlaybackRate = rate;
+      audio?.setVolume(channel as "music" | "sfx", value);
     },
     [audio],
   );
@@ -195,9 +178,9 @@ export function GameBoard({
       setMuted((prev) => {
         const next = { ...prev, [channel]: !prev[channel as keyof typeof prev] };
         if (next[channel as keyof typeof next]) {
-          audio?.mute(channel as "music" | "sfx" | "voice");
+          audio?.mute(channel as "music" | "sfx");
         } else {
-          audio?.unmute(channel as "music" | "sfx" | "voice");
+          audio?.unmute(channel as "music" | "sfx");
         }
         return next;
       });
@@ -283,10 +266,6 @@ export function GameBoard({
             muted={muted}
             onVolumeChange={handleVolumeChange}
             onMuteToggle={handleMuteToggle}
-            voicePlaybackRate={voicePlaybackRate}
-            onPlaybackRateChange={handlePlaybackRateChange}
-            selectedVoice={selectedVoice}
-            onVoiceChange={handleVoiceChange}
           />
         );
       case "gallery":
@@ -296,8 +275,7 @@ export function GameBoard({
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData, journalEntries,
       knowledgeEntries, confrontationData, onBeatSelect, nowPlaying, volumes, muted,
-      handleVolumeChange, handleMuteToggle, voicePlaybackRate, handlePlaybackRateChange,
-      selectedVoice, handleVoiceChange, resources, genreSlug,
+      handleVolumeChange, handleMuteToggle, resources, genreSlug,
       onRequestJournal, handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId]);
 

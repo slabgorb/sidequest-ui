@@ -50,54 +50,25 @@ export function markdownToHtml(text: string): string {
 
 export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
   const segments: NarrativeSegment[] = [];
-  let chunkBuffer = "";
-  let hasChunksForTurn = false;
-
-  const skipNarrationAt = new Set<number>();
-  for (let i = 0; i < messages.length; i++) {
-    if (messages[i].type !== MessageType.NARRATION) continue;
-    for (let j = i + 1; j < messages.length; j++) {
-      if (messages[j].type === MessageType.NARRATION_CHUNK) {
-        skipNarrationAt.add(i);
-        break;
-      }
-      if (messages[j].type === MessageType.PLAYER_ACTION || messages[j].type === MessageType.ACTION_REVEAL) break;
-    }
-  }
 
   const seenRevealTurns = new Set<number>();
   const seenNarrationTexts = new Set<string>();
   let lastChapterLocation = "";
 
-  const flushChunks = () => {
-    if (chunkBuffer) {
-      segments.push({ kind: "text", html: DOMPurify.sanitize(markdownToHtml(chunkBuffer)) });
-      chunkBuffer = "";
-    }
-  };
-
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
     switch (msg.type) {
-      case MessageType.NARRATION_CHUNK:
-        chunkBuffer += (chunkBuffer ? " " : "") + (msg.payload.text as string);
-        hasChunksForTurn = true;
-        break;
       case MessageType.NARRATION_END:
-        flushChunks();
         if (segments.length > 0 && segments[segments.length - 1].kind !== "separator") {
           segments.push({ kind: "separator" });
         }
-        hasChunksForTurn = false;
         break;
       case MessageType.NARRATION:
-        if (hasChunksForTurn || skipNarrationAt.has(i)) break;
         {
           const narText = msg.payload.text as string;
           if (seenNarrationTexts.has(narText)) break;
           seenNarrationTexts.add(narText);
         }
-        flushChunks();
         {
           const footnotes = (msg.payload.footnotes as FootnoteData[] | undefined) ?? [];
           segments.push({
@@ -113,7 +84,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
       case MessageType.IMAGE: {
         // Images routed to gallery widget via ImageBusProvider.
         // Emit a subtle gallery notice in the narrative stream.
-        flushChunks();
         const renderId = msg.payload.render_id as string | undefined;
         // Remove any stale render-pending placeholder
         if (renderId) {
@@ -126,7 +96,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
       case MessageType.SESSION_EVENT: {
         const event = msg.payload.event as string | undefined;
         if (event === "theme_css" || event === "connected" || event === "ready") break;
-        flushChunks();
         const sysText = msg.payload.text as string | undefined;
         if (sysText) {
           segments.push({ kind: "system", text: sysText });
@@ -143,7 +112,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       }
       case MessageType.TURN_STATUS: {
-        flushChunks();
         const name = msg.payload.player_name as string;
         const status = msg.payload.status as string;
         segments.push({
@@ -153,14 +121,12 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       }
       case MessageType.ERROR:
-        flushChunks();
         segments.push({ kind: "error", text: msg.payload.message as string });
         break;
       // CHARACTER_SHEET case removed 2026-04. The sheet now rides on
       // PartyMember and no longer surfaces as a narrative segment — it's
       // a panel-only concern.
       case MessageType.PLAYER_ACTION: {
-        flushChunks();
         const action = msg.payload.action as string;
         const aside = msg.payload.aside as boolean | undefined;
         if (action) {
@@ -172,7 +138,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       }
       case MessageType.CHAPTER_MARKER: {
-        flushChunks();
         const location = msg.payload.location as string;
         if (location && location !== lastChapterLocation) {
           segments.push({ kind: "chapter-marker", text: location });
@@ -181,7 +146,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       }
       case MessageType.ACTION_REVEAL: {
-        flushChunks();
         const turnNumber = msg.payload.turn_number as number;
         if (seenRevealTurns.has(turnNumber)) break;
         seenRevealTurns.add(turnNumber);
@@ -197,7 +161,6 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
     }
   }
 
-  flushChunks();
 
   while (segments.length > 0 && segments[0].kind === "separator") {
     segments.shift();

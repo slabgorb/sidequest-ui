@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useRef, useCallback, useMemo } from "react";
 import { AudioEngine } from "@/audio/AudioEngine";
 
 export function useAudio() {
@@ -23,29 +23,25 @@ export function useAudio() {
     await engineRef.current?.playSfx(url);
   }, []);
 
-  const playVoice = useCallback(async (audioData: ArrayBuffer) => {
-    await engineRef.current?.playVoice(audioData);
-  }, []);
-
   const setVolume = useCallback(
-    (channel: "music" | "sfx" | "voice" | "master", value: number) => {
+    (channel: "music" | "sfx" | "master", value: number) => {
       engineRef.current?.setVolume(channel, value);
     },
     [],
   );
 
   const getVolume = useCallback(
-    (channel: "music" | "sfx" | "voice" | "master"): number => {
+    (channel: "music" | "sfx" | "master"): number => {
       return engineRef.current?.getVolume(channel) ?? 1.0;
     },
     [],
   );
 
-  const mute = useCallback((channel: "music" | "sfx" | "voice") => {
+  const mute = useCallback((channel: "music" | "sfx") => {
     engineRef.current?.mute(channel);
   }, []);
 
-  const unmute = useCallback((channel: "music" | "sfx" | "voice") => {
+  const unmute = useCallback((channel: "music" | "sfx") => {
     engineRef.current?.unmute(channel);
   }, []);
 
@@ -55,12 +51,11 @@ export function useAudio() {
       resume,
       playMusic,
       playSfx,
-      playVoice,
       setVolume,
       getVolume,
       mute,
       unmute,
     }),
-    [resume, playMusic, playSfx, playVoice, setVolume, getVolume, mute, unmute],
+    [resume, playMusic, playSfx, setVolume, getVolume, mute, unmute],
   );
 }

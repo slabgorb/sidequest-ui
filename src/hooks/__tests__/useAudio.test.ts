@@ -78,11 +78,6 @@ describe("useAudio", () => {
       expect(typeof result.current.playSfx).toBe("function");
     });
 
-    it("exposes playVoice function", () => {
-      const { result } = renderHook(() => useAudio());
-      expect(typeof result.current.playVoice).toBe("function");
-    });
-
     it("exposes setVolume function", () => {
       const { result } = renderHook(() => useAudio());
       expect(typeof result.current.setVolume).toBe("function");

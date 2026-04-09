@@ -19,16 +19,12 @@ export enum MessageType {
   IMAGE = "IMAGE",
   AUDIO_CUE = "AUDIO_CUE",
   VOICE_TEXT = "VOICE_TEXT",
-  NARRATION_CHUNK = "NARRATION_CHUNK",
   NARRATION_END = "NARRATION_END",
   ACTION_QUEUE = "ACTION_QUEUE",
   CHAPTER_MARKER = "CHAPTER_MARKER",
   THINKING = "THINKING",
   COMBAT_EVENT = "COMBAT_EVENT",
   ACTION_REVEAL = "ACTION_REVEAL",
-  TTS_START = "TTS_START",
-  TTS_CHUNK = "TTS_CHUNK",
-  TTS_END = "TTS_END",
   SCENARIO_EVENT = "SCENARIO_EVENT",
   ACHIEVEMENT_EARNED = "ACHIEVEMENT_EARNED",
   CONFRONTATION = "CONFRONTATION",
@@ -43,20 +39,6 @@ export interface GameMessage {
   type: MessageType;
   payload: Record<string, unknown>;
   player_id: string;
-}
-
-/** TTS stream start — announces how many audio segments to expect. */
-export interface TtsStartPayload {
-  total_segments: number;
-}
-
-/** TTS audio chunk — base64-encoded audio for one narration segment. */
-export interface TtsChunkPayload {
-  audio_base64: string;
-  segment_index: number;
-  is_last_chunk: boolean;
-  speaker: string;
-  format: string;
 }
 
 /** Scenario system event (Epic 7). */

@@ -44,7 +44,6 @@ export function useAudioCue(
         action,
         music_volume,
         sfx_volume,
-        voice_volume,
         crossfade_ms,
       } = msg.payload as {
         mood?: string;
@@ -53,7 +52,6 @@ export function useAudioCue(
         action?: string;
         music_volume?: number;
         sfx_volume?: number;
-        voice_volume?: number;
         crossfade_ms?: number;
       };
 
@@ -62,7 +60,6 @@ export function useAudioCue(
         // Genre-pack mixer config — set initial channel volumes
         if (music_volume != null) engine.setVolume("music", music_volume);
         if (sfx_volume != null) engine.setVolume("sfx", sfx_volume);
-        if (voice_volume != null) engine.setVolume("voice", voice_volume);
         if (crossfade_ms != null) crossfadeMs = crossfade_ms;
         continue;
       } else if (action === "duck") {

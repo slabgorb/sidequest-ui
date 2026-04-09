@@ -2,7 +2,7 @@ import { AudioCache } from "./AudioCache";
 import { Crossfader } from "./Crossfader";
 import { Ducker } from "./Ducker";
 
-type ChannelName = "music" | "sfx" | "voice";
+type ChannelName = "music" | "sfx";
 type VolumeTarget = ChannelName | "master";
 
 const STORAGE_KEY = "sidequest_audio_volumes";
@@ -10,14 +10,12 @@ const STORAGE_KEY = "sidequest_audio_volumes";
 interface VolumeState {
   music: number;
   sfx: number;
-  voice: number;
   master: number;
 }
 
 const DEFAULT_VOLUMES: VolumeState = {
   music: 1.0,
   sfx: 1.0,
-  voice: 1.0,
   master: 1.0,
 };
 
@@ -29,7 +27,6 @@ function loadVolumes(): VolumeState {
     return {
       music: parsed.music ?? DEFAULT_VOLUMES.music,
       sfx: parsed.sfx ?? DEFAULT_VOLUMES.sfx,
-      voice: parsed.voice ?? DEFAULT_VOLUMES.voice,
       master: parsed.master ?? DEFAULT_VOLUMES.master,
     };
   } catch {
@@ -71,18 +68,7 @@ export class AudioEngine {
   private volumes: VolumeState;
   private preMuteVolumes: Partial<Record<ChannelName, number>> = {};
   private activeSources: AudioBufferSourceNode[] = [];
-  private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
-  private _voicePlaybackRate = 1.0;
-  private _voiceSegmentCount = 0;
-
-  /** Callback fired when voice playback starts (true) or all segments end (false). */
-  onVoicePlaybackChange?: (playing: boolean) => void;
-
-  /** True when at least one voice segment is actively playing. */
-  get isVoicePlaying(): boolean {
-    return this._voiceSegmentCount > 0;
-  }
 
   constructor() {
     this.ctx = new AudioContext();
@@ -101,11 +87,7 @@ export class AudioEngine {
     sfxGain.gain.value = this.volumes.sfx;
     sfxGain.connect(this.masterGain);
 
-    const voiceGain = this.ctx.createGain();
-    voiceGain.gain.value = this.volumes.voice;
-    voiceGain.connect(this.masterGain);
-
-    this.channels = { music: musicGain, sfx: sfxGain, voice: voiceGain };
+    this.channels = { music: musicGain, sfx: sfxGain };
     this.crossfader = new Crossfader();
     this.ducker = new Ducker(musicGain);
   }
@@ -189,77 +171,6 @@ export class AudioEngine {
     this.activeSources.push(source);
   }
 
-  async playVoice(audioData: ArrayBuffer, onStart?: () => void): Promise<void> {
-    const audioBuffer = await this.ctx.decodeAudioData(audioData);
-    this.playVoiceBuffer(audioBuffer, onStart);
-  }
-
-  /**
-   * Play raw PCM s16le audio through the voice channel with music ducking.
-   * Converts PCM int16 samples to float32 and creates an AudioBuffer directly,
-   * bypassing decodeAudioData (which can't decode raw PCM).
-   */
-  playVoicePCM(pcmData: ArrayBuffer, sampleRate = 24000, onStart?: () => void): void {
-    // Ensure alignment
-    const aligned = new ArrayBuffer(pcmData.byteLength);
-    new Uint8Array(aligned).set(new Uint8Array(pcmData));
-    const s16 = new Int16Array(aligned);
-    const float32 = new Float32Array(s16.length);
-    for (let i = 0; i < s16.length; i++) {
-      float32[i] = s16[i] / 32768;
-    }
-    if (float32.length === 0) return;
-
-    const audioBuffer = this.ctx.createBuffer(1, float32.length, sampleRate);
-    audioBuffer.getChannelData(0).set(float32);
-    this.playVoiceBuffer(audioBuffer, onStart);
-  }
-
-  /**
-   * Queue a voice segment for sequential playback with music ducking.
-   * Optional `onStart` fires just before audio begins — used to synchronize
-   * text reveal with TTS playback so narration text appears as the voice reads.
-   */
-  private playVoiceBuffer(audioBuffer: AudioBuffer, onStart?: () => void): void {
-    const wasPlaying = this._voiceSegmentCount > 0;
-    this._voiceSegmentCount++;
-    if (!wasPlaying) {
-      this.onVoicePlaybackChange?.(true);
-    }
-
-    // Create source eagerly so it's available for inspection,
-    // but schedule start() through the voiceChain for sequential playback.
-    const source = this.ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.playbackRate.value = this._voicePlaybackRate;
-    source.connect(this.channels.voice);
-    this.activeSources.push(source);
-
-    // Chain resolve callback — set once the chain executor runs.
-    let chainResolve: (() => void) | null = null;
-
-    source.onended = () => {
-      this.ducker.unduck();
-      source.disconnect();
-      this.activeSources = this.activeSources.filter((s) => s !== source);
-      this._voiceSegmentCount--;
-      if (this._voiceSegmentCount === 0) {
-        this.onVoicePlaybackChange?.(false);
-      }
-      chainResolve?.();
-    };
-
-    this.voiceChain = this.voiceChain.then(
-      () =>
-        new Promise<void>((resolve) => {
-          chainResolve = resolve;
-          this.ducker.duck();
-          onStart?.();
-          source.start();
-        }),
-    );
-  }
-
   setVolume(channel: VolumeTarget, value: number): void {
     const clamped = Math.max(0, Math.min(1, value));
     this.volumes[channel] = clamped;
@@ -286,15 +197,6 @@ export class AudioEngine {
     const restored = this.preMuteVolumes[channel] ?? 1.0;
     delete this.preMuteVolumes[channel];
     this.setVolume(channel, restored);
-  }
-
-  /** Voice playback rate (0.5–2.0). Affects all future TTS segments. */
-  get voicePlaybackRate(): number {
-    return this._voicePlaybackRate;
-  }
-
-  set voicePlaybackRate(rate: number) {
-    this._voicePlaybackRate = Math.max(0.5, Math.min(2.0, rate));
   }
 
   dispose(): void {
