@@ -25,14 +25,6 @@ const CHARACTER: CharacterSheetData = {
   current_location: "The Rusty Cantina",
 };
 
-const INVENTORY = {
-  items: [
-    { name: "Elven Longbow", type: "weapon", equipped: true, description: "A fine bow." },
-    { name: "Healing Potion", type: "consumable", quantity: 3, description: "Restores HP." },
-  ],
-  gold: 42,
-};
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -141,25 +133,9 @@ describe("CharacterPanel — AC-2: tabbed sections", () => {
     );
   });
 
-  it("renders an Inventory tab when inventory data is provided", () => {
-    render(<CharacterPanel character={CHARACTER} inventory={INVENTORY} />);
-    expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
-  });
-
-  it("renders Inventory tab with empty state when inventory is absent", () => {
+  it("does NOT render an Inventory subtab — inventory has its own top-level panel", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.getByRole("tab", { name: /inventory/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /inventory/i }));
-    const tabpanel = screen.getByRole("tabpanel");
-    expect(within(tabpanel).getByText("No items yet.")).toBeInTheDocument();
-  });
-
-  it("shows inventory items when Inventory tab is selected", () => {
-    render(<CharacterPanel character={CHARACTER} inventory={INVENTORY} />);
-    fireEvent.click(screen.getByRole("tab", { name: /inventory/i }));
-    const tabpanel = screen.getByRole("tabpanel");
-    expect(within(tabpanel).getByText("Elven Longbow")).toBeInTheDocument();
-    expect(within(tabpanel).getByText("Healing Potion")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /inventory/i })).not.toBeInTheDocument();
   });
 });
 

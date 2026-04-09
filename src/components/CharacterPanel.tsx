@@ -1,13 +1,12 @@
 import { useRef } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
-import type { InventoryData, InventoryItem } from "./InventoryPanel";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "./PartyPanel";
 import { KnowledgeJournal } from "./KnowledgeJournal";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 
-type TabId = "stats" | "abilities" | "backstory" | "inventory" | "status" | "journal";
+type TabId = "stats" | "abilities" | "backstory" | "status" | "journal";
 
 export interface ResourcePool {
   value: number;
@@ -25,7 +24,6 @@ const DEFAULTS: CharacterPanelPrefs = {
 
 export interface CharacterPanelProps {
   character: CharacterSheetData;
-  inventory?: InventoryData | null;
   resources?: Record<string, ResourcePool> | null;
   genreSlug?: string;
   onResourceThresholdCrossed?: (info: {
@@ -47,7 +45,6 @@ function toDisplayName(id: string): string {
 
 export function CharacterPanel({
   character,
-  inventory,
   resources,
   genreSlug,
   knowledgeEntries,
@@ -62,18 +59,20 @@ export function CharacterPanel({
     DEFAULTS,
   );
 
-  const activeTab = prefs.activeTab;
-
   const hasResources = resources != null && Object.keys(resources).length > 0;
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "stats", label: "Stats" },
     { id: "abilities", label: "Abilities" },
     { id: "backstory", label: "Backstory" },
-    { id: "inventory" as TabId, label: "Inventory" },
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
     ...(knowledgeEntries && knowledgeEntries.length > 0 ? [{ id: "journal" as TabId, label: "Journal" }] : []),
   ];
+
+  // Inventory has its own top-level panel — drop the redundant subtab.
+  // If a previous session persisted activeTab="inventory" (now removed),
+  // fall back to "stats" instead of leaving the panel blank.
+  const activeTab: TabId = (tabs.some((t) => t.id === prefs.activeTab) ? prefs.activeTab : "stats");
 
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -128,9 +127,6 @@ export function CharacterPanel({
         {activeTab === "stats" && <StatsContent stats={character.stats} />}
         {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
         {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
-        {activeTab === "inventory" && (
-          inventory ? <InventoryContent inventory={inventory} /> : <p className="text-sm text-muted-foreground/60">No items yet.</p>
-        )}
         {activeTab === "status" && hasResources && (
           <StatusContent
             resources={resources!}
@@ -253,36 +249,6 @@ function AbilitiesContent({ abilities }: { abilities: string[] }) {
 
 function BackstoryContent({ backstory }: { backstory: string }) {
   return <p className="text-sm font-[var(--font-narrative)]">{backstory}</p>;
-}
-
-function InventoryContent({ inventory }: { inventory: InventoryData }) {
-  // Stack identical items by normalized name, summing quantities
-  const stacked = new Map<string, { item: InventoryItem; count: number }>();
-  for (const item of inventory.items) {
-    const key = item.name.trim();
-    const existing = stacked.get(key);
-    if (existing) {
-      existing.count += item.quantity ?? 1;
-    } else {
-      stacked.set(key, { item, count: item.quantity ?? 1 });
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      {Array.from(stacked.entries()).map(([name, { item, count }]) => (
-        <div key={name} className="text-sm">
-          <span className="font-medium">{item.name}</span>
-          {count > 1 && (
-            <span className="text-muted-foreground ml-1">x{count}</span>
-          )}
-        </div>
-      ))}
-      {inventory.gold != null && (
-        <div className="text-sm text-amber-500/80 mt-2">Gold: {inventory.gold}</div>
-      )}
-    </div>
-  );
 }
 
 function StatusContent({

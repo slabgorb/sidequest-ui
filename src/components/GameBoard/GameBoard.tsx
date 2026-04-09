@@ -118,21 +118,26 @@ export function GameBoard({
 
   const [editMode, setEditMode] = useState(false);
 
-  // Build available widgets set (data-gated widgets only visible when data exists)
+  // Build available widgets set. Tabs are deterministic per-session — they
+  // appear once the game is loaded (we're already past chargen by the time
+  // GameBoard mounts), regardless of whether the player has accumulated any
+  // entries yet. Per-player gating caused inconsistent panel sets between
+  // players in the same session (e.g. Kael had Knowledge but Mira did not
+  // because Mira had not yet had her first turn).
   const availableWidgets = useMemo(() => {
     const available = new Set<WidgetId>();
     available.add("narrative");
     available.add("settings");
     available.add("gallery");
     available.add("audio");
+    available.add("knowledge");
+    available.add("journal");
     if (characterSheet) available.add("character");
     if (inventoryData) available.add("inventory");
     if (mapData) available.add("map");
-    if (journalEntries && journalEntries.length > 0) available.add("journal");
-    if (knowledgeEntries && knowledgeEntries.length > 0) available.add("knowledge");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [characterSheet, inventoryData, mapData, journalEntries, knowledgeEntries, confrontationData]);
+  }, [characterSheet, inventoryData, mapData, confrontationData]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -236,7 +241,6 @@ export function GameBoard({
         return characterSheet ? (
           <CharacterWidget
             character={characterSheet}
-            inventory={inventoryData}
             resources={resources}
             genreSlug={genreSlug}
             knowledgeEntries={knowledgeEntries}
