@@ -132,12 +132,12 @@ export function GameBoard({
     available.add("knowledge");
     available.add("journal");
     available.add("lore");
+    available.add("map");
     if (characterSheet) available.add("character");
     if (inventoryData) available.add("inventory");
-    if (mapData) available.add("map");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [characterSheet, inventoryData, mapData, confrontationData]);
+  }, [characterSheet, inventoryData, confrontationData]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -261,7 +261,7 @@ export function GameBoard({
           />
         );
       case "map":
-        return mapData ? <MapWidget mapData={mapData} /> : null;
+        return <MapWidget mapData={mapData ?? null} />;
       case "journal":
         return journalEntries ? <JournalWidget entries={journalEntries} /> : null;
       case "knowledge":
