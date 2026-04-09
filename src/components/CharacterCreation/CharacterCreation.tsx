@@ -6,6 +6,11 @@ interface CreationChoice {
   description: string;
 }
 
+interface RolledStat {
+  name: string;
+  value: number;
+}
+
 export interface CreationScene {
   phase: string;
   scene_index?: number;
@@ -18,6 +23,7 @@ export interface CreationScene {
   input_type?: string;
   loading_text?: string;
   character_preview?: Record<string, unknown>;
+  rolled_stats?: RolledStat[];
   previous_choice?: number;
   previous_input?: string;
 }
@@ -157,6 +163,24 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
       </div>
 
       <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">{scene.prompt}</p>
+
+      {scene.rolled_stats && scene.rolled_stats.length > 0 && (
+        <div
+          data-testid="creation-rolled-stats"
+          className="grid grid-cols-3 gap-3 w-full max-w-md border-y border-border/40 py-4 my-2"
+        >
+          {scene.rolled_stats.map((stat) => (
+            <div key={stat.name} className="flex flex-col items-center">
+              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60">
+                {stat.name}
+              </span>
+              <span className="text-2xl font-bold text-[var(--primary)] tabular-nums">
+                {stat.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {scene.choices && scene.choices.length > 0 && (
         <div className="flex flex-col gap-3 w-full max-w-prose">
