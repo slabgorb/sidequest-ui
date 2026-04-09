@@ -35,7 +35,6 @@ import { BackgroundCanvas } from "./BackgroundCanvas";
 import { MobileTabView } from "./MobileTabView";
 import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
-import { LoreWidget } from "./widgets/LoreWidget";
 import { MapWidget } from "./widgets/MapWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
 import { JournalWidget } from "./widgets/JournalWidget";
@@ -141,7 +140,6 @@ export function GameBoard({
     available.add("character");
     available.add("inventory");
     available.add("map");
-    available.add("lore");
     available.add("knowledge");
     available.add("journal");
     available.add("gallery");
@@ -267,19 +265,19 @@ export function GameBoard({
         ) : null;
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
-      case "lore":
-        return (
-          <LoreWidget
-            character={characterSheet ?? null}
-            knowledgeEntries={knowledgeEntries ?? []}
-          />
-        );
       case "map":
         return <MapWidget mapData={mapData ?? null} />;
       case "journal":
         return journalEntries ? <JournalWidget entries={journalEntries} /> : null;
       case "knowledge":
-        return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
+        // Knowledge absorbed the old Lore widget — backstory renders as a
+        // header section, knowledge entries as the sortable/categorical list.
+        return (
+          <KnowledgeWidget
+            entries={knowledgeEntries ?? []}
+            backstory={characterSheet?.backstory ?? ""}
+          />
+        );
       case "confrontation":
         return confrontationData ? (
           <ConfrontationWidget data={confrontationData} onBeatSelect={onBeatSelect} />
@@ -367,7 +365,6 @@ export function GameBoard({
       "character",
       "inventory",
       "map",
-      "lore",
       "knowledge",
       "journal",
       "gallery",
