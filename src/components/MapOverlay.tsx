@@ -1,9 +1,29 @@
-interface ExploredLocation {
+export interface RoomExitInfo {
+  /** Target room ID this exit leads to. */
+  target: string;
+  /** "door" | "corridor" | "chute_down" | "chute_up" | "secret". */
+  exit_type: string;
+}
+
+export interface ExploredLocation {
+  /**
+   * Stable room identifier (slug). In room graph mode this is the RoomDef
+   * id that `room_exits[].target` references — the UI uses it to join
+   * exits back to rooms. Empty/absent in region/cartography mode where
+   * `name` is the only identifier.
+   */
+  id?: string;
   name: string;
   x: number;
   y: number;
   type: string;
   connections: string[];
+  /** Room graph mode only — exit descriptors with target room ID + type. */
+  room_exits?: RoomExitInfo[];
+  /** Room graph mode only — room type from RoomDef (e.g. "entrance", "normal"). */
+  room_type?: string;
+  /** Room graph mode only — true if this is the player's current room. */
+  is_current_room?: boolean;
 }
 
 export interface CartographyRegion {
