@@ -24,6 +24,13 @@ export interface ExploredLocation {
   room_type?: string;
   /** Room graph mode only — true if this is the player's current room. */
   is_current_room?: boolean;
+  /** Room graph mode only — parsed tactical grid for SVG rendering. */
+  tactical_grid?: {
+    width: number;
+    height: number;
+    cells: string[][];
+    features: { glyph: string; feature_type: string; label: string; positions: number[][] }[];
+  };
 }
 
 export interface CartographyRegion {

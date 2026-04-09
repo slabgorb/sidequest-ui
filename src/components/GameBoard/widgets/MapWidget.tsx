@@ -89,5 +89,14 @@ function toExploredRooms(mapData: MapState): ExploredRoom[] {
       // ExploredRoom.id we just assigned above via `keyFor`.
       to_room_id: ex.target,
     })),
+    // Story 35-7: Pass tactical grid through to Automapper/TacticalGridRenderer.
+    grid: loc.tactical_grid
+      ? {
+          width: loc.tactical_grid.width,
+          height: loc.tactical_grid.height,
+          cells: loc.tactical_grid.cells,
+          features: loc.tactical_grid.features,
+        }
+      : undefined,
   }));
 }
