@@ -74,9 +74,12 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
     expect(screen.getByText("Kael")).toBeInTheDocument();
   });
 
-  it("displays current location when available", () => {
+  it("does NOT display per-character location (single source of truth is the top header)", () => {
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.getByText("The Rusty Cantina")).toBeInTheDocument();
+    // The character.current_location field is set once at chargen and was
+    // never updated as the player moved, leading to stale location displays.
+    // The top-level location header is now the single source of truth.
+    expect(screen.queryByText("The Rusty Cantina")).not.toBeInTheDocument();
   });
 
   it("renders level", () => {

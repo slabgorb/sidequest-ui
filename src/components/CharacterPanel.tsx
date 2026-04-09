@@ -96,11 +96,11 @@ export function CharacterPanel({
           <p className="text-xs text-muted-foreground">
             Level {character.level} {toDisplayName(character.class)}
           </p>
-          {character.current_location && (
-            <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">
-              {character.current_location}
-            </p>
-          )}
+          {/* Per-character location removed: it was set once at chargen and
+              never updated as the player moved, leading to a stale "mouth"
+              display while the top header correctly showed "ANTECHAMBER".
+              Party shares location — the top-level location header is the
+              single source of truth. */}
         </div>
       </div>
 
