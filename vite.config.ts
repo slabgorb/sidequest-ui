@@ -20,6 +20,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: true,
     allowedHosts: true,
     proxy: {
       '/ws': { target: 'ws://localhost:8765', ws: true },
