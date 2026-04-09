@@ -329,12 +329,19 @@ export function GameBoard({
     />
   );
 
-  // Dockview panel adapter — receives panelId from params, renders the widget
+  // Dockview panel adapter — receives panelId from params, renders the widget.
+  // The outer `.dockview-panel-content` is a flex column (see dockview-theme.css)
+  // so `flex-1 min-h-0` descendants (NarrativeView, CharacterPanel, MapOverlay)
+  // actually fill the panel. Wrapping the widget in a `flex-1 min-h-0` inner
+  // div guarantees every widget gets the available space even if its own root
+  // element isn't a flex container — fixes the panels-visually-empty regression.
   const PanelAdapter = useCallback(
     ({ params }: IDockviewPanelProps<{ panelId: WidgetId }>) => {
       return (
         <div className="dockview-panel-content" data-widget={params.panelId}>
-          {renderWidgetContent(params.panelId)}
+          <div className="flex-1 min-h-0 flex flex-col overflow-auto">
+            {renderWidgetContent(params.panelId)}
+          </div>
         </div>
       );
     },
