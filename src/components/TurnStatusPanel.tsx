@@ -3,6 +3,10 @@
  *
  * Presentational component: receives turn entries as props, renders status per player.
  * WebSocket integration lives in the parent (provider/hook layer).
+ *
+ * Story 13-13: Enhanced with sealed-letter visual metaphor for multiplayer prominence.
+ * Per-player sealed/unsealed indicators, "all letters sealed" transition state,
+ * hidden in single-player, data attributes for CSS styling.
  */
 
 import { useEffect, useMemo, useRef } from 'react';
@@ -48,6 +52,8 @@ export function TurnStatusPanel({
   const localStatus = localEntry?.status;
   const allResolved = deduped.length > 0 && deduped.every((e) => isResolved(e.status));
   const showWaiting = localStatus !== undefined && isResolved(localStatus) && !allResolved;
+  const isStructured = gameMode === 'structured';
+  const sealedCount = deduped.filter((e) => isResolved(e.status)).length;
 
   // Track previous status to deduplicate callback fires
   const prevStatusRef = useRef<TurnStatusEntry['status'] | undefined>(undefined);
@@ -66,32 +72,51 @@ export function TurnStatusPanel({
     return null;
   }
 
-  const localAutoResolved = localStatus === 'auto_resolved';
+  // Hidden in single-player during active game modes — panel only shows for multiplayer (2+ players)
+  if (gameMode && deduped.length < 2) {
+    return null;
+  }
 
   return (
-    <div data-testid="turn-status-panel">
-      {deduped.map((entry) => (
-        <div
-          key={entry.player_id}
-          data-testid={`turn-entry-${entry.player_id}`}
-          data-local={localPlayerId ? String(entry.player_id === localPlayerId) : undefined}
-        >
-          <span>{entry.character_name}</span>
-          <span
-            data-testid="status-indicator"
-            data-status={entry.status}
-            data-timeout={entry.status === 'auto_resolved' ? 'true' : undefined}
-          />
-          {entry.status === 'auto_resolved' && (
-            <span className="text-amber-500 text-xs ml-1">timed out</span>
-          )}
-        </div>
-      ))}
-      {localAutoResolved && (
-        <div className="text-amber-500 text-sm">Your action timed out — a default action was taken.</div>
+    <div
+      data-testid="turn-status-panel"
+      data-sealed-round={isStructured ? 'true' : undefined}
+      data-all-in={isStructured && allResolved ? 'true' : undefined}
+      role={isStructured ? 'status' : undefined}
+    >
+      {deduped.map((entry) => {
+        const sealed = isResolved(entry.status);
+        return (
+          <div
+            key={entry.player_id}
+            data-testid={`turn-entry-${entry.player_id}`}
+            data-local={localPlayerId ? String(entry.player_id === localPlayerId) : undefined}
+          >
+            <span>{entry.character_name}</span>
+            <span
+              data-testid="status-indicator"
+              data-status={entry.status}
+              data-letter={isStructured ? (sealed ? 'sealed' : 'unsealed') : undefined}
+              data-timeout={entry.status === 'auto_resolved' ? 'true' : undefined}
+            />
+            {isStructured ? (
+              <span>{sealed ? 'Sealed' : 'Composing'}</span>
+            ) : (
+              entry.status === 'auto_resolved' && (
+                <span className="text-amber-500 text-xs ml-1">timed out</span>
+              )
+            )}
+          </div>
+        );
+      })}
+      {isStructured && (
+        <div>{sealedCount} / {deduped.length}</div>
       )}
-      {showWaiting && <div>Waiting for other players...</div>}
-      {allResolved && <div>Resolving turn...</div>}
+      {isStructured && allResolved && (
+        <div>All letters sealed</div>
+      )}
+      {!isStructured && showWaiting && <div>Waiting for other players...</div>}
+      {!isStructured && allResolved && <div>Resolving turn...</div>}
     </div>
   );
 }
