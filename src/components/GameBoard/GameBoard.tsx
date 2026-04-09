@@ -385,7 +385,7 @@ export function GameBoard({
     // 2. Narrative panel gets focus so keyboard input and visual emphasis
     //    land on the storytelling column, not the supporting dock.
     if (rightFirst) {
-      api.setActivePanel(rightFirst);
+      rightFirst.api.setActive();
     }
     narrative.focus();
   }, [availableWidgets]);
