@@ -73,6 +73,10 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
     onRespond({ phase: "confirmation", choice: "1" });
   };
 
+  const handleContinue = () => {
+    onRespond({ phase: "continue" });
+  };
+
   const handleBack = () => {
     onRespond({ action: "back" });
   };
@@ -217,6 +221,16 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Go Back
           </button>
         </div>
+      )}
+
+      {scene.input_type === "continue" && (
+        <button
+          onClick={handleContinue}
+          data-testid="creation-continue"
+          className="inline-flex items-center justify-center rounded-lg text-sm font-semibold h-11 px-8 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          Continue
+        </button>
       )}
 
       {showBack && (
