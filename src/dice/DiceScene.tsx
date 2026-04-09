@@ -9,7 +9,7 @@
  * - Force-stop timeout after 5 seconds
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
@@ -289,7 +289,7 @@ function useDragThrow(onThrow: (params: ThrowParams) => void) {
         .add(raycaster.ray.direction.clone().multiplyScalar(t));
       return { x: hit.x, z: hit.z };
     },
-    [camera, size]
+    [camera, size, pointer, raycaster]
   );
 
   const handlePointerDown = useCallback(

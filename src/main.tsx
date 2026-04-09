@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 
 // Spike: ?dice-spike query param loads the dice test page directly
+// eslint-disable-next-line react-refresh/only-export-components
 const DiceSpikePage = lazy(() => import('./dice/DiceSpikePage'));
 const isDiceSpike = new URLSearchParams(window.location.search).has('dice-spike');
 
