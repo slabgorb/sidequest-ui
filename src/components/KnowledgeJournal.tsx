@@ -8,12 +8,9 @@ type SortMode = 'chronological' | 'categorical';
 interface KnowledgeJournalProps {
   entries: KnowledgeEntry[];
   onRequestJournal?: (category?: string) => void;
-  /** Character backstory — absorbed from the old standalone Lore panel.
-   *  Renders as a static section above the discovered-facts list. */
-  backstory?: string;
 }
 
-export function KnowledgeJournal({ entries, onRequestJournal, backstory }: KnowledgeJournalProps) {
+export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournalProps) {
   const [activeCategory, setActiveCategory] = useState<FactCategory | 'All'>('All');
   const [sortMode, setSortMode] = useState<SortMode>('chronological');
 
@@ -25,28 +22,10 @@ export function KnowledgeJournal({ entries, onRequestJournal, backstory }: Knowl
     return counts;
   }, [entries]);
 
-  const hasBackstory = backstory && backstory.trim().length > 0;
-
-  const backstorySection = hasBackstory ? (
-    <section data-testid="knowledge-backstory" className="mb-5 pb-4 border-b border-border/30">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-[var(--primary)]/70 mb-2">
-        Backstory
-      </h3>
-      <p className="text-sm font-[var(--font-narrative)] leading-relaxed whitespace-pre-wrap text-foreground/80">
-        {backstory}
-      </p>
-    </section>
-  ) : null;
-
   if (entries.length === 0) {
     return (
       <div data-testid="knowledge-journal" className="p-6">
-        {backstorySection}
-        <p className="text-muted-foreground/60 italic">
-          {hasBackstory
-            ? "Your journal is empty beyond your own history. Explore the world to fill its pages."
-            : "Your journal is empty. Explore the world to fill its pages."}
-        </p>
+        <p className="text-muted-foreground/60 italic">Your journal is empty. Explore the world to fill its pages.</p>
       </div>
     );
   }
@@ -69,7 +48,6 @@ export function KnowledgeJournal({ entries, onRequestJournal, backstory }: Knowl
 
   return (
     <div data-testid="knowledge-journal" className="p-4">
-      {backstorySection}
       <div role="tablist" className="flex gap-1 mb-3 flex-wrap">
         <button
           role="tab"

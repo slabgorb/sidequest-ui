@@ -270,14 +270,7 @@ export function GameBoard({
       case "journal":
         return journalEntries ? <JournalWidget entries={journalEntries} /> : null;
       case "knowledge":
-        // Knowledge absorbed the old Lore widget — backstory renders as a
-        // header section, knowledge entries as the sortable/categorical list.
-        return (
-          <KnowledgeWidget
-            entries={knowledgeEntries ?? []}
-            backstory={characterSheet?.backstory ?? ""}
-          />
-        );
+        return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
         return confrontationData ? (
           <ConfrontationWidget data={confrontationData} onBeatSelect={onBeatSelect} />
