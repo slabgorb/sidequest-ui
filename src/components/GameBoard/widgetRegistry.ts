@@ -2,10 +2,10 @@ export type WidgetId =
   | "narrative"
   | "character"
   | "inventory"
+  | "lore"
   | "map"
   | "journal"
   | "knowledge"
-  | "settings"
   | "gallery"
   | "confrontation"
   | "audio";
@@ -56,6 +56,17 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     closable: true,
     dataGated: true,
   },
+  lore: {
+    id: "lore",
+    label: "Lore",
+    hotkey: "l",
+    minW: 3,
+    minH: 3,
+    defaultW: 4,
+    defaultH: 5,
+    closable: true,
+    dataGated: false,
+  },
   map: {
     id: "map",
     label: "Map",
@@ -88,17 +99,6 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     defaultH: 4,
     closable: true,
     dataGated: true,
-  },
-  settings: {
-    id: "settings",
-    label: "Settings",
-    hotkey: "s",
-    minW: 2,
-    minH: 2,
-    defaultW: 3,
-    defaultH: 3,
-    closable: true,
-    dataGated: false,
   },
   gallery: {
     id: "gallery",

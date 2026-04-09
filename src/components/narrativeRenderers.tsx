@@ -3,24 +3,31 @@ import type { NarrativeSegment } from "@/lib/narrativeSegments";
 function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] }) {
   if (!footnotes || footnotes.length === 0) return null;
   return (
-    <div className="mt-3 pt-2 border-t border-border/20 space-y-1">
+    <aside
+      data-testid="world-facts"
+      aria-label="World facts learned this turn"
+      className="mt-6 pt-4 border-t-2 border-[var(--primary)]/30 space-y-1.5"
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--primary)]/70 mb-2">
+        World learned this turn
+      </div>
       {footnotes.map((fn, fi) => (
         <div
           key={fi}
           id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
           data-footnote-id={fn.marker != null ? fn.marker : undefined}
-          className="text-xs text-muted-foreground/60 leading-snug flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 transition-colors"
+          className="text-sm text-muted-foreground leading-snug flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 py-0.5 transition-colors"
         >
           {fn.marker != null && (
-            <span className="text-muted-foreground/40 shrink-0">[{fn.marker}]</span>
+            <span className="text-muted-foreground/50 shrink-0">[{fn.marker}]</span>
           )}
           <span>{fn.summary}</span>
           {fn.is_new && (
-            <span className="text-accent-foreground/40 italic shrink-0">new</span>
+            <span className="text-[var(--primary)]/60 italic shrink-0 text-xs self-center">new</span>
           )}
         </div>
       ))}
-    </div>
+    </aside>
   );
 }
 

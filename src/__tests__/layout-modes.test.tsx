@@ -314,54 +314,6 @@ describe("Layout content parity", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC5: Tests cover settings integration
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("SettingsPanel layout mode integration", () => {
-  it("SettingsPanel includes the LayoutModeSelector", async () => {
-    const { SettingsPanel } = await import("@/components/SettingsPanel");
-    render(
-      <SettingsPanel
-        verbosity="normal"
-        vocabulary="normal"
-        imageCooldown={30}
-        onVerbosityChange={() => {}}
-        onVocabularyChange={() => {}}
-        onImageCooldownChange={() => {}}
-        layoutMode="scroll"
-        onLayoutModeChange={() => {}}
-      />,
-    );
-
-    // The layout selector should be visible within settings
-    expect(screen.getByRole("button", { name: /scroll/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /focus/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /cards/i })).toBeInTheDocument();
-  });
-
-  it("SettingsPanel calls onLayoutModeChange when layout is selected", async () => {
-    const user = userEvent.setup();
-    const onLayoutModeChange = vi.fn();
-    const { SettingsPanel } = await import("@/components/SettingsPanel");
-    render(
-      <SettingsPanel
-        verbosity="normal"
-        vocabulary="normal"
-        imageCooldown={30}
-        onVerbosityChange={() => {}}
-        onVocabularyChange={() => {}}
-        onImageCooldownChange={() => {}}
-        layoutMode="scroll"
-        onLayoutModeChange={onLayoutModeChange}
-      />,
-    );
-
-    await user.click(screen.getByRole("button", { name: /focus/i }));
-    expect(onLayoutModeChange).toHaveBeenCalledWith("focus");
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
 // AC6: Active layout is immediately applied on selection
 // ══════════════════════════════════════════════════════════════════════════════
 

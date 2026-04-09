@@ -66,10 +66,8 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
                       <span className="text-muted-foreground ml-1 font-normal">x{count}</span>
                     )}
                   </span>
-                  {item.equipped != null && (
-                    <span className="text-xs text-[var(--accent)]">
-                      {item.equipped ? 'Equipped' : 'Unequipped'}
-                    </span>
+                  {item.equipped === true && (
+                    <span className="text-xs text-muted-foreground">Equipped</span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">{item.description}</p>

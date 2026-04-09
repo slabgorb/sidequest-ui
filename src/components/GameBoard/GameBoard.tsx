@@ -1,7 +1,12 @@
-import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { ResponsiveGridLayout } from "react-grid-layout";
-import { Settings, Lock, Unlock } from "lucide-react";
-import "react-grid-layout/css/styles.css";
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  DockviewReact,
+  type DockviewReadyEvent,
+  type DockviewApi,
+  type IDockviewPanelProps,
+} from "dockview-react";
+import "dockview-react/dist/styles/dockview.css";
+import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/screens/NarrativeView";
 import InputBar from "@/components/InputBar";
@@ -18,7 +23,6 @@ import type { MapState } from "@/components/MapOverlay";
 import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
-import type { SettingsPanelProps } from "@/components/SettingsPanel";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import type { CharacterSummary } from "@/components/PartyPanel";
 import type { useAudio } from "@/hooks/useAudio";
@@ -26,19 +30,18 @@ import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 
-import { WidgetWrapper } from "./WidgetWrapper";
 import { WIDGET_REGISTRY, type WidgetId } from "./widgetRegistry";
 import { BackgroundCanvas } from "./BackgroundCanvas";
 import { MobileTabView } from "./MobileTabView";
 import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
+import { LoreWidget } from "./widgets/LoreWidget";
 import { MapWidget } from "./widgets/MapWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
 import { JournalWidget } from "./widgets/JournalWidget";
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { ConfrontationWidget } from "./widgets/ConfrontationWidget";
 import { AudioWidget } from "./widgets/AudioWidget";
-import { SettingsWidget } from "./widgets/SettingsWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
 
 // react-grid-layout v2 exports ResponsiveGridLayout directly (no WidthProvider)
@@ -65,7 +68,6 @@ export interface GameBoardProps {
   activePlayerName?: string | null;
   waitingForPlayer?: string;
   turnStatusEntries?: TurnStatusEntry[];
-  settingsProps?: SettingsPanelProps;
   resources?: Record<string, ResourcePool> | null;
   genreSlug?: string;
   worldSlug?: string;
@@ -95,7 +97,6 @@ export function GameBoard({
   activePlayerName,
   waitingForPlayer,
   turnStatusEntries = [],
-  settingsProps,
   resources,
   genreSlug,
   worldSlug,
@@ -106,33 +107,37 @@ export function GameBoard({
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
 
-  // Layout management
+  // Layout management — dockview handles its own layout state internally,
+  // but we still use the show/hide tracking for data-gating widgets.
   const {
     visibleWidgets,
-    visibleLayouts,
     showWidget,
     hideWidget,
     toggleWidget,
-    onLayoutChange,
   } = useGameBoardLayout(genreSlug, worldSlug);
 
-  const [editMode, setEditMode] = useState(false);
+  const dockviewApiRef = useRef<DockviewApi | null>(null);
 
-  // Build available widgets set (data-gated widgets only visible when data exists)
+  // Build available widgets set. Tabs are deterministic per-session — they
+  // appear once the game is loaded (we're already past chargen by the time
+  // GameBoard mounts), regardless of whether the player has accumulated any
+  // entries yet. Per-player gating caused inconsistent panel sets between
+  // players in the same session (e.g. Kael had Knowledge but Mira did not
+  // because Mira had not yet had her first turn).
   const availableWidgets = useMemo(() => {
     const available = new Set<WidgetId>();
     available.add("narrative");
-    available.add("settings");
     available.add("gallery");
     available.add("audio");
+    available.add("knowledge");
+    available.add("journal");
+    available.add("lore");
     if (characterSheet) available.add("character");
     if (inventoryData) available.add("inventory");
     if (mapData) available.add("map");
-    if (journalEntries && journalEntries.length > 0) available.add("journal");
-    if (knowledgeEntries && knowledgeEntries.length > 0) available.add("knowledge");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [characterSheet, inventoryData, mapData, journalEntries, knowledgeEntries, confrontationData]);
+  }, [characterSheet, inventoryData, mapData, confrontationData]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -236,7 +241,6 @@ export function GameBoard({
         return characterSheet ? (
           <CharacterWidget
             character={characterSheet}
-            inventory={inventoryData}
             resources={resources}
             genreSlug={genreSlug}
             knowledgeEntries={knowledgeEntries}
@@ -249,6 +253,13 @@ export function GameBoard({
         ) : null;
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
+      case "lore":
+        return (
+          <LoreWidget
+            character={characterSheet ?? null}
+            knowledgeEntries={knowledgeEntries ?? []}
+          />
+        );
       case "map":
         return mapData ? <MapWidget mapData={mapData} /> : null;
       case "journal":
@@ -273,8 +284,6 @@ export function GameBoard({
             onVoiceChange={handleVoiceChange}
           />
         );
-      case "settings":
-        return settingsProps ? <SettingsWidget {...settingsProps} /> : null;
       case "gallery":
         return <ImageGalleryWidget />;
       default:
@@ -283,7 +292,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData, journalEntries,
       knowledgeEntries, confrontationData, onBeatSelect, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, voicePlaybackRate, handlePlaybackRateChange,
-      selectedVoice, handleVoiceChange, settingsProps, resources, genreSlug,
+      selectedVoice, handleVoiceChange, resources, genreSlug,
       onRequestJournal, handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId]);
 
@@ -308,6 +317,89 @@ export function GameBoard({
     />
   );
 
+  // Dockview panel adapter — receives panelId from params, renders the widget
+  const PanelAdapter = useCallback(
+    ({ params }: IDockviewPanelProps<{ panelId: WidgetId }>) => {
+      return (
+        <div className="dockview-panel-content" data-widget={params.panelId}>
+          {renderWidgetContent(params.panelId)}
+        </div>
+      );
+    },
+    [renderWidgetContent],
+  );
+
+  const dockviewComponents = useMemo(() => ({ PanelAdapter }), [PanelAdapter]);
+
+  // Build the initial dockview layout when the API is ready.
+  // Two-region default: narrative on the left, supporting panels (character/map/gallery/audio) tabbed on the right.
+  const onDockviewReady = useCallback((event: DockviewReadyEvent) => {
+    const api = event.api;
+    dockviewApiRef.current = api;
+
+    // Always-present panels
+    const narrative = api.addPanel({
+      id: "narrative",
+      component: "PanelAdapter",
+      params: { panelId: "narrative" as WidgetId },
+      title: WIDGET_REGISTRY.narrative.label,
+    });
+
+    // Right-side group: stack supporting panels as tabs
+    const rightGroupOrder: WidgetId[] = ["character", "map", "gallery", "audio"];
+    let rightFirst: ReturnType<typeof api.addPanel> | null = null;
+    for (const id of rightGroupOrder) {
+      if (!availableWidgets.has(id)) continue;
+      const def = WIDGET_REGISTRY[id];
+      if (!rightFirst) {
+        rightFirst = api.addPanel({
+          id,
+          component: "PanelAdapter",
+          params: { panelId: id },
+          position: { referencePanel: narrative.id, direction: "right" },
+          title: def.label,
+        });
+      } else {
+        api.addPanel({
+          id,
+          component: "PanelAdapter",
+          params: { panelId: id },
+          position: { referencePanel: rightFirst.id },
+          title: def.label,
+        });
+      }
+    }
+  }, [availableWidgets]);
+
+  // Sync widget visibility with dockview panels (add/remove as data-gates change).
+  useEffect(() => {
+    const api = dockviewApiRef.current;
+    if (!api) return;
+
+    const dockviewIds = new Set(api.panels.map((p) => p.id));
+
+    // Remove panels that became unavailable
+    for (const id of dockviewIds) {
+      if (!availableWidgets.has(id as WidgetId)) {
+        const panel = api.getPanel(id);
+        if (panel) api.removePanel(panel);
+      }
+    }
+
+    // Add panels that became available
+    for (const id of availableWidgets) {
+      if (!dockviewIds.has(id)) {
+        const def = WIDGET_REGISTRY[id];
+        api.addPanel({
+          id,
+          component: "PanelAdapter",
+          params: { panelId: id },
+          title: def.label,
+        });
+      }
+    }
+  }, [availableWidgets]);
+
   // Mobile fallback
   if (isMobile) {
     return (
@@ -319,9 +411,6 @@ export function GameBoard({
       </MobileTabView>
     );
   }
-
-  // Desktop/tablet grid layout
-  const visibleWidgetIds = Array.from(visibleWidgets).filter(id => availableWidgets.has(id));
 
   return (
     <div data-testid="game-board" className="flex flex-col h-screen overflow-hidden">
@@ -336,24 +425,6 @@ export function GameBoard({
           {chapterTitle ?? "\u00A0"}
         </span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setEditMode(prev => !prev)}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
-            title={editMode ? "Lock layout" : "Unlock layout"}
-            aria-label={editMode ? "Lock layout" : "Unlock layout"}
-          >
-            {editMode ? <Unlock className="size-4" /> : <Lock className="size-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleWidget("settings")}
-            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/50"
-            title="Settings (S)"
-            aria-label="Settings"
-          >
-            <Settings className="size-4" />
-          </button>
           {onLeave && (
             <button
               type="button"
@@ -387,37 +458,14 @@ export function GameBoard({
         </div>
       )}
 
-      {/* Grid */}
-      <div className="flex-1 min-h-0 overflow-auto px-2">
-        <ResponsiveGridLayout
-          layouts={visibleLayouts}
-          breakpoints={{ lg: 1200, md: 768, sm: 480 }}
-          cols={{ lg: 12, md: 8, sm: 6 }}
-          rowHeight={60}
-          margin={[12, 12]}
-          containerPadding={[8, 8]}
-          isDraggable={editMode}
-          isResizable={editMode}
-          draggableHandle=".widget-drag-handle"
-          onLayoutChange={onLayoutChange}
-          compactType="vertical"
-        >
-          {visibleWidgetIds.map((id) => {
-            const def = WIDGET_REGISTRY[id];
-            return (
-              <div key={id}>
-                <WidgetWrapper
-                  widgetId={id}
-                  title={def.label}
-                  closable={def.closable}
-                  onClose={() => hideWidget(id)}
-                >
-                  {renderWidgetContent(id)}
-                </WidgetWrapper>
-              </div>
-            );
-          })}
-        </ResponsiveGridLayout>
+      {/* Dockview workspace — tabbed groups, drag tabs between groups, no z-index */}
+      <div className="sidequest-dockview flex-1 min-h-0">
+        <DockviewReact
+          className="dockview-container dockview-theme-abyss"
+          onReady={onDockviewReady}
+          components={dockviewComponents}
+          watermarkComponent={() => null}
+        />
       </div>
 
       {/* Turn status */}
