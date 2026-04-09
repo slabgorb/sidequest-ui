@@ -112,6 +112,9 @@ function AppInner() {
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(hmrState ? loadSession()?.genre ?? null : null);
   const [thinking, setThinking] = useState(false);
+  // Unified input lock: false after submit, true when narration arrives.
+  // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
+  const [canType, setCanType] = useState(true);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
 
@@ -174,6 +177,94 @@ function AppInner() {
   // Audio engine — unified mixer for TTS, music, SFX
   const audio = useAudio();
 
+  // Narration buffer — holds NARRATION, NARRATION_END, and NARRATION_CHUNK messages
+  // so text reveals sentence-by-sentence in sync with TTS audio playback.
+  // Without this, the server sends full NARRATION text before TTS starts streaming,
+  // and prefetch causes multiple chunks to arrive before the first audio finishes.
+  const narrationBufferRef = useRef<{
+    narration: GameMessage | null;
+    narrationEnd: GameMessage | null;
+    chunks: GameMessage[];
+    flushTimer: ReturnType<typeof setTimeout> | null;
+    watchdogTimer: ReturnType<typeof setTimeout> | null;
+  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null, watchdogTimer: null });
+
+  const flushNarrationBuffer = useCallback(() => {
+    const buf = narrationBufferRef.current;
+    if (buf.flushTimer) {
+      clearTimeout(buf.flushTimer);
+      buf.flushTimer = null;
+    }
+    if (buf.watchdogTimer) {
+      clearTimeout(buf.watchdogTimer);
+      buf.watchdogTimer = null;
+    }
+
+    const toFlush: GameMessage[] = [];
+    // Chunks first so buildSegments sets hasChunksForTurn before seeing NARRATION
+    toFlush.push(...buf.chunks);
+    buf.chunks = [];
+    if (buf.narration) {
+      toFlush.push(buf.narration);
+      buf.narration = null;
+    }
+    if (buf.narrationEnd) {
+      toFlush.push(buf.narrationEnd);
+      buf.narrationEnd = null;
+    }
+
+    if (toFlush.length > 0) {
+      setThinking(false);
+      setCanType(true); // Narration arrived — new turn, can type again
+      setMessages(prev => [...prev, ...toFlush]);
+    }
+  }, []);
+
+  // Route binary WebSocket frames (TTS voice) through AudioEngine,
+  // synchronized with narration text reveal.
+  const handleBinaryMessage = useCallback(
+    (data: ArrayBuffer) => {
+      if (!audio.engine) return;
+      if (!isVoiceAudioFrame(data)) return;
+
+      const { header, audioData } = decodeVoiceFrame(data);
+      if (audioData.byteLength === 0) return;
+
+      // Pop the next buffered narration chunk — reveal its text when this
+      // audio segment actually starts playing (not when it's queued).
+      const buf = narrationBufferRef.current;
+      // Reset watchdog — audio is arriving, TTS pipeline is healthy
+      if (buf.watchdogTimer) {
+        clearTimeout(buf.watchdogTimer);
+        buf.watchdogTimer = null;
+      }
+      const nextChunk = buf.chunks.shift();
+
+      const onStart = () => {
+        if (nextChunk) {
+          setThinking(false);
+          setMessages(prev => [...prev, nextChunk]);
+        }
+      };
+
+      if (header.format === 'pcm_s16le') {
+        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000, onStart);
+      } else {
+        audio.engine.playVoice(audioData, onStart);
+      }
+
+      // When all chunks have been revealed and NARRATION is waiting, flush it
+      // (adds state_delta to messages; buildSegments skips its text via dedup)
+      if (buf.chunks.length === 0 && buf.narration) {
+        setTimeout(flushNarrationBuffer, 100);
+      } else if (buf.chunks.length > 0) {
+        // Re-arm watchdog for remaining chunks
+        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
+      }
+    },
+    [audio.engine, flushNarrationBuffer],
+  );
+
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
 
@@ -212,6 +303,7 @@ function AppInner() {
       // is lost when the server restarts, so clear the spinner.
       if (event === "connected" || event === "ready") {
         setThinking(false);
+        setCanType(true);
       }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
@@ -488,6 +580,7 @@ function AppInner() {
       };
       setMessages((prev) => [...prev, msg]);
       send(msg);
+      setCanType(false); // Sealed — wait for narration before typing again
     },
     [send, executeSlashCommand],
   );
@@ -521,6 +614,7 @@ function AppInner() {
     setPartyMembers([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
+    setCanType(true);
     setConfrontationData(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
@@ -574,6 +668,7 @@ function AppInner() {
     prevReadyState.current = readyState;
     if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
       setThinking(false);
+      setCanType(true);
       const saved = loadSession();
       if (saved) {
         send({
@@ -621,11 +716,13 @@ function AppInner() {
     [partyMembers, gameState.characters],
   );
 
-  // Turn gating — only meaningful in multiplayer (partyMembers only populated from PARTY_STATUS)
-  // isMultiplayer: true if party has 2+ members OR if we've received a TURN_STATUS
-  // (which only fires in multiplayer). This handles the race condition where
-  // TURN_STATUS arrives before PARTY_STATUS populates partyMembers.
-  const isMultiplayer = partyMembers.length > 1 || activePlayerName !== null;
+  // Turn gating — two multiplayer models:
+  // 1. Sequential (FreePlay): server sends "active" for the acting player, others wait
+  // 2. Sealed-letter (Structured): ALL players submit simultaneously, no "active" player
+  //
+  // In sealed-letter mode, activePlayerName stays null. Input is disabled only
+  // when THIS player has already submitted (tracked via turnStatusEntries).
+  const isMultiplayer = partyMembers.length > 1 || turnStatusEntries.length > 0 || activePlayerName !== null;
   const currentPlayerId = useMemo(
     () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
     [partyMembers, connectedPlayerName],
@@ -634,8 +731,17 @@ function AppInner() {
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
   );
-  const isMyTurn = !isMultiplayer || !activePlayerName || activePlayerName === connectedPlayerName;
-  const waitingForPlayer = isMultiplayer && !isMyTurn ? (activePlayerName ?? undefined) : undefined;
+  // Sealed-letter: have I already submitted this turn?
+  const haveISubmitted = currentPlayerId
+    ? turnStatusEntries.some((e) => e.player_id === currentPlayerId && e.status === "submitted")
+    : false;
+  // Sequential: is someone else active? Sealed-letter: have I submitted?
+  const isMyTurn = !isMultiplayer
+    || (!activePlayerName && !haveISubmitted)
+    || activePlayerName === connectedPlayerName;
+  const waitingForPlayer = isMultiplayer && !isMyTurn
+    ? (activePlayerName ?? (haveISubmitted ? "other players" : undefined))
+    : undefined;
 
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
@@ -675,7 +781,7 @@ function AppInner() {
                 characters={characters}
                 onSend={handleSend}
                 onLeave={handleLeave}
-                disabled={readyState !== WebSocket.OPEN || thinking || (isMultiplayer && !isMyTurn)}
+                disabled={readyState !== WebSocket.OPEN || !canType}
                 thinking={thinking}
                 characterSheet={characterSheet}
                 inventoryData={inventoryData}
@@ -691,7 +797,7 @@ function AppInner() {
                 currentPlayerId={currentPlayerId ?? undefined}
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
-                waitingForPlayer={waitingForPlayer}
+                waitingForPlayer={!canType && isMultiplayer ? "other players" : undefined}
                 resources={partyResources}
                 genreSlug={currentGenre ?? undefined}
                 turnStatusEntries={turnStatusEntries}

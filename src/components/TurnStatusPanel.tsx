@@ -83,6 +83,7 @@ export function TurnStatusPanel({
       data-sealed-round={isStructured ? 'true' : undefined}
       data-all-in={isStructured && allResolved ? 'true' : undefined}
       role={isStructured ? 'status' : undefined}
+      className="flex items-center gap-3 text-sm"
     >
       {deduped.map((entry) => {
         const sealed = isResolved(entry.status);
@@ -91,16 +92,20 @@ export function TurnStatusPanel({
             key={entry.player_id}
             data-testid={`turn-entry-${entry.player_id}`}
             data-local={localPlayerId ? String(entry.player_id === localPlayerId) : undefined}
+            className="flex items-center gap-1.5"
           >
-            <span>{entry.character_name}</span>
+            <span className="font-medium text-foreground/80">{entry.character_name}</span>
             <span
               data-testid="status-indicator"
               data-status={entry.status}
               data-letter={isStructured ? (sealed ? 'sealed' : 'unsealed') : undefined}
               data-timeout={entry.status === 'auto_resolved' ? 'true' : undefined}
+              className={`inline-block w-2 h-2 rounded-full ${
+                sealed ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+              }`}
             />
             {isStructured ? (
-              <span>{sealed ? 'Sealed' : 'Composing'}</span>
+              <span className={sealed ? 'text-emerald-400' : 'text-amber-400'}>{sealed ? '✓ Sealed' : 'Composing…'}</span>
             ) : (
               entry.status === 'auto_resolved' && (
                 <span className="text-amber-500 text-xs ml-1">timed out</span>
@@ -109,14 +114,14 @@ export function TurnStatusPanel({
           </div>
         );
       })}
-      {isStructured && (
-        <div>{sealedCount} / {deduped.length}</div>
+      {isStructured && !allResolved && (
+        <span className="text-muted-foreground ml-2">({sealedCount}/{deduped.length})</span>
       )}
       {isStructured && allResolved && (
-        <div>All letters sealed</div>
+        <span className="text-emerald-400 ml-2 font-medium">All sealed — resolving…</span>
       )}
-      {!isStructured && showWaiting && <div>Waiting for other players...</div>}
-      {!isStructured && allResolved && <div>Resolving turn...</div>}
+      {!isStructured && showWaiting && <span>Waiting for other players...</span>}
+      {!isStructured && allResolved && <span>Resolving turn...</span>}
     </div>
   );
 }
