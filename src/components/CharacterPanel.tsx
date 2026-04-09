@@ -6,7 +6,7 @@ import type { CharacterSummary } from "./PartyPanel";
 import { KnowledgeJournal } from "./KnowledgeJournal";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 
-type TabId = "stats" | "abilities" | "backstory" | "status" | "journal";
+type TabId = "stats" | "abilities" | "status" | "journal";
 
 export interface ResourcePool {
   value: number;
@@ -61,10 +61,11 @@ export function CharacterPanel({
 
   const hasResources = resources != null && Object.keys(resources).length > 0;
 
+  // Backstory removed: lives in the top-level Lore panel now. Character
+  // tab is the mechanical sheet (stats / abilities / status), not lore.
   const tabs: { id: TabId; label: string }[] = [
     { id: "stats", label: "Stats" },
     { id: "abilities", label: "Abilities" },
-    { id: "backstory", label: "Backstory" },
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
     ...(knowledgeEntries && knowledgeEntries.length > 0 ? [{ id: "journal" as TabId, label: "Journal" }] : []),
   ];
@@ -126,7 +127,6 @@ export function CharacterPanel({
       <div role="tabpanel" className="flex-1 overflow-auto p-4">
         {activeTab === "stats" && <StatsContent stats={character.stats} />}
         {activeTab === "abilities" && <AbilitiesContent abilities={character.abilities} />}
-        {activeTab === "backstory" && <BackstoryContent backstory={character.backstory} />}
         {activeTab === "status" && hasResources && (
           <StatusContent
             resources={resources!}
@@ -245,10 +245,6 @@ function AbilitiesContent({ abilities }: { abilities: string[] }) {
       ))}
     </ul>
   );
-}
-
-function BackstoryContent({ backstory }: { backstory: string }) {
-  return <p className="text-sm font-[var(--font-narrative)]">{backstory}</p>;
 }
 
 function StatusContent({

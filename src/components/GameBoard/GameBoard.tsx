@@ -32,6 +32,7 @@ import { BackgroundCanvas } from "./BackgroundCanvas";
 import { MobileTabView } from "./MobileTabView";
 import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
+import { LoreWidget } from "./widgets/LoreWidget";
 import { MapWidget } from "./widgets/MapWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
 import { JournalWidget } from "./widgets/JournalWidget";
@@ -132,6 +133,7 @@ export function GameBoard({
     available.add("audio");
     available.add("knowledge");
     available.add("journal");
+    available.add("lore");
     if (characterSheet) available.add("character");
     if (inventoryData) available.add("inventory");
     if (mapData) available.add("map");
@@ -253,6 +255,13 @@ export function GameBoard({
         ) : null;
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
+      case "lore":
+        return (
+          <LoreWidget
+            character={characterSheet ?? null}
+            knowledgeEntries={knowledgeEntries ?? []}
+          />
+        );
       case "map":
         return mapData ? <MapWidget mapData={mapData} /> : null;
       case "journal":

@@ -93,11 +93,15 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
 // ---------------------------------------------------------------------------
 
 describe("CharacterPanel — AC-2: tabbed sections", () => {
-  it("renders tab buttons for Stats, Abilities, and Backstory", () => {
+  it("renders tab buttons for Stats and Abilities", () => {
     render(<CharacterPanel character={CHARACTER} />);
     expect(screen.getByRole("tab", { name: /stats/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /abilities/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /backstory/i })).toBeInTheDocument();
+  });
+
+  it("does NOT render a Backstory subtab — backstory lives in the top-level Lore panel", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(screen.queryByRole("tab", { name: /backstory/i })).not.toBeInTheDocument();
   });
 
   it("shows Stats tab content by default", () => {
@@ -114,13 +118,6 @@ describe("CharacterPanel — AC-2: tabbed sections", () => {
     const tabpanel = screen.getByRole("tabpanel");
     expect(within(tabpanel).getByText("Tracker")).toBeInTheDocument();
     expect(within(tabpanel).getByText("Beast Companion")).toBeInTheDocument();
-  });
-
-  it("switches to Backstory tab on click", () => {
-    render(<CharacterPanel character={CHARACTER} />);
-    fireEvent.click(screen.getByRole("tab", { name: /backstory/i }));
-    const tabpanel = screen.getByRole("tabpanel");
-    expect(within(tabpanel).getByText(/Born in the Ashwood/)).toBeInTheDocument();
   });
 
   it("marks the active tab with aria-selected", () => {
@@ -160,10 +157,22 @@ describe("CharacterPanel — AC-3: tab persistence", () => {
   it("restores previously selected tab from localStorage on mount", () => {
     localStorage.setItem(
       "sq-character-panel",
+      JSON.stringify({ activeTab: "abilities" }),
+    );
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(screen.getByRole("tab", { name: /abilities/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("falls back to Stats when localStorage has a stale tab id (e.g. removed Backstory)", () => {
+    localStorage.setItem(
+      "sq-character-panel",
       JSON.stringify({ activeTab: "backstory" }),
     );
     render(<CharacterPanel character={CHARACTER} />);
-    expect(screen.getByRole("tab", { name: /backstory/i })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: /stats/i })).toHaveAttribute(
       "aria-selected",
       "true",
     );
