@@ -4,10 +4,11 @@
  */
 
 export enum MessageType {
+  // CHARACTER_SHEET and INVENTORY removed 2026-04 — per-character sheet
+  // and inventory state are now nested inside each PartyMember carried by
+  // PARTY_STATUS. See sidequest-protocol `PartyMember.sheet` / `.inventory`.
   PARTY_STATUS = "PARTY_STATUS",
   MAP_UPDATE = "MAP_UPDATE",
-  CHARACTER_SHEET = "CHARACTER_SHEET",
-  INVENTORY = "INVENTORY",
   PLAYER_ACTION = "PLAYER_ACTION",
   NARRATION = "NARRATION",
   TURN_STATUS = "TURN_STATUS",

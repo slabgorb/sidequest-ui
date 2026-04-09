@@ -288,23 +288,9 @@ describe("NarrativeView", () => {
     expect(alert).toHaveTextContent("Connection lost to server.");
   });
 
-  // -- CHARACTER_SHEET ---------------------------------------------------------
-  it("renders CHARACTER_SHEET as system info", () => {
-    render(
-      <NarrativeView
-        messages={[
-          msg(MessageType.CHARACTER_SHEET, {
-            name: "Thrain",
-            class: "Warrior",
-            level: 3,
-          }),
-        ]}
-      />,
-    );
-    const charInfo = screen.getByText(/Thrain/);
-    expect(charInfo).toBeInTheDocument();
-    expect(charInfo.closest("[data-testid='system-message']")).toBeInTheDocument();
-  });
+  // CHARACTER_SHEET narrative-segment test removed 2026-04. The sheet now
+  // lives on PartyMember and is a panel-only concern — it no longer appears
+  // as a system message in the narrative scroll.
 
   // -- unknown message types ignored -------------------------------------------
   it("silently ignores unknown message types without crashing", () => {

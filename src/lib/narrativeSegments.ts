@@ -156,27 +156,9 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         flushChunks();
         segments.push({ kind: "error", text: msg.payload.message as string });
         break;
-      case MessageType.CHARACTER_SHEET: {
-        flushChunks();
-        const charName = msg.payload.name as string;
-        const charClass = msg.payload.class as string | undefined;
-        const race = msg.payload.race as string | undefined;
-        const level = msg.payload.level as number | undefined;
-        const personality = msg.payload.personality as string | undefined;
-        const pronouns = msg.payload.pronouns as string | undefined;
-        const equipment = (msg.payload.equipment as string[] | undefined) ?? [];
-        const header = [charName, race, charClass, level != null ? `Lv ${level}` : null]
-          .filter(Boolean)
-          .join(" — ");
-        const details = [
-          personality ? `Personality: ${personality}` : null,
-          pronouns ? `Pronouns: ${pronouns}` : null,
-          equipment.length > 0 ? `Equipment: ${equipment.join(", ")}` : null,
-        ].filter(Boolean).join(" | ");
-        const text = details ? `${header}\n${details}` : header;
-        segments.push({ kind: "system", text });
-        break;
-      }
+      // CHARACTER_SHEET case removed 2026-04. The sheet now rides on
+      // PartyMember and no longer surfaces as a narrative segment — it's
+      // a panel-only concern.
       case MessageType.PLAYER_ACTION: {
         flushChunks();
         const action = msg.payload.action as string;

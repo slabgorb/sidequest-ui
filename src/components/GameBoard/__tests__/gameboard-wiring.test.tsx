@@ -62,9 +62,12 @@ describe("GameBoard wiring", () => {
 
   it("widgetRegistry exports all required widgets", async () => {
     const mod = await import("@/components/GameBoard/widgetRegistry");
+    // `settings` was removed during the dockview migration (the old
+    // SettingsOverlay is gone — settings live in their own screen now).
+    // `lore` was added as a top-level panel.
     const requiredIds = [
-      "narrative", "character", "inventory", "map",
-      "journal", "knowledge", "settings", "gallery",
+      "narrative", "character", "inventory", "map", "lore",
+      "journal", "knowledge", "gallery",
       "confrontation", "audio",
     ];
     for (const id of requiredIds) {

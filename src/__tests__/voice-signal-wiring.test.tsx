@@ -113,6 +113,12 @@ async function connectAndReady(
   user: ReturnType<typeof userEvent.setup>,
   playerName = "TestHero",
 ) {
+  // Let App's genre fetch resolve so ConnectScreen renders with genre
+  // options populated. Without this, the "player name" input may not be
+  // in the tree yet (fetch pending → loading state).
+  await act(async () => {
+    vi.advanceTimersByTime(100);
+  });
   const nameInput = screen.getByLabelText(/player name/i);
   await user.clear(nameInput);
   await user.type(nameInput, playerName);
@@ -136,7 +142,9 @@ async function connectAndReady(
     }
   }
 
-  const connectBtn = screen.getByRole("button", { name: /connect|join|play/i });
+  // ConnectScreen's submit button is labeled "Begin" — older aliases kept
+  // for historical compatibility in case the label rotates again.
+  const connectBtn = screen.getByRole("button", { name: /connect|join|play|begin/i });
   await user.click(connectBtn);
 
   await act(async () => {
@@ -182,10 +190,13 @@ beforeEach(() => {
   AudioEngine.resetInstance();
   installWebAudioMock();
   installLocalStorageMock();
+  // Mock matchMedia to report mobile breakpoint — see src/test-setup.ts
+  // for the rationale (GameBoard uses MobileTabView in tests to avoid
+  // dockview's jsdom-incompatible content rendering).
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches: query.includes("max-width: 767px"),
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -198,7 +209,10 @@ beforeEach(() => {
   MockWebSocket.instances = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalThis.WebSocket = MockWebSocket as any;
+  // App.tsx's genres fetch checks `res.ok` before parsing — without it,
+  // the Promise chain throws and the genre dropdown stays empty.
   globalThis.fetch = vi.fn().mockResolvedValue({
+    ok: true,
     json: async () => ({
       low_fantasy: { worlds: ["default"] },
     }),
