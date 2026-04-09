@@ -21,27 +21,27 @@ export interface MockAudioParam {
 }
 
 export function createMockAudioParam(defaultValue = 1): MockAudioParam {
+  // IMPORTANT: do NOT use `.bind(param)` on these vi.fn mocks — bind() returns
+  // a plain Function that drops the `.mock` tracking property, which breaks
+  // every test that introspects `linearRampToValueAtTime.mock.calls`. Capture
+  // `param` via closure instead and mutate `param.value` directly.
   const param: MockAudioParam = {
     value: defaultValue,
     defaultValue,
-    setValueAtTime: vi.fn().mockImplementation(function (this: MockAudioParam, value: number) {
-      this.value = value;
-      return this;
+    setValueAtTime: vi.fn((value: number) => {
+      param.value = value;
+      return param;
     }),
-    linearRampToValueAtTime: vi.fn().mockImplementation(function (this: MockAudioParam, value: number) {
-      this.value = value;
-      return this;
+    linearRampToValueAtTime: vi.fn((value: number) => {
+      param.value = value;
+      return param;
     }),
-    exponentialRampToValueAtTime: vi.fn().mockImplementation(function (this: MockAudioParam, value: number) {
-      this.value = value;
-      return this;
+    exponentialRampToValueAtTime: vi.fn((value: number) => {
+      param.value = value;
+      return param;
     }),
     cancelScheduledValues: vi.fn(),
   };
-  // Bind all methods
-  param.setValueAtTime = param.setValueAtTime.bind(param);
-  param.linearRampToValueAtTime = param.linearRampToValueAtTime.bind(param);
-  param.exponentialRampToValueAtTime = param.exponentialRampToValueAtTime.bind(param);
   return param;
 }
 
@@ -118,18 +118,21 @@ export interface MockAudioContext {
 }
 
 export function createMockAudioContext(): MockAudioContext {
+  // Same closure-capture pattern as createMockAudioParam — `.bind(ctx)`
+  // on a vi.fn mock strips its `.mock` tracking and breaks every test
+  // that asserts on `ctx.resume`/`ctx.close` call counts.
   const ctx: MockAudioContext = {
     state: "suspended",
     currentTime: 0,
     destination: {},
-    resume: vi.fn().mockImplementation(async function (this: MockAudioContext) {
-      this.state = "running";
+    resume: vi.fn(async () => {
+      ctx.state = "running";
     }),
-    close: vi.fn().mockImplementation(async function (this: MockAudioContext) {
-      this.state = "closed";
+    close: vi.fn(async () => {
+      ctx.state = "closed";
     }),
-    suspend: vi.fn().mockImplementation(async function (this: MockAudioContext) {
-      this.state = "suspended";
+    suspend: vi.fn(async () => {
+      ctx.state = "suspended";
     }),
     createGain: vi.fn(),
     createBuffer: vi.fn(),
@@ -138,11 +141,6 @@ export function createMockAudioContext(): MockAudioContext {
     _gainNodes: [],
     _sourceNodes: [],
   };
-
-  // Bind resume/close/suspend
-  ctx.resume = ctx.resume.bind(ctx);
-  ctx.close = ctx.close.bind(ctx);
-  ctx.suspend = ctx.suspend.bind(ctx);
 
   ctx.createGain.mockImplementation(() => {
     const node: MockGainNode = {

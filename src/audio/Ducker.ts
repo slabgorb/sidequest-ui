@@ -1,4 +1,6 @@
-const DUCK_LEVEL = 0.5;
+// 0.3 ducks music loudly enough that voice narration cuts through clearly —
+// 0.5 was not a deep enough duck and let music compete with the narrator.
+const DUCK_LEVEL = 0.3;
 const DUCK_RAMP_MS = 200;
 const UNDUCK_RAMP_MS = 500;
 

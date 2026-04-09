@@ -20,7 +20,7 @@ import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import type { ConfrontationData } from "@/components/ConfrontationOverlay";
+import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
@@ -124,20 +124,31 @@ export function GameBoard({
   // entries yet. Per-player gating caused inconsistent panel sets between
   // players in the same session (e.g. Kael had Knowledge but Mira did not
   // because Mira had not yet had her first turn).
+  //
+  // CRITICAL: Every widget that should ever appear in the dock MUST be added
+  // here UNCONDITIONALLY. Dockview's `onReady` only fires once at mount, so
+  // any widget missing from `availableWidgets` at mount time is skipped from
+  // the initial layout. The sync effect below can only add panels without a
+  // stable position reference once the initial layout exists. The renderer
+  // (`renderWidgetContent`) is responsible for showing loading/empty states
+  // when a widget's data has not yet arrived.
+  //
+  // Confrontation is the ONE exception — it is an overlay that only exists
+  // mid-encounter, and its appearance is a narrative event, not a dock state.
   const availableWidgets = useMemo(() => {
     const available = new Set<WidgetId>();
     available.add("narrative");
-    available.add("gallery");
-    available.add("audio");
+    available.add("character");
+    available.add("inventory");
+    available.add("map");
+    available.add("lore");
     available.add("knowledge");
     available.add("journal");
-    available.add("lore");
-    available.add("map");
-    if (characterSheet) available.add("character");
-    if (inventoryData) available.add("inventory");
+    available.add("gallery");
+    available.add("audio");
     if (confrontationData) available.add("confrontation");
     return available;
-  }, [characterSheet, inventoryData, confrontationData]);
+  }, [confrontationData]);
 
   // Hotkeys
   useGameBoardHotkeys(toggleWidget, availableWidgets);
@@ -232,7 +243,10 @@ export function GameBoard({
 
   const { chapterTitle } = useRunningHeader(messages);
 
-  // Render a widget by ID
+  // Render a widget by ID. Character/inventory/map data is guaranteed
+  // present via PARTY_STATUS (collapsed CHARACTER_SHEET / INVENTORY model),
+  // so the null branches below exist only for the brief window between
+  // GameBoard mount and the first PARTY_STATUS arrival on a fresh session.
   const renderWidgetContent = useCallback((id: WidgetId): ReactNode => {
     switch (id) {
       case "narrative":
@@ -345,8 +359,20 @@ export function GameBoard({
       title: WIDGET_REGISTRY.narrative.label,
     });
 
-    // Right-side group: stack supporting panels as tabs
-    const rightGroupOrder: WidgetId[] = ["character", "map", "gallery", "audio"];
+    // Right-side group: stack ALL supporting panels as tabs of a single group.
+    // Order here = left-to-right tab order. Every panel referenced here must
+    // also be in `availableWidgets` (unconditional additions above) so the
+    // initial layout is stable regardless of when data arrives.
+    const rightGroupOrder: WidgetId[] = [
+      "character",
+      "inventory",
+      "map",
+      "lore",
+      "knowledge",
+      "journal",
+      "gallery",
+      "audio",
+    ];
     let rightFirst: ReturnType<typeof api.addPanel> | null = null;
     for (const id of rightGroupOrder) {
       if (!availableWidgets.has(id)) continue;
@@ -372,6 +398,13 @@ export function GameBoard({
   }, [availableWidgets]);
 
   // Sync widget visibility with dockview panels (add/remove as data-gates change).
+  // In practice this only fires for `confrontation` — every other widget is
+  // unconditional in `availableWidgets`, so the initial `onDockviewReady`
+  // pass creates them once and this effect has nothing to add on their behalf.
+  //
+  // When a dynamic panel is added, anchor it to an existing right-group panel
+  // (`character` is the most stable reference) so it joins the tab strip
+  // instead of being created in a detached floating group.
   useEffect(() => {
     const api = dockviewApiRef.current;
     if (!api) return;
@@ -386,7 +419,15 @@ export function GameBoard({
       }
     }
 
-    // Add panels that became available
+    // Add panels that became available — anchor to `character` so dynamic
+    // additions join the right tab group. Fall back to `narrative` if the
+    // character panel was somehow removed.
+    const anchorId = dockviewIds.has("character")
+      ? "character"
+      : dockviewIds.has("narrative")
+        ? "narrative"
+        : null;
+
     for (const id of availableWidgets) {
       if (!dockviewIds.has(id)) {
         const def = WIDGET_REGISTRY[id];
@@ -395,20 +436,31 @@ export function GameBoard({
           component: "PanelAdapter",
           params: { panelId: id },
           title: def.label,
+          ...(anchorId ? { position: { referencePanel: anchorId } } : {}),
         });
       }
     }
   }, [availableWidgets]);
 
+  // Confrontation overlay — renders as a modal on top of whichever layout
+  // branch is active (mobile tab view OR desktop dockview). It's a narrative
+  // event, not a persistent panel, so it lives outside the panel system.
+  const confrontationOverlay = confrontationData ? (
+    <ConfrontationOverlay data={confrontationData} onBeatSelect={onBeatSelect} />
+  ) : null;
+
   // Mobile fallback
   if (isMobile) {
     return (
-      <MobileTabView
-        renderWidget={renderWidgetContent}
-        availableWidgets={availableWidgets}
-      >
-        {inputBar}
-      </MobileTabView>
+      <>
+        <MobileTabView
+          renderWidget={renderWidgetContent}
+          availableWidgets={availableWidgets}
+        >
+          {inputBar}
+        </MobileTabView>
+        {confrontationOverlay}
+      </>
     );
   }
 
@@ -492,6 +544,9 @@ export function GameBoard({
       <div className="input-area border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">
         {inputBar}
       </div>
+
+      {/* Confrontation overlay — modal on top of the workspace when active. */}
+      {confrontationOverlay}
     </div>
   );
 }

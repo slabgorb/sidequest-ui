@@ -211,11 +211,13 @@ beforeEach(() => {
   AudioEngine.resetInstance();
   installWebAudioMock();
   installLocalStorageMock();
-  // Mock matchMedia for useBreakpoint (GameLayout uses it)
+  // Mock matchMedia for useBreakpoint. Report "mobile" so GameBoard renders
+  // via MobileTabView instead of dockview — see src/test-setup.ts for the
+  // rationale (dockview does not render panel content in jsdom).
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches: query.includes("max-width: 767px"),
       media: query,
       onchange: null,
       addListener: vi.fn(),

@@ -433,7 +433,11 @@ function AppInner() {
       return;
     }
 
-    // Capture party status — richer data with portrait_url for PartyPanel
+    // Capture party status — single source of truth for party + per-character
+    // state. As of 2026-04 PartyMember also carries `sheet` (race/stats/
+    // abilities/backstory/etc.) and `inventory` (items/gold) facets, replacing
+    // the deleted CHARACTER_SHEET and INVENTORY message types. We fan out the
+    // local player's slice into characterSheet / inventoryData here.
     if (msg.type === MessageType.PARTY_STATUS) {
       const members = (msg.payload.members as Array<Record<string, unknown>>) ?? [];
       const mapped = members.map((m) => ({
@@ -457,6 +461,37 @@ function AppInner() {
       });
       setPartyMembers(deduped);
 
+      // Fan out the local player's sheet + inventory facets. The local
+      // player is identified by matching `name` against connectedPlayerName,
+      // then falling back to the first member (single-player case).
+      const localName = connectedPlayerName;
+      const rawLocal =
+        (localName && members.find((m) => (m.name as string) === localName)) ||
+        members[0];
+      if (rawLocal) {
+        const sheetFacet = rawLocal.sheet as Record<string, unknown> | undefined;
+        if (sheetFacet) {
+          // Assemble the UI-facing CharacterSheetData from the PartyMember
+          // root fields (name/class/level/portrait_url/current_location) plus
+          // the nested sheet facet (stats/abilities/backstory).
+          const built: CharacterSheetData = {
+            name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
+            class: (rawLocal.class as string) ?? "",
+            level: (rawLocal.level as number) ?? 1,
+            stats: (sheetFacet.stats as Record<string, number>) ?? {},
+            abilities: (sheetFacet.abilities as string[]) ?? [],
+            backstory: (sheetFacet.backstory as string) ?? "",
+            portrait_url: (rawLocal.portrait_url as string) || undefined,
+            current_location: (rawLocal.current_location as string) ?? "",
+          };
+          setCharacterSheet(built);
+        }
+        const invFacet = rawLocal.inventory as Record<string, unknown> | undefined;
+        if (invFacet) {
+          setInventoryData(invFacet as unknown as InventoryData);
+        }
+      }
+
       // Extract genre resources from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
       const resources = msg.payload.resources as Record<string, ResourcePool> | undefined;
       if (resources && typeof resources === "object") {
@@ -467,14 +502,6 @@ function AppInner() {
     }
 
     // Capture overlay data from server — these update the panels/overlays
-    if (msg.type === MessageType.CHARACTER_SHEET) {
-      setCharacterSheet(msg.payload as unknown as CharacterSheetData);
-      return;
-    }
-    if (msg.type === MessageType.INVENTORY) {
-      setInventoryData(msg.payload as unknown as InventoryData);
-      return;
-    }
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
       return;
