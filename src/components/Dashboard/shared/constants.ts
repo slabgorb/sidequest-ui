@@ -15,7 +15,6 @@ export const SPAN_COLORS: Record<string, string> = {
   broadcast: "#90a4ae",
   music_director: "#f06292",
   render_pipeline: "#e57373",
-  tts_pipeline: "#ce93d8",
   prerender_scheduler: "#80cbc4",
 };
 
