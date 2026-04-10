@@ -174,20 +174,19 @@ function AppInner() {
     fetchGenres();
   }, [fetchGenres]);
 
-  // Audio engine — unified mixer for TTS, music, SFX
+  // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
 
-  // Narration buffer — holds NARRATION, NARRATION_END, and NARRATION_CHUNK messages
-  // so text reveals sentence-by-sentence in sync with TTS audio playback.
-  // Without this, the server sends full NARRATION text before TTS starts streaming,
-  // and prefetch causes multiple chunks to arrive before the first audio finishes.
+  // Narration buffer — pairs a NARRATION message with its terminal NARRATION_END
+  // so the final state delta applies in the same React commit as the narration
+  // text (ADR-076). Without this buffer, the NARRATION renders first and the
+  // state delta from NARRATION_END renders on a second tick, causing visible
+  // out-of-order updates for HP, inventory, and location changes.
   const narrationBufferRef = useRef<{
     narration: GameMessage | null;
     narrationEnd: GameMessage | null;
-    chunks: GameMessage[];
     flushTimer: ReturnType<typeof setTimeout> | null;
-    watchdogTimer: ReturnType<typeof setTimeout> | null;
-  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null, watchdogTimer: null });
+  }>({ narration: null, narrationEnd: null, flushTimer: null });
 
   const flushNarrationBuffer = useCallback(() => {
     const buf = narrationBufferRef.current;
@@ -195,15 +194,8 @@ function AppInner() {
       clearTimeout(buf.flushTimer);
       buf.flushTimer = null;
     }
-    if (buf.watchdogTimer) {
-      clearTimeout(buf.watchdogTimer);
-      buf.watchdogTimer = null;
-    }
 
     const toFlush: GameMessage[] = [];
-    // Chunks first so buildSegments sets hasChunksForTurn before seeing NARRATION
-    toFlush.push(...buf.chunks);
-    buf.chunks = [];
     if (buf.narration) {
       toFlush.push(buf.narration);
       buf.narration = null;
@@ -219,51 +211,6 @@ function AppInner() {
       setMessages(prev => [...prev, ...toFlush]);
     }
   }, []);
-
-  // Route binary WebSocket frames (TTS voice) through AudioEngine,
-  // synchronized with narration text reveal.
-  const handleBinaryMessage = useCallback(
-    (data: ArrayBuffer) => {
-      if (!audio.engine) return;
-      if (!isVoiceAudioFrame(data)) return;
-
-      const { header, audioData } = decodeVoiceFrame(data);
-      if (audioData.byteLength === 0) return;
-
-      // Pop the next buffered narration chunk — reveal its text when this
-      // audio segment actually starts playing (not when it's queued).
-      const buf = narrationBufferRef.current;
-      // Reset watchdog — audio is arriving, TTS pipeline is healthy
-      if (buf.watchdogTimer) {
-        clearTimeout(buf.watchdogTimer);
-        buf.watchdogTimer = null;
-      }
-      const nextChunk = buf.chunks.shift();
-
-      const onStart = () => {
-        if (nextChunk) {
-          setThinking(false);
-          setMessages(prev => [...prev, nextChunk]);
-        }
-      };
-
-      if (header.format === 'pcm_s16le') {
-        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000, onStart);
-      } else {
-        audio.engine.playVoice(audioData, onStart);
-      }
-
-      // When all chunks have been revealed and NARRATION is waiting, flush it
-      // (adds state_delta to messages; buildSegments skips its text via dedup)
-      if (buf.chunks.length === 0 && buf.narration) {
-        setTimeout(flushNarrationBuffer, 100);
-      } else if (buf.chunks.length > 0) {
-        // Re-arm watchdog for remaining chunks
-        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
-      }
-    },
-    [audio.engine, flushNarrationBuffer],
-  );
 
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
