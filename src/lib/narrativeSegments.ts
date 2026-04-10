@@ -1,18 +1,8 @@
 import DOMPurify from "dompurify";
 import { MessageType, type GameMessage } from "@/types/protocol";
+import type { FootnoteData, ActionRevealEntry } from "@/types/payloads";
 
-export interface FootnoteData {
-  marker?: number;
-  summary: string;
-  category?: string;
-  is_new?: boolean;
-}
-
-export interface ActionRevealEntry {
-  character_name: string;
-  player_id: string;
-  action: string;
-}
+export type { FootnoteData, ActionRevealEntry };
 
 export interface NarrativeSegment {
   kind: "text" | "image" | "separator" | "system" | "turn-status" | "error" | "player-action" | "player-aside" | "chapter-marker" | "portrait-group" | "action-reveal" | "render-pending" | "gallery-notice";

@@ -35,28 +35,26 @@ export enum MessageType {
   RESOURCE_MIN_REACHED = "RESOURCE_MIN_REACHED",
 }
 
+/**
+ * Loose GameMessage — kept for backward compatibility during migration.
+ * Prefer TypedGameMessage from types/payloads.ts for new code.
+ */
 export interface GameMessage {
   type: MessageType;
   payload: Record<string, unknown>;
   player_id: string;
 }
 
-/** Scenario system event (Epic 7). */
-export interface ScenarioEventPayload {
-  event_type: string;
-  description: string;
-  details?: Record<string, unknown>;
-}
-
-/** Achievement earned — trope transition triggered an achievement (story 15-13). */
-export interface AchievementEarnedPayload {
-  achievement_id: string;
-  name: string;
-  description: string;
-  trope_id: string;
-  trigger: string;
-  emoji?: string;
-}
+// Re-export typed payloads for convenience
+export type {
+  TypedGameMessage,
+  FootnoteData,
+  ActionRevealEntry,
+  TurnStatusEntry,
+  StateDelta,
+  ScenarioEventPayload,
+  AchievementEarnedPayload,
+} from "./payloads";
 
 /** Per-session narrator verbosity control (story 14-3). */
 export type NarratorVerbosity = 'concise' | 'standard' | 'verbose';
