@@ -206,6 +206,12 @@ function AppInner() {
     if (msg.type === MessageType.NARRATION || msg.type === MessageType.NARRATION_END) {
       setThinking(false);
       setMessages((prev) => [...prev, msg]);
+      // Turn-end signal: unlock input once the narrator has responded.
+      // Paired with setCanType(false) in handleSend. Without this, the input
+      // stays sealed after every turn until the player disconnects or leaves.
+      if (msg.type === MessageType.NARRATION_END) {
+        setCanType(true);
+      }
       return;
     }
 
