@@ -177,41 +177,6 @@ function AppInner() {
   // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
 
-  // Narration buffer — pairs a NARRATION message with its terminal NARRATION_END
-  // so the final state delta applies in the same React commit as the narration
-  // text (ADR-076). Without this buffer, the NARRATION renders first and the
-  // state delta from NARRATION_END renders on a second tick, causing visible
-  // out-of-order updates for HP, inventory, and location changes.
-  const narrationBufferRef = useRef<{
-    narration: GameMessage | null;
-    narrationEnd: GameMessage | null;
-    flushTimer: ReturnType<typeof setTimeout> | null;
-  }>({ narration: null, narrationEnd: null, flushTimer: null });
-
-  const flushNarrationBuffer = useCallback(() => {
-    const buf = narrationBufferRef.current;
-    if (buf.flushTimer) {
-      clearTimeout(buf.flushTimer);
-      buf.flushTimer = null;
-    }
-
-    const toFlush: GameMessage[] = [];
-    if (buf.narration) {
-      toFlush.push(buf.narration);
-      buf.narration = null;
-    }
-    if (buf.narrationEnd) {
-      toFlush.push(buf.narrationEnd);
-      buf.narrationEnd = null;
-    }
-
-    if (toFlush.length > 0) {
-      setThinking(false);
-      setCanType(true); // Narration arrived — new turn, can type again
-      setMessages(prev => [...prev, ...toFlush]);
-    }
-  }, []);
-
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
 
@@ -256,11 +221,11 @@ function AppInner() {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
       } else if (event === "ready") {
-        // On reconnect (phase not yet "game"), clear stale messages and
-        // narration buffer to avoid duplicates.  On first connect after
-        // chargen, CHARACTER_CREATION "complete" already set phase to
-        // "game" — DON'T clear, or the opening narration (already
-        // buffered from the auto-first-turn) gets wiped.
+        // On reconnect (phase not yet "game"), clear stale messages to
+        // avoid duplicates.  On first connect after chargen,
+        // CHARACTER_CREATION "complete" already set phase to "game" —
+        // DON'T clear, or the opening narration from the auto-first-turn
+        // gets wiped.
         const isReconnect = sessionPhaseRef.current !== "game";
         sessionPhaseRef.current = "game";
         setSessionPhase("game");
