@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Automapper, type ExploredRoom } from "@/components/Automapper";
 import { MapOverlay, type MapState } from "@/components/MapOverlay";
+import { tacticalGridFromWire } from "@/lib/tacticalGridFromWire";
 
 interface MapWidgetProps {
   mapData: MapState | null;
@@ -89,14 +90,10 @@ function toExploredRooms(mapData: MapState): ExploredRoom[] {
       // ExploredRoom.id we just assigned above via `keyFor`.
       to_room_id: ex.target,
     })),
-    // Story 35-7: Pass tactical grid through to Automapper/TacticalGridRenderer.
-    grid: loc.tactical_grid
-      ? {
-          width: loc.tactical_grid.width,
-          height: loc.tactical_grid.height,
-          cells: loc.tactical_grid.cells,
-          features: loc.tactical_grid.features,
-        }
-      : undefined,
+    // Story 35-7 + 2026-04-10 playtest fix: translate the wire-format
+    // tactical grid (string cells + features sidecar) into the renderer's
+    // typed-cell shape. Without this adapter every cell rendered with
+    // fill=undefined and the panel was solid black.
+    grid: loc.tactical_grid ? tacticalGridFromWire(loc.tactical_grid) : undefined,
   }));
 }
