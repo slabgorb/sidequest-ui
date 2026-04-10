@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Pennyfarthing / agent session state — orchestrator-only
+.session/
