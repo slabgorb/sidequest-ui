@@ -174,96 +174,8 @@ function AppInner() {
     fetchGenres();
   }, [fetchGenres]);
 
-  // Audio engine — unified mixer for TTS, music, SFX
+  // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
-
-  // Narration buffer — holds NARRATION, NARRATION_END, and NARRATION_CHUNK messages
-  // so text reveals sentence-by-sentence in sync with TTS audio playback.
-  // Without this, the server sends full NARRATION text before TTS starts streaming,
-  // and prefetch causes multiple chunks to arrive before the first audio finishes.
-  const narrationBufferRef = useRef<{
-    narration: GameMessage | null;
-    narrationEnd: GameMessage | null;
-    chunks: GameMessage[];
-    flushTimer: ReturnType<typeof setTimeout> | null;
-    watchdogTimer: ReturnType<typeof setTimeout> | null;
-  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null, watchdogTimer: null });
-
-  const flushNarrationBuffer = useCallback(() => {
-    const buf = narrationBufferRef.current;
-    if (buf.flushTimer) {
-      clearTimeout(buf.flushTimer);
-      buf.flushTimer = null;
-    }
-    if (buf.watchdogTimer) {
-      clearTimeout(buf.watchdogTimer);
-      buf.watchdogTimer = null;
-    }
-
-    const toFlush: GameMessage[] = [];
-    // Chunks first so buildSegments sets hasChunksForTurn before seeing NARRATION
-    toFlush.push(...buf.chunks);
-    buf.chunks = [];
-    if (buf.narration) {
-      toFlush.push(buf.narration);
-      buf.narration = null;
-    }
-    if (buf.narrationEnd) {
-      toFlush.push(buf.narrationEnd);
-      buf.narrationEnd = null;
-    }
-
-    if (toFlush.length > 0) {
-      setThinking(false);
-      setCanType(true); // Narration arrived — new turn, can type again
-      setMessages(prev => [...prev, ...toFlush]);
-    }
-  }, []);
-
-  // Route binary WebSocket frames (TTS voice) through AudioEngine,
-  // synchronized with narration text reveal.
-  const handleBinaryMessage = useCallback(
-    (data: ArrayBuffer) => {
-      if (!audio.engine) return;
-      if (!isVoiceAudioFrame(data)) return;
-
-      const { header, audioData } = decodeVoiceFrame(data);
-      if (audioData.byteLength === 0) return;
-
-      // Pop the next buffered narration chunk — reveal its text when this
-      // audio segment actually starts playing (not when it's queued).
-      const buf = narrationBufferRef.current;
-      // Reset watchdog — audio is arriving, TTS pipeline is healthy
-      if (buf.watchdogTimer) {
-        clearTimeout(buf.watchdogTimer);
-        buf.watchdogTimer = null;
-      }
-      const nextChunk = buf.chunks.shift();
-
-      const onStart = () => {
-        if (nextChunk) {
-          setThinking(false);
-          setMessages(prev => [...prev, nextChunk]);
-        }
-      };
-
-      if (header.format === 'pcm_s16le') {
-        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000, onStart);
-      } else {
-        audio.engine.playVoice(audioData, onStart);
-      }
-
-      // When all chunks have been revealed and NARRATION is waiting, flush it
-      // (adds state_delta to messages; buildSegments skips its text via dedup)
-      if (buf.chunks.length === 0 && buf.narration) {
-        setTimeout(flushNarrationBuffer, 100);
-      } else if (buf.chunks.length > 0) {
-        // Re-arm watchdog for remaining chunks
-        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
-      }
-    },
-    [audio.engine, flushNarrationBuffer],
-  );
 
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
@@ -309,11 +221,11 @@ function AppInner() {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
       } else if (event === "ready") {
-        // On reconnect (phase not yet "game"), clear stale messages and
-        // narration buffer to avoid duplicates.  On first connect after
-        // chargen, CHARACTER_CREATION "complete" already set phase to
-        // "game" — DON'T clear, or the opening narration (already
-        // buffered from the auto-first-turn) gets wiped.
+        // On reconnect (phase not yet "game"), clear stale messages to
+        // avoid duplicates.  On first connect after chargen,
+        // CHARACTER_CREATION "complete" already set phase to "game" —
+        // DON'T clear, or the opening narration from the auto-first-turn
+        // gets wiped.
         const isReconnect = sessionPhaseRef.current !== "game";
         sessionPhaseRef.current = "game";
         setSessionPhase("game");

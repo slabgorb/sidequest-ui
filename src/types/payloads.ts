@@ -89,10 +89,6 @@ export interface NarrationEndPayload {
   state_delta?: StateDelta;
 }
 
-export interface NarrationChunkPayload {
-  text: string;
-}
-
 export interface SessionEventPayload {
   event: string;
   player_name?: string;
