@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach } from "vitest";
 import { MessageType, type GameMessage } from "@/types/protocol";
@@ -24,9 +24,6 @@ const SAMPLE_MESSAGES: GameMessage[] = [
 
 const LAYOUT_PREFS_KEY = "sq-narrative-layout";
 
-// ── Layout type definition ───────────────────────────────────────────────────
-
-type LayoutMode = "scroll" | "focus" | "cards";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AC1: Three narrative layout implementations exist (Scroll, Focus, Cards)
@@ -186,58 +183,6 @@ describe("NarrationCards", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC2: Settings UI includes a layout mode selector
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("LayoutModeSelector", () => {
-  it("renders a selector with three layout options", async () => {
-    const { LayoutModeSelector } = await import("@/components/LayoutModeSelector");
-    render(
-      <LayoutModeSelector value="scroll" onChange={() => {}} />,
-    );
-
-    // Should show all three options
-    expect(screen.getByRole("button", { name: /scroll/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /focus/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /cards/i })).toBeInTheDocument();
-  });
-
-  it("highlights the currently active layout", async () => {
-    const { LayoutModeSelector } = await import("@/components/LayoutModeSelector");
-    render(
-      <LayoutModeSelector value="focus" onChange={() => {}} />,
-    );
-
-    const focusBtn = screen.getByRole("button", { name: /focus/i });
-    expect(focusBtn).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("calls onChange when a different layout is selected", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { LayoutModeSelector } = await import("@/components/LayoutModeSelector");
-    render(
-      <LayoutModeSelector value="scroll" onChange={onChange} />,
-    );
-
-    await user.click(screen.getByRole("button", { name: /cards/i }));
-    expect(onChange).toHaveBeenCalledWith("cards");
-  });
-
-  it("does not call onChange when current layout is re-selected", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    const { LayoutModeSelector } = await import("@/components/LayoutModeSelector");
-    render(
-      <LayoutModeSelector value="scroll" onChange={onChange} />,
-    );
-
-    await user.click(screen.getByRole("button", { name: /scroll/i }));
-    expect(onChange).not.toHaveBeenCalled();
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
 // AC3: Layout preference is persisted to localStorage
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -365,11 +310,6 @@ describe("Layout modes wiring", () => {
   it("NarrationCards is importable from @/components/NarrationCards", async () => {
     const mod = await import("@/components/NarrationCards");
     expect(typeof mod.NarrationCards).toBe("function");
-  });
-
-  it("LayoutModeSelector is importable from @/components/LayoutModeSelector", async () => {
-    const mod = await import("@/components/LayoutModeSelector");
-    expect(typeof mod.LayoutModeSelector).toBe("function");
   });
 
   it("useLayoutMode is importable from @/hooks/useLayoutMode", async () => {

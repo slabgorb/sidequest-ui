@@ -127,7 +127,7 @@ function AppInner() {
   const { toggleWidget } = useGameBoardLayout(currentGenre ?? undefined);
 
   // Layout mode — client-only, persisted to localStorage
-  const { mode: layoutMode, setMode: setLayoutMode } = useLayoutMode();
+  const { mode: layoutMode } = useLayoutMode();
 
 
   // Party status — richer than state_delta (includes portrait_url)
