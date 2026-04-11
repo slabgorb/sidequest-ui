@@ -62,10 +62,6 @@ export function useAudioCue(
         if (sfx_volume != null) engine.setVolume("sfx", sfx_volume);
         if (crossfade_ms != null) crossfadeMs = crossfade_ms;
         continue;
-      } else if (action === "duck") {
-        engine.duckMusic();
-      } else if (action === "restore") {
-        engine.restoreMusic();
       } else if (action === "fade_out" || action === "stop") {
         engine.stopMusic(action === "fade_out" ? crossfadeMs : undefined);
       } else {

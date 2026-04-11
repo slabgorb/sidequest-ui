@@ -1,6 +1,5 @@
 import { AudioCache } from "./AudioCache";
 import { Crossfader } from "./Crossfader";
-import { Ducker } from "./Ducker";
 
 type ChannelName = "music" | "sfx";
 type VolumeTarget = ChannelName | "master";
@@ -64,7 +63,6 @@ export class AudioEngine {
   private channels: Record<ChannelName, GainNode>;
   private masterGain: GainNode;
   private crossfader: Crossfader;
-  private ducker: Ducker;
   private volumes: VolumeState;
   private preMuteVolumes: Partial<Record<ChannelName, number>> = {};
   private activeSources: AudioBufferSourceNode[] = [];
@@ -89,7 +87,6 @@ export class AudioEngine {
 
     this.channels = { music: musicGain, sfx: sfxGain };
     this.crossfader = new Crossfader();
-    this.ducker = new Ducker(musicGain);
   }
 
   async resume(): Promise<void> {
@@ -132,14 +129,6 @@ export class AudioEngine {
       this.channels.music,
       fadeMs,
     );
-  }
-
-  duckMusic(): void {
-    this.ducker.duck();
-  }
-
-  restoreMusic(): void {
-    this.ducker.unduck();
   }
 
   stopMusic(fadeMs?: number): void {

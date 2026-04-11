@@ -201,33 +201,6 @@ describe("useAudioCue", () => {
     engine.dispose();
   });
 
-  it("ducks music on action=duck instead of playing new track", () => {
-    const engine = new AudioEngine();
-    const playMusicSpy = vi.spyOn(engine, "playMusic");
-    const duckSpy = vi.spyOn(engine, "duckMusic");
-
-    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "duck");
-
-    renderHook(() => useAudioCue([msg], engine));
-
-    expect(duckSpy).toHaveBeenCalledTimes(1);
-    expect(playMusicSpy).not.toHaveBeenCalled();
-    engine.dispose();
-  });
-
-  it("restores music on action=restore instead of playing new track", () => {
-    const engine = new AudioEngine();
-    const playMusicSpy = vi.spyOn(engine, "playMusic");
-    const restoreSpy = vi.spyOn(engine, "restoreMusic");
-
-    const msg = makeAudioCue("tense", "/genre/low_fantasy/audio/tense.mp3", [], "restore");
-
-    renderHook(() => useAudioCue([msg], engine));
-
-    expect(restoreSpy).toHaveBeenCalledTimes(1);
-    expect(playMusicSpy).not.toHaveBeenCalled();
-    engine.dispose();
-  });
 
   it("stops music on action=stop", () => {
     const engine = new AudioEngine();
