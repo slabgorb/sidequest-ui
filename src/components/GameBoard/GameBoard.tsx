@@ -1,4 +1,13 @@
-import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   DockviewReact,
   type DockviewReadyEvent,
@@ -44,6 +53,56 @@ import { AudioWidget } from "./widgets/AudioWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
 
 // react-grid-layout v2 exports ResponsiveGridLayout directly (no WidthProvider)
+
+// ────────────────────────────────────────────────────────────────────────────
+// Dockview closure bridge
+//
+// Dockview freezes the `component` reference at panel-creation time
+// (see node_modules/dockview/dist/cjs/dockview/reactContentPart.js — the
+// `ReactPanelContentPart` constructor stores `this.component = component`
+// and the `update()` method only forwards new params, never a new component).
+// So if we defined `PanelAdapter` inline with a `useCallback([renderWidgetContent])`
+// dep, the adapter's closure over `renderWidgetContent` — and therefore over
+// `messages`, `thinking`, `characterSheet`, etc. — would be locked in forever
+// at the moment each panel was first added. Any subsequent setState in the
+// parent would be invisible inside the dockview panel: the narrative panel
+// wouldn't show new turns, the character panel wouldn't show HP changes,
+// and so on. Refreshing the page would appear to "fix" it because sessionStorage
+// hydration gave the first render the correct initial state.
+//
+// The fix is to make `PanelAdapter` and `dockviewComponents` module-level
+// stable references that pull the current render function out of a React
+// context. Context consumers re-render on context value updates regardless
+// of closure position — React tracks subscription by fiber, and portal
+// children are still part of the React tree for context purposes. So the
+// GameBoard component updates the context value on every render, and the
+// stable PanelAdapter sees the latest `renderWidget` immediately.
+
+interface GameBoardRenderContextValue {
+  renderWidget: (id: WidgetId) => ReactNode;
+}
+
+const GameBoardRenderContext = createContext<GameBoardRenderContextValue | null>(
+  null,
+);
+
+function PanelAdapter({
+  params,
+}: IDockviewPanelProps<{ panelId: WidgetId }>) {
+  const ctx = useContext(GameBoardRenderContext);
+  const content = ctx ? ctx.renderWidget(params.panelId) : null;
+  return (
+    <div className="dockview-panel-content" data-widget={params.panelId}>
+      <div className="flex-1 min-h-0 flex flex-col overflow-auto">
+        {content}
+      </div>
+    </div>
+  );
+}
+
+const DOCKVIEW_COMPONENTS = { PanelAdapter };
+
+// ────────────────────────────────────────────────────────────────────────────
 
 export interface GameBoardProps {
   messages: GameMessage[];
@@ -300,26 +359,15 @@ export function GameBoard({
     />
   );
 
-  // Dockview panel adapter — receives panelId from params, renders the widget.
-  // The outer `.dockview-panel-content` is a flex column (see dockview-theme.css)
-  // so `flex-1 min-h-0` descendants (NarrativeView, CharacterPanel, MapOverlay)
-  // actually fill the panel. Wrapping the widget in a `flex-1 min-h-0` inner
-  // div guarantees every widget gets the available space even if its own root
-  // element isn't a flex container — fixes the panels-visually-empty regression.
-  const PanelAdapter = useCallback(
-    ({ params }: IDockviewPanelProps<{ panelId: WidgetId }>) => {
-      return (
-        <div className="dockview-panel-content" data-widget={params.panelId}>
-          <div className="flex-1 min-h-0 flex flex-col overflow-auto">
-            {renderWidgetContent(params.panelId)}
-          </div>
-        </div>
-      );
-    },
+  // Context value consumed by the module-level PanelAdapter. See the comment
+  // block above GameBoardRenderContext for why this indirection is required.
+  // Each render produces a new `renderWidget` reference when its dependencies
+  // change, which updates the context and re-renders every dockview panel
+  // that consumes it — bypassing dockview's frozen-component-reference trap.
+  const renderContextValue = useMemo<GameBoardRenderContextValue>(
+    () => ({ renderWidget: renderWidgetContent }),
     [renderWidgetContent],
   );
-
-  const dockviewComponents = useMemo(() => ({ PanelAdapter }), [PanelAdapter]);
 
   // Build the initial dockview layout when the API is ready.
   // Two-region default: narrative on the left, supporting panels (character/map/gallery/audio) tabbed on the right.
@@ -458,6 +506,7 @@ export function GameBoard({
   }
 
   return (
+    <GameBoardRenderContext.Provider value={renderContextValue}>
     <div data-testid="game-board" className="flex flex-col h-screen overflow-hidden">
       <BackgroundCanvas />
 
@@ -508,7 +557,7 @@ export function GameBoard({
         <DockviewReact
           className="dockview-container dockview-theme-abyss"
           onReady={onDockviewReady}
-          components={dockviewComponents}
+          components={DOCKVIEW_COMPONENTS}
           watermarkComponent={() => null}
         />
       </div>
@@ -541,5 +590,6 @@ export function GameBoard({
       {/* Confrontation overlay — modal on top of the workspace when active. */}
       {confrontationOverlay}
     </div>
+    </GameBoardRenderContext.Provider>
   );
 }
