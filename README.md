@@ -50,8 +50,8 @@ A game session moves through three phases, each rendered by its own screen:
 | **MapOverlay**     | SVG nodes and connections, fog of war, current location      |
 | **JournalView**    | Handout thumbnails with lightbox modal                       |
 | **CombatOverlay**  | Enemy HP bars, turn order, health status indicators          |
-| **AudioStatus**    | 3-channel mixer UI (music/SFX/voice), mute toggles          |
-| **InputBar**       | Text input with aside toggle and push-to-talk button         |
+| **AudioStatus**    | 2-channel mixer UI (music/SFX), mute toggles                |
+| **InputBar**       | Text input with aside toggle                                 |
 | **GMMode**         | Watcher socket, event stream, trope timeline, state inspector|
 | **OverlayManager** | Mobile-aware consolidated panel manager                      |
 
@@ -67,54 +67,59 @@ A game session moves through three phases, each rendered by its own screen:
 
 ## Hooks
 
-Sixteen custom hooks power the client logic:
+Custom hooks under `src/hooks/`:
 
-| Hook                 | Responsibility                                    |
-|----------------------|---------------------------------------------------|
-| `useGameSocket`      | WebSocket lifecycle and message dispatch           |
-| `useStateMirror`     | Sync local game state from server messages         |
-| `useSlashCommands`   | Parse `/inventory`, `/character`, `/quests`, etc.  |
-| `useAudio`           | Core audio context management                      |
-| `useAudioCue`        | Play one-shot audio cues from server events        |
-| `useMusicPlayer`     | Background music playback and crossfade            |
-| `useSfxPlayer`       | Sound effect playback                              |
-| `useVoiceChat`       | WebRTC peer-to-peer voice                          |
-| `useVoicePlayback`   | Server-side TTS audio playback                     |
-| `usePushToTalk`      | PTT state machine (record, transcribe, preview)    |
-| `useWhisper`         | Local Whisper.js speech-to-text                    |
-| `useGenreTheme`      | Inject genre pack CSS variables                    |
-| `useGMMode`          | GM debugging dashboard state                       |
-| `useWatcherSocket`   | Telemetry WebSocket for GM mode                    |
-| `useBreakpoint`      | Responsive breakpoint detection                    |
+| Hook                   | Responsibility                                          |
+|------------------------|---------------------------------------------------------|
+| `useWebSocket`         | Low-level WebSocket transport with reconnect            |
+| `useGameSocket`        | Game-message dispatch built on `useWebSocket`           |
+| `useStateMirror`       | Sync local game state from server messages              |
+| `useWatcherSocket`     | Telemetry WebSocket for GM mode                         |
+| `useSlashCommands`     | Parse `/inventory`, `/character`, `/quests`, etc.       |
+| `useAudio`             | Core audio context management                           |
+| `useAudioCue`          | Play one-shot audio cues (SFX) from server events       |
+| `useGenreTheme`        | Inject genre pack CSS variables                         |
+| `useChromeArchetype`   | Archetype-driven UI chrome styling                      |
+| `useLayoutMode`        | Desktop/mobile layout selection                         |
+| `useBreakpoint`        | Responsive breakpoint detection                         |
+| `useLocalPrefs`        | Persisted user preferences (volume, panel layout, etc.) |
+| `useRunningHeader`     | Scroll-aware running header state                       |
+| `useGameBoardLayout`   | Game board panel arrangement                            |
+| `useGameBoardHotkeys`  | Keyboard shortcut bindings for game board panels        |
+
+> The full list is authoritative in `src/hooks/`. Former voice hooks
+> (`useVoiceChat`, `useVoicePlayback`, `usePushToTalk`, `useWhisper`) were
+> removed along with the TTS / WebRTC voice pipeline (2026-04).
 
 ## Audio Engine
 
-The audio subsystem uses the Web Audio API with three independent channels:
+The audio subsystem uses the Web Audio API with two independent channels:
 
-- **AudioEngine.ts** — 3-channel mixer (music, SFX, voice) with per-channel gain
+- **AudioEngine.ts** — 2-channel mixer (music + SFX) with per-channel gain
 - **AudioCache.ts** — URL-to-AudioBuffer cache to avoid redundant fetches
 - **Crossfader.ts** — Smooth gain-curve transitions between music tracks
-- **Ducker.ts** — Automatic music ducking when voice audio plays
-- **LocalTranscriber.ts** — Loads Whisper model for in-browser speech-to-text
+
+The voice channel, `LocalTranscriber.ts`, `Ducker.ts`, and the Kokoro TTS
+playback path were all removed in 2026-04. Music-ducking was only ever wired
+to duck under TTS voice playback; with voice gone, the entire duck/restore
+chain is gone too — the Rust server no longer emits `AudioAction::Duck`
+constructions. See `orc-quest/docs/adr/076-narration-protocol-collapse-post-tts.md`.
 
 ## WebSocket Protocol
 
-The client handles these message types from the server:
+Client-handled message types include `NARRATION`, `NARRATION_END`, `PARTY_STATUS`,
+`CHARACTER_SHEET`, `INVENTORY`, `MAP_UPDATE`, `IMAGE`, `AUDIO_CUE`, `CHAPTER_MARKER`,
+`SESSION_EVENT`, `TURN_STATUS`, `CHARACTER_CREATION`, `THINKING`, `ERROR`,
+`COMBAT_EVENT`, `ACTION_QUEUE`, and the dice protocol triplet (`DICE_REQUEST`,
+`DICE_THROW`, `DICE_RESULT`).
 
-```
-PARTY_STATUS        CHARACTER_SHEET     INVENTORY
-MAP_UPDATE          NARRATION           NARRATION_CHUNK
-NARRATION_END       PLAYER_ACTION       CHAPTER_MARKER
-CHARACTER_CREATION  SESSION_EVENT       TURN_STATUS
-IMAGE               AUDIO_CUE           VOICE_TEXT
-VOICE_SIGNAL        THINKING            ERROR
-COMBAT_EVENT        ACTION_QUEUE
-```
+See `src/types/` for the authoritative TypeScript payload definitions and
+`orc-quest/docs/api-contract.md` for the cross-repo protocol reference.
 
 ## Tests
 
-27 test files covering integration, component, hook, audio, and WebRTC behavior.
-Tests run in JSDOM via Vitest with React Testing Library.
+Vitest + React Testing Library + JSDOM. Test files cover integration,
+component, hook, and audio behavior.
 
 ```bash
 npm test              # Watch mode

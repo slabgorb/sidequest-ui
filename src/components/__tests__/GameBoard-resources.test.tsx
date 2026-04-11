@@ -55,8 +55,6 @@ const mockPlaySfx = vi.fn();
 const mockAudio = {
   resume: vi.fn(),
   playMusic: vi.fn(),
-  duckMusic: vi.fn(),
-  restoreMusic: vi.fn(),
   stopMusic: vi.fn(),
   playSfx: mockPlaySfx,
   setVolume: vi.fn(),

@@ -282,8 +282,7 @@ describe("AudioEngine", () => {
   describe("Audio graph topology", () => {
     it("creates 2 channel gain nodes plus master", () => {
       const engine = new AudioEngine();
-      // Should have: music, sfx, master = at least 3 gain nodes
-      // (voice channel removed with TTS)
+      // music + sfx channel gains + master = 3 gain nodes.
       expect(ctx._gainNodes.length).toBeGreaterThanOrEqual(3);
       engine.dispose();
     });
