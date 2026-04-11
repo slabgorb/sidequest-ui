@@ -113,6 +113,87 @@ describe("rugged archetype rules", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Widget chrome rules — per-archetype [data-widget] rulesets (Story 33-1)
+// ---------------------------------------------------------------------------
+
+describe("widget chrome rules", () => {
+  const archetypes = ["parchment", "terminal", "rugged"] as const;
+
+  for (const archetype of archetypes) {
+    describe(`${archetype} widget rules`, () => {
+      it("contains a [data-widget] selector inside the archetype section", () => {
+        const css = loadArchetypeCSS();
+        const section = extractArchetypeSection(css, archetype);
+        expect(section).toContain(`[data-archetype="${archetype}"] [data-widget]`);
+      });
+
+      it("sets a box-shadow on the widget root", () => {
+        const css = loadArchetypeCSS();
+        const widgetBlock = extractWidgetBlock(css, archetype);
+        expect(widgetBlock).toContain("box-shadow");
+      });
+
+      it("styles the widget-drag-handle header", () => {
+        const css = loadArchetypeCSS();
+        const section = extractArchetypeSection(css, archetype);
+        expect(section).toContain(
+          `[data-archetype="${archetype}"] [data-widget] .widget-drag-handle`,
+        );
+      });
+
+      it("does not set padding, margin, width, or height on [data-widget] (AC-7 composition)", () => {
+        const css = loadArchetypeCSS();
+        const widgetBlock = extractWidgetBlock(css, archetype);
+        // Guard against any layout properties that would fight WidgetWrapper's Tailwind classes.
+        // Split into lines and scan each for forbidden property names.
+        const forbidden = /^\s*(padding|margin|width|height|flex)(-[a-z]+)?\s*:/m;
+        expect(widgetBlock).not.toMatch(forbidden);
+      });
+    });
+  }
+
+  it("parchment widget has corner flourish pseudo-elements (::before and ::after)", () => {
+    const css = loadArchetypeCSS();
+    const section = extractArchetypeSection(css, "parchment");
+    expect(section).toContain('[data-archetype="parchment"] [data-widget]::before');
+    expect(section).toContain('[data-archetype="parchment"] [data-widget]::after');
+  });
+
+  it("terminal widget has a scan-line ::after overlay using repeating-linear-gradient", () => {
+    const css = loadArchetypeCSS();
+    const section = extractArchetypeSection(css, "terminal");
+    expect(section).toContain('[data-archetype="terminal"] [data-widget]::after');
+    // The scanline overlay must use repeating-linear-gradient inside the widget ::after block
+    const afterBlock = extractRuleBlock(
+      section,
+      '[data-archetype="terminal"] [data-widget]::after',
+    );
+    expect(afterBlock).toContain("repeating-linear-gradient");
+  });
+
+  it("rugged widget has metal bracket pseudo-elements (::before and ::after)", () => {
+    const css = loadArchetypeCSS();
+    const section = extractArchetypeSection(css, "rugged");
+    expect(section).toContain('[data-archetype="rugged"] [data-widget]::before');
+    expect(section).toContain('[data-archetype="rugged"] [data-widget]::after');
+  });
+
+  // Regression guard for the HIGH finding from the first review round:
+  // rugged corner brackets were originally at top/left/bottom/right: -3px, which
+  // got clipped by WidgetWrapper's overflow:hidden. The rugged section contains
+  // only pseudo-element decorations inside an overflow:hidden container, so any
+  // negative offset here is a red flag — it would recreate the clipping bug.
+  // This test scans the whole rugged section for negative top/left/bottom/right
+  // declarations.
+  it("rugged section has no negative offsets (chrome would be clipped by overflow:hidden)", () => {
+    const css = loadArchetypeCSS();
+    const section = extractArchetypeSection(css, "rugged");
+    const negativeOffset = /\b(top|left|bottom|right)\s*:\s*-\d/;
+    expect(section).not.toMatch(negativeOffset);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // AC6: CSS lives in a dedicated file (not inline)
 // ---------------------------------------------------------------------------
 
@@ -194,4 +275,57 @@ function extractArchetypeSection(css: string, archetype: string): string {
   }
 
   return css.slice(startIndex, endIndex);
+}
+
+/**
+ * Extracts the first rule block (from `{` to its matching `}`) for a specific
+ * CSS selector. Walks braces to handle nested groups correctly. Returns the
+ * block contents without the surrounding braces, or an empty string if the
+ * selector is not found.
+ */
+function extractRuleBlock(css: string, selector: string): string {
+  const selectorIndex = css.indexOf(selector);
+  if (selectorIndex === -1) return "";
+
+  const openBrace = css.indexOf("{", selectorIndex);
+  if (openBrace === -1) return "";
+
+  // Walk forward counting braces to find the matching close.
+  let depth = 1;
+  let i = openBrace + 1;
+  while (i < css.length && depth > 0) {
+    if (css[i] === "{") depth++;
+    else if (css[i] === "}") depth--;
+    if (depth === 0) break;
+    i++;
+  }
+  if (depth !== 0) return "";
+
+  return css.slice(openBrace + 1, i);
+}
+
+/**
+ * Extracts the rule block for the `[data-archetype="X"] [data-widget]` root
+ * selector (no trailing descendant, no pseudo-element). Used to check that
+ * no layout properties (padding/margin/width/height/flex) are declared on
+ * the widget root itself. Anchored on the literal `{` to avoid matching
+ * descendant rules like `[data-archetype="X"] [data-widget] .widget-drag-handle`.
+ */
+function extractWidgetBlock(css: string, archetype: string): string {
+  const rootSelector = `[data-archetype="${archetype}"] [data-widget] {`;
+  const selectorIndex = css.indexOf(rootSelector);
+  if (selectorIndex === -1) return "";
+  const openBrace = selectorIndex + rootSelector.length - 1;
+
+  // Walk forward counting braces to find the matching close.
+  let depth = 1;
+  let i = openBrace + 1;
+  while (i < css.length && depth > 0) {
+    if (css[i] === "{") depth++;
+    else if (css[i] === "}") depth--;
+    if (depth === 0) break;
+    i++;
+  }
+  if (depth !== 0) return "";
+  return css.slice(openBrace + 1, i);
 }
