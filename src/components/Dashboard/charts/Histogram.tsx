@@ -1,6 +1,6 @@
 import { useRef, useEffect } from "react";
 import * as d3 from "d3";
-import { AGENT_COLORS, THEME } from "../shared/constants";
+import { THEME } from "../shared/constants";
 
 interface Props {
   durations: { ms: number; agent: string }[];

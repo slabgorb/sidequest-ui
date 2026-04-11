@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GameBoard, type GameBoardProps } from "../GameBoard/GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "../CharacterPanel";
-import type { ResourceThreshold } from "../GenericResourceBar";
 
 // ═══════════════════════════════════════════════════════════
 // Test fixtures
@@ -54,14 +53,16 @@ const MOCK_RESOURCES: Record<string, ResourcePool> = {
 
 const mockPlaySfx = vi.fn();
 const mockAudio = {
-  engine: null,
   resume: vi.fn(),
   playMusic: vi.fn(),
+  duckMusic: vi.fn(),
+  restoreMusic: vi.fn(),
+  stopMusic: vi.fn(),
   playSfx: mockPlaySfx,
-  playVoice: vi.fn(),
   setVolume: vi.fn(),
   getVolume: vi.fn().mockReturnValue(1.0),
-  voicePlaybackRate: 1.0,
+  mute: vi.fn(),
+  unmute: vi.fn(),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -90,6 +91,17 @@ function renderLayout(overrides: Partial<GameBoardProps> = {}) {
   );
 }
 
+// In jsdom, GameBoard renders via MobileTabView (test-setup defaults
+// matchMedia to mobile so dockview's panel content is reachable). Resources
+// live inside the Character widget's "Status" sub-tab, so we have to
+// navigate to Character first, then click the Status sub-tab.
+function openStatusTab() {
+  // Step 1: open the Character widget in the mobile tab bar.
+  fireEvent.click(screen.getByRole("tab", { name: /^character$/i }));
+  // Step 2: open the Status sub-tab inside CharacterPanel.
+  fireEvent.click(screen.getByRole("tab", { name: /^status$/i }));
+}
+
 // ═══════════════════════════════════════════════════════════
 // AC-2: GameBoard passes resources and genreSlug to CharacterPanel
 // ═══════════════════════════════════════════════════════════
@@ -101,6 +113,7 @@ describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
       resources: MOCK_RESOURCES,
       genreSlug: "spaghetti_western",
     });
+    fireEvent.click(screen.getByRole("tab", { name: /^character$/i }));
     expect(screen.getByTestId("character-panel")).toBeInTheDocument();
   });
 
@@ -108,6 +121,7 @@ describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
     renderLayout({
       genreSlug: "spaghetti_western",
     });
+    fireEvent.click(screen.getByRole("tab", { name: /^character$/i }));
     expect(screen.getByTestId("character-panel")).toBeInTheDocument();
   });
 
@@ -117,7 +131,7 @@ describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
       genreSlug: "spaghetti_western",
     });
     // Click the Status tab to see resource bars
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     const bars = screen.getAllByTestId("resource-bar");
     expect(bars).toHaveLength(2);
   });
@@ -127,7 +141,7 @@ describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     const bar = screen.getByTestId("resource-bar");
     expect(bar).toHaveAttribute("data-genre", "spaghetti_western");
   });
@@ -137,23 +151,30 @@ describe("25-11 AC-2: GameBoard passes resources to CharacterPanel", () => {
       resources: { Humanity: HUMANITY_RESOURCE },
       genreSlug: "neon_dystopia",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     expect(screen.getByText("Humanity")).toBeInTheDocument();
     expect(screen.getByText(/60\s*\/\s*100/)).toBeInTheDocument();
     expect(screen.getByTestId("resource-bar")).toHaveAttribute("data-genre", "neon_dystopia");
   });
 
-  it("does not render Status tab when resources are absent", () => {
+  it("does not render Status sub-tab when resources are absent", () => {
     renderLayout();
-    expect(screen.queryByRole("tab", { name: /status/i })).not.toBeInTheDocument();
+    // Navigate to Character widget so its sub-tab strip is mounted.
+    fireEvent.click(screen.getByRole("tab", { name: /^character$/i }));
+    expect(
+      screen.queryByRole("tab", { name: /^status$/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("does not render Status tab when resources are empty", () => {
+  it("does not render Status sub-tab when resources are empty", () => {
     renderLayout({
       resources: {},
       genreSlug: "spaghetti_western",
     });
-    expect(screen.queryByRole("tab", { name: /status/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /^character$/i }));
+    expect(
+      screen.queryByRole("tab", { name: /^status$/i }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -168,7 +189,7 @@ describe("25-11 AC-3: Threshold crossing routes to AudioEngine", () => {
       resources: { Fuel: FUEL_RESOURCE },
       genreSlug: "road_warrior",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     // GenericResourceBar fires onThresholdCrossed via useEffect on mount
     // when value <= threshold. GameBoard should route this to audio.playSfx
     expect(mockPlaySfx).toHaveBeenCalled();
@@ -180,7 +201,7 @@ describe("25-11 AC-3: Threshold crossing routes to AudioEngine", () => {
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     expect(mockPlaySfx).not.toHaveBeenCalled();
   });
 });
@@ -195,7 +216,7 @@ describe("25-11 AC-5: No silent fallbacks", () => {
       resources: MOCK_RESOURCES,
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     expect(screen.getAllByTestId("resource-bar")).toHaveLength(2);
   });
 
@@ -206,7 +227,7 @@ describe("25-11 AC-5: No silent fallbacks", () => {
       resources: { Fuel: FUEL_RESOURCE },
       // genreSlug intentionally omitted — should warn, not silently fallback
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("genreSlug"),
     );
@@ -226,7 +247,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
       },
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
 
     // Verify the bar renders with correct data all the way through
     expect(screen.getByText("Luck")).toBeInTheDocument();
@@ -240,7 +261,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
       resources: MOCK_RESOURCES,
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
 
     expect(screen.getByText("Luck")).toBeInTheDocument();
     expect(screen.getByText("Humanity")).toBeInTheDocument();
@@ -256,23 +277,23 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     expect(screen.getByText(/4\s*\/\s*6/)).toBeInTheDocument();
 
     // Simulate resource update via new props (as would happen from PARTY_STATUS)
     rerender(
-      <GameBoard
-        messages={[]}
-        characters={[{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }]}
-        onSend={vi.fn()}
-        disabled={false}
-        characterSheet={CHARACTER_SHEET}
-        activeOverlay={null as OverlayType}
-        onOverlayChange={vi.fn()}
-        audio={mockAudio as unknown as GameBoardProps["audio"]}
-        resources={{ Luck: { ...LUCK_RESOURCE, value: 1 } }}
-        genreSlug="spaghetti_western"
-      />,
+      <ImageBusProvider messages={[]}>
+        <GameBoard
+          messages={[]}
+          characters={[{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }]}
+          onSend={vi.fn()}
+          disabled={false}
+          characterSheet={CHARACTER_SHEET}
+          audio={mockAudio as unknown as GameBoardProps["audio"]}
+          resources={{ Luck: { ...LUCK_RESOURCE, value: 1 } }}
+          genreSlug="spaghetti_western"
+        />
+      </ImageBusProvider>,
     );
     expect(screen.getByText(/1\s*\/\s*6/)).toBeInTheDocument();
   });
@@ -290,7 +311,7 @@ describe("25-11 Wiring: resources flow through GameBoard", () => {
       resources: { Luck: LUCK_RESOURCE },
       genreSlug: "spaghetti_western",
     });
-    fireEvent.click(screen.getByRole("tab", { name: /status/i }));
+    openStatusTab();
     // If GameBoard doesn't pass resources to CharacterPanel, no resource bar renders
     expect(screen.getByTestId("resource-bar")).toBeInTheDocument();
     expect(screen.getByText("Luck")).toBeInTheDocument();

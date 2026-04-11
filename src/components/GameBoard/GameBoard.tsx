@@ -17,11 +17,9 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import "@/styles/dockview-theme.css";
 
-import { useRunningHeader } from "@/screens/NarrativeView";
+import { useRunningHeader } from "@/hooks/useRunningHeader";
 import InputBar from "@/components/InputBar";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
-import { usePushToTalk } from "@/hooks/usePushToTalk";
-import { useWhisper } from "@/hooks/useWhisper";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useGameBoardHotkeys } from "@/hooks/useGameBoardHotkeys";
 import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
@@ -259,28 +257,6 @@ export function GameBoard({
     [audio, genreSlug],
   );
 
-  // Mic & PTT
-  const [micEnabled, setMicEnabled] = useState(() =>
-    localStorage.getItem("sq-mic-enabled") === "true"
-  );
-  const toggleMic = useCallback(() => {
-    setMicEnabled(prev => {
-      const next = !prev;
-      localStorage.setItem("sq-mic-enabled", String(next));
-      return next;
-    });
-  }, []);
-  const { transcribe } = useWhisper({ enabled: micEnabled });
-  const ptt = usePushToTalk({
-    transcribe,
-    onConfirm: (text: string) => onSend(text, false),
-    enabled: micEnabled,
-  });
-  useEffect(() => {
-    if (!micEnabled) ptt.discard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [micEnabled]);
-
   const { chapterTitle } = useRunningHeader(messages);
 
   // Render a widget by ID. Character/inventory/map data is guaranteed
@@ -345,16 +321,6 @@ export function GameBoard({
       disabled={disabled}
       mobile={isMobile}
       thinking={thinking}
-      micEnabled={micEnabled}
-      onMicToggle={toggleMic}
-      pttState={ptt.state}
-      onPttStart={ptt.startRecording}
-      onPttStop={ptt.stopRecording}
-      transcript={ptt.transcript}
-      onTranscriptEdit={ptt.editTranscript}
-      onTranscriptConfirm={ptt.confirm}
-      onTranscriptDiscard={ptt.discard}
-      duration={ptt.duration}
       waitingForPlayer={waitingForPlayer}
     />
   );

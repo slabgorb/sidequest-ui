@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toRoman } from "@/lib/utils";
 
 interface CreationChoice {
@@ -35,13 +35,22 @@ export interface CharacterCreationProps {
 }
 
 export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
+  // React idiom: reset state during render when the identifying prop changes,
+  // instead of useEffect → setState (which forces an extra render). When
+  // `scene_index` or `phase` change, snap the local input/selection back to
+  // whatever the scene was last given. See:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const sceneKey = scene ? `${scene.scene_index}-${scene.phase}` : null;
+  const [lastSceneKey, setLastSceneKey] = useState<string | null>(sceneKey);
   const [inputValue, setInputValue] = useState(scene?.previous_input ?? "");
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(scene?.previous_choice ?? null);
-
-  useEffect(() => {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(
+    scene?.previous_choice ?? null,
+  );
+  if (sceneKey !== lastSceneKey) {
+    setLastSceneKey(sceneKey);
     setInputValue(scene?.previous_input ?? "");
     setSelectedIndex(scene?.previous_choice ?? null);
-  }, [scene?.scene_index, scene?.phase]);
+  }
 
   if (loading) {
     return (

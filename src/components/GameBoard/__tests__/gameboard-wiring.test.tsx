@@ -107,10 +107,12 @@ describe("GameBoard wiring", () => {
     it("GameBoard explicitly activates rightFirst (character tab)", async () => {
       // Without this call, dockview activates the last-added panel, which
       // meant the right group landed on `audio` on every fresh game load.
+      // (Renamed from `api.setActivePanel(rightFirst)` to
+      // `rightFirst.api.setActive()` in commit 7490fb1.)
       const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
         default: string;
       };
-      expect(src.default).toContain("api.setActivePanel(rightFirst)");
+      expect(src.default).toContain("rightFirst.api.setActive()");
     });
 
     it("GameBoard focuses the narrative panel on mount", async () => {

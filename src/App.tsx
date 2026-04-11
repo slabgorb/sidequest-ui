@@ -12,7 +12,6 @@ import { useGenreTheme } from "@/hooks/useGenreTheme";
 import { useChromeArchetype } from "@/hooks/useChromeArchetype";
 import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
-import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useStateMirror } from "@/hooks/useStateMirror";
 import { useSlashCommands } from "@/hooks/useSlashCommands";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
@@ -202,7 +201,6 @@ function AppInner() {
       return;
     }
 
-    // Narration flows straight into the message feed now that TTS is gone.
     if (msg.type === MessageType.NARRATION || msg.type === MessageType.NARRATION_END) {
       setThinking(false);
       setMessages((prev) => [...prev, msg]);
@@ -402,20 +400,9 @@ function AppInner() {
       return; // Don't show this error in the narrative
     }
 
-    // WebRTC signaling — route to useVoiceChat, never display as narrative
-    if (msg.type === MessageType.VOICE_SIGNAL) {
-      const from = msg.payload.from as string | undefined;
-      const signal = msg.payload.signal as Record<string, unknown> | undefined;
-      if (from && signal) {
-        voiceHandleSignalRef.current(from, signal);
-      }
-      return;
-    }
-
     setMessages((prev) => [...prev, msg]);
-  }, []);
+  }, [connectedPlayerName]);
 
-  const voiceHandleSignalRef = useRef<(peerId: string, signal: Record<string, unknown>) => void>(() => {});
   const sendRef = useRef<typeof send | null>(null);
 
   const { connect, disconnect, send, readyState, error } = useGameSocket({
@@ -424,20 +411,6 @@ function AppInner() {
   });
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
-
-  // WebRTC voice chat — wire signaling through the game server
-  const voiceChat = useVoiceChat({
-    peers: [],
-    onSignal: useCallback((peerId: string, signal: Record<string, unknown>) => {
-      sendRef.current?.({
-        type: MessageType.VOICE_SIGNAL,
-        payload: { target: peerId, signal },
-        player_id: "",
-      });
-    }, []),
-  });
-  // eslint-disable-next-line react-hooks/immutability
-  voiceHandleSignalRef.current = voiceChat.handleSignal;
 
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
@@ -454,7 +427,7 @@ function AppInner() {
         });
       }, 300);
     },
-    [connect, send, audio.engine],
+    [connect, send],
   );
 
   const handleCreationRespond = useCallback(
@@ -500,7 +473,7 @@ function AppInner() {
       send(msg);
       setCanType(false); // Sealed — wait for narration before typing again
     },
-    [send, executeSlashCommand],
+    [send, executeSlashCommand, toggleWidget],
   );
 
   const handleRequestJournal = useCallback(
@@ -649,18 +622,6 @@ function AppInner() {
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
   );
-  // Sealed-letter: have I already submitted this turn?
-  const haveISubmitted = currentPlayerId
-    ? turnStatusEntries.some((e) => e.player_id === currentPlayerId && e.status === "submitted")
-    : false;
-  // Sequential: is someone else active? Sealed-letter: have I submitted?
-  const isMyTurn = !isMultiplayer
-    || (!activePlayerName && !haveISubmitted)
-    || activePlayerName === connectedPlayerName;
-  const waitingForPlayer = isMultiplayer && !isMyTurn
-    ? (activePlayerName ?? (haveISubmitted ? "other players" : undefined))
-    : undefined;
-
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <main className="flex flex-col flex-1 min-h-0">

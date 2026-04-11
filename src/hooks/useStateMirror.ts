@@ -218,7 +218,7 @@ export function useStateMirror(messages: GameMessage[]): void {
       prevLengthRef.current = messages.length;
       setState(current);
     }
-  }, [messages, setState]);
+  }, [messages, setState, setLocalPlayerId]);
 }
 
 function normalizeCharacter(c: CharacterState): CharacterState {

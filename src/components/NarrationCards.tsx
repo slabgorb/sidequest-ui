@@ -8,7 +8,6 @@ import { ThinkingIndicator, EmptyNarrationState } from "./NarrationShared";
 export interface NarrationCardsProps {
   messages: GameMessage[];
   thinking?: boolean;
-  setLightboxUrl?: (url: string | null) => void;
 }
 
 /** Turn boundary kinds — a new turn card starts at these segment types. */
@@ -47,7 +46,7 @@ function groupIntoTurns(segments: NarrativeSegment[]): NarrativeSegment[][] {
   return turns;
 }
 
-export function NarrationCards({ messages, thinking, setLightboxUrl }: NarrationCardsProps) {
+export function NarrationCards({ messages, thinking }: NarrationCardsProps) {
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
     [messages],
@@ -64,7 +63,7 @@ export function NarrationCards({ messages, thinking, setLightboxUrl }: Narration
             data-testid="narration-card"
             className="rounded-lg border border-border/30 bg-card/50 p-4 shadow-sm space-y-2"
           >
-            {turnSegs.map((seg, si) => renderSegment(seg, ti * 1000 + si, { maxTextWidth: "", setLightboxUrl }))}
+            {turnSegs.map((seg, si) => renderSegment(seg, ti * 1000 + si, { maxTextWidth: "" }))}
           </div>
         ))}
       </div>

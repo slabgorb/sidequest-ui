@@ -3,7 +3,6 @@ import {
   createMockAudioContext,
   createMockAudioBuffer,
   type MockAudioContext,
-  type MockGainNode,
 } from "./web-audio-mock";
 
 // ---------------------------------------------------------------------------
@@ -120,7 +119,7 @@ describe("Crossfader", () => {
         (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
       );
       const hasCorrectTiming = allRamps.some(
-        ([_value, time]: [number, number]) =>
+        ([, time]: [number, number]) =>
           Math.abs(time - (ctx.currentTime + fadeSec)) < 0.01,
       );
       expect(hasCorrectTiming).toBe(true);
@@ -141,7 +140,7 @@ describe("Crossfader", () => {
         (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
       );
       const hasDefaultTiming = allRamps.some(
-        ([_value, time]: [number, number]) =>
+        ([, time]: [number, number]) =>
           Math.abs(time - (ctx.currentTime + 3)) < 0.01,
       );
       expect(hasDefaultTiming).toBe(true);

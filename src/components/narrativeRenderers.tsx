@@ -1,3 +1,9 @@
+// This file is a rendering-helpers module: it exports `renderSegment` (a
+// function that returns JSX, not a typical component) alongside the
+// `FootnoteList` helper component. react-refresh wants pure-component files
+// — but turning `renderSegment` into a component would invert every call
+// site (renderSegment(seg) → <RenderSegment seg={seg} />). Suppress.
+/* eslint-disable react-refresh/only-export-components */
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
 
 function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] }) {
@@ -35,7 +41,6 @@ export interface RenderSegmentOpts {
   maxTextWidth?: string;
   chapterTitle?: string | null;
   dinkusGlyph?: string;
-  setLightboxUrl?: (url: string | null) => void;
 }
 
 export function renderSegment(
@@ -47,7 +52,6 @@ export function renderSegment(
     maxTextWidth = "",
     chapterTitle = null,
     dinkusGlyph = "◇",
-    setLightboxUrl,
   } = opts;
 
   switch (seg.kind) {

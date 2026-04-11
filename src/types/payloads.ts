@@ -75,9 +75,8 @@ export interface RolledStat {
 // Per-message-type payload interfaces
 // ---------------------------------------------------------------------------
 
-export interface ThinkingPayload {
-  // empty — spinner indicator
-}
+/** Spinner indicator — no fields, presence is the signal. */
+export type ThinkingPayload = Record<string, never>;
 
 export interface NarrationPayload {
   text: string;
@@ -162,12 +161,6 @@ export interface ConfrontationPayload {
 export interface ErrorPayload {
   message: string;
   reconnect_required?: boolean;
-}
-
-export interface VoiceSignalPayload {
-  from: string;
-  target?: string;
-  signal: Record<string, unknown>;
 }
 
 export interface ImagePayload {
@@ -309,11 +302,6 @@ export interface ErrorMessage extends BaseMessage {
   payload: ErrorPayload;
 }
 
-export interface VoiceSignalMessage extends BaseMessage {
-  type: MessageType.VOICE_SIGNAL;
-  payload: VoiceSignalPayload;
-}
-
 export interface ImageMessage extends BaseMessage {
   type: MessageType.IMAGE;
   payload: ImagePayload;
@@ -366,7 +354,6 @@ export type TypedGameMessage =
   | MapUpdateMessage
   | ConfrontationMessage
   | ErrorMessage
-  | VoiceSignalMessage
   | ImageMessage
   | AudioCueMessage
   | RenderQueuedMessage
@@ -418,10 +405,6 @@ export function isConfrontation(msg: TypedGameMessage): msg is ConfrontationMess
 
 export function isError(msg: TypedGameMessage): msg is ErrorMessage {
   return msg.type === MessageType.ERROR;
-}
-
-export function isVoiceSignal(msg: TypedGameMessage): msg is VoiceSignalMessage {
-  return msg.type === MessageType.VOICE_SIGNAL;
 }
 
 export function isImage(msg: TypedGameMessage): msg is ImageMessage {

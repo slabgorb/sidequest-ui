@@ -4,8 +4,6 @@ import type {
   TacticalGridData,
   TacticalThemeConfig,
   TacticalCell,
-  GridPos,
-  PlacedRoomData,
   DungeonLayoutData,
 } from "@/types/tactical";
 

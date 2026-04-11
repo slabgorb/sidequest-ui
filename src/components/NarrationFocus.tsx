@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import { renderSegment } from "./narrativeRenderers";
@@ -7,23 +7,24 @@ import { ThinkingIndicator } from "./NarrationShared";
 export interface NarrationFocusProps {
   messages: GameMessage[];
   thinking?: boolean;
-  setLightboxUrl?: (url: string | null) => void;
 }
 
-export function NarrationFocus({ messages, thinking, setLightboxUrl }: NarrationFocusProps) {
+export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
   const segments = useMemo(
     () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
     [messages],
   );
 
-  const [index, setIndex] = useState(0);
-
-  // Default to last segment when segments change
-  useEffect(() => {
+  // Reset cursor to the latest segment when the segment list grows.
+  // Derive-during-render pattern (no useEffect → setState → re-render).
+  const [lastSegmentCount, setLastSegmentCount] = useState(segments.length);
+  const [index, setIndex] = useState(Math.max(0, segments.length - 1));
+  if (segments.length !== lastSegmentCount) {
+    setLastSegmentCount(segments.length);
     if (segments.length > 0) {
       setIndex(segments.length - 1);
     }
-  }, [segments.length]);
+  }
 
   const isFirst = index <= 0;
   const isLast = index >= segments.length - 1;
@@ -33,7 +34,7 @@ export function NarrationFocus({ messages, thinking, setLightboxUrl }: Narration
       <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center px-6 py-8">
         {segments.length > 0 && (
           <div className="max-w-[85ch] w-full">
-            {renderSegment(segments[index], index, { maxTextWidth: "max-w-[85ch]", setLightboxUrl })}
+            {renderSegment(segments[index], index, { maxTextWidth: "max-w-[85ch]" })}
           </div>
         )}
       </div>

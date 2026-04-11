@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { NarrativeView } from "@/screens/NarrativeView";
 import { MessageType, type GameMessage } from "@/types/protocol";
@@ -100,8 +99,6 @@ describe("NarrativeView", () => {
 
   // -- user scroll up stops auto-scroll --------------------------------------
   it("stops auto-scrolling when user scrolls up", async () => {
-    const user = userEvent.setup();
-
     const messages = Array.from({ length: 20 }, (_, i) =>
       narration(`Paragraph ${i + 1}. `.repeat(5)),
     );

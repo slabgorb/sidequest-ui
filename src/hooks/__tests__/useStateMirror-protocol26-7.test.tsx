@@ -7,12 +7,11 @@
  * JOURNAL_REQUEST is client→server only (sent, not received), so it doesn't
  * need a useStateMirror handler — but we test the send path separately.
  */
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import {
   GameStateProvider,
   useGameState,
-  type ClientGameState,
 } from '../../providers/GameStateProvider';
 import { useStateMirror } from '../../hooks/useStateMirror';
 import { MessageType, type GameMessage } from '../../types/protocol';
