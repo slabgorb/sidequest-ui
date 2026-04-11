@@ -51,12 +51,18 @@ describe("useSlashCommands", () => {
     expect(out.messages).toEqual([]);
   });
 
-  it("/journal returns overlay trigger", () => {
+  // /journal slash command was removed playtest 2026-04-11 — the Handouts
+  // tab it toggled was removed from the right-panel tab strip. When the
+  // feature is revived this test should be restored alongside the case in
+  // useSlashCommands.ts.
+  it("/journal is now an unknown command (handled silently, no widget)", () => {
     const { result } = renderSlashCommands();
     const out = result.current.execute("/journal");
 
+    // Unknown slash commands are swallowed client-side (handled: true,
+    // empty messages, no widget) per the default branch of the switch.
     expect(out.handled).toBe(true);
-    expect(out.widget).toBe("journal");
+    expect(out.widget).toBeUndefined();
     expect(out.messages).toEqual([]);
   });
 

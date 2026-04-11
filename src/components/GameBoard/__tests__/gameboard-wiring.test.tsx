@@ -37,7 +37,7 @@ describe("GameBoard wiring", () => {
       "@/components/GameBoard/widgets/CharacterWidget",
       "@/components/GameBoard/widgets/MapWidget",
       "@/components/GameBoard/widgets/InventoryWidget",
-      "@/components/GameBoard/widgets/JournalWidget",
+      // JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts.
       "@/components/GameBoard/widgets/KnowledgeWidget",
       "@/components/GameBoard/widgets/ImageGalleryWidget",
       "@/components/GameBoard/widgets/ConfrontationWidget",
@@ -68,7 +68,8 @@ describe("GameBoard wiring", () => {
     // header section inside KnowledgeJournal).
     const requiredIds = [
       "narrative", "character", "inventory", "map",
-      "journal", "knowledge", "gallery",
+      // "journal" removed playtest 2026-04-11 — empty Handouts tab.
+      "knowledge", "gallery",
       "confrontation", "audio",
     ];
     for (const id of requiredIds) {

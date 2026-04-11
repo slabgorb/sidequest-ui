@@ -735,7 +735,6 @@ function AppInner() {
                 mapData={mapData}
                 audio={audio}
                 nowPlaying={nowPlaying}
-                journalEntries={gameState.journal}
                 knowledgeEntries={gameState.knowledge}
                 depletions={gameState.depletions}
                 resourceAlerts={gameState.resourceAlerts}
