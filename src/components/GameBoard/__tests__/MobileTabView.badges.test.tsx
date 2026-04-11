@@ -1,8 +1,8 @@
 /**
  * Story 33-11: Tab notification badges
  *
- * Failing tests (RED state) for inline dot badges on Knowledge / Gallery /
- * Map / Inventory tabs when their content updates while the tab is inactive.
+ * Tests for inline dot badges on Knowledge / Gallery / Map / Inventory tabs
+ * when their content updates while the tab is inactive.
  *
  * Contract:
  *   - MobileTabView accepts an optional `contentSignals` prop of shape
@@ -46,16 +46,25 @@ interface RenderArgs {
 }
 
 function renderTabView(args: RenderArgs = {}) {
-  const props = {
-    renderWidget: renderWidgetStub,
-    availableWidgets: args.availableWidgets ?? ALL_AVAILABLE,
-    // `contentSignals` is the new prop being introduced by this story.
-    // Cast allows the failing tests to compile before Dev adds the prop
-    // declaration on MobileTabViewProps. Remove the cast in GREEN.
-    ...(args.contentSignals !== undefined ? { contentSignals: args.contentSignals } : {}),
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return render(<MobileTabView {...(props as any)} />);
+  const result = render(
+    <MobileTabView
+      renderWidget={renderWidgetStub}
+      availableWidgets={args.availableWidgets ?? ALL_AVAILABLE}
+      contentSignals={args.contentSignals}
+    />,
+  );
+  const rerenderWith = (
+    contentSignals: Partial<Record<WidgetId, number>>,
+    availableWidgets: Set<WidgetId> = args.availableWidgets ?? ALL_AVAILABLE,
+  ) =>
+    result.rerender(
+      <MobileTabView
+        renderWidget={renderWidgetStub}
+        availableWidgets={availableWidgets}
+        contentSignals={contentSignals}
+      />,
+    );
+  return { ...result, rerenderWith };
 }
 
 /**
@@ -68,18 +77,15 @@ function queryBadge(id: WidgetId): HTMLElement | null {
 
 /**
  * Find the clickable tab button for a given tab id.
- * Each button corresponds to one entry in the TABS list; we identify it
- * by the label text that's visible inside the button.
  */
 function getTabButton(label: string): HTMLElement {
   return screen.getByRole("tab", { name: new RegExp(label, "i") });
 }
 
 // ─────────────────────────────────────────────────────────────
-// AC-1: No badges initially
-// ─────────────────────────────────────────────────────────────
 
 describe("MobileTabView — tab notification badges (Story 33-11)", () => {
+  // AC-1: No badges initially
   it("renders no badges on first mount when no contentSignals provided", () => {
     renderTabView();
     expect(queryBadge("knowledge")).toBeNull();
@@ -100,97 +106,46 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
     expect(queryBadge("inventory")).toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-2: Badge appears on Knowledge tab when `world_learned` arrives
-  // ─────────────────────────────────────────────────────────────
-
   it("renders Knowledge badge when knowledge signal increments while tab inactive", () => {
-    const { rerender } = renderTabView({
-      contentSignals: { knowledge: 0 },
-    });
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
     expect(queryBadge("knowledge")).toBeNull();
 
     // Simulate a new world_learned event: parent bumps the signal.
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1 } } as any)}
-      />
-    );
+    rerenderWith({ knowledge: 1 });
 
     expect(queryBadge("knowledge")).not.toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-3: Badge appears on Gallery tab when scene images arrive
-  // ─────────────────────────────────────────────────────────────
-
   it("renders Gallery badge when gallery signal increments while tab inactive", () => {
-    const { rerender } = renderTabView({
-      contentSignals: { gallery: 0 },
-    });
+    const { rerenderWith } = renderTabView({ contentSignals: { gallery: 0 } });
     expect(queryBadge("gallery")).toBeNull();
 
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { gallery: 1 } } as any)}
-      />
-    );
+    rerenderWith({ gallery: 1 });
 
     expect(queryBadge("gallery")).not.toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-4: Secondary targets — Map and Inventory
-  // ─────────────────────────────────────────────────────────────
-
   it("renders Map badge when map signal increments", () => {
-    const { rerender } = renderTabView({ contentSignals: { map: 0 } });
+    const { rerenderWith } = renderTabView({ contentSignals: { map: 0 } });
     expect(queryBadge("map")).toBeNull();
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { map: 1 } } as any)}
-      />
-    );
+    rerenderWith({ map: 1 });
     expect(queryBadge("map")).not.toBeNull();
   });
 
   it("renders Inventory badge when inventory signal increments", () => {
-    const { rerender } = renderTabView({ contentSignals: { inventory: 0 } });
+    const { rerenderWith } = renderTabView({ contentSignals: { inventory: 0 } });
     expect(queryBadge("inventory")).toBeNull();
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { inventory: 1 } } as any)}
-      />
-    );
+    rerenderWith({ inventory: 1 });
     expect(queryBadge("inventory")).not.toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-5: Badge clears when the user clicks that tab
-  // ─────────────────────────────────────────────────────────────
-
   it("clears Knowledge badge immediately when the Knowledge tab is clicked", () => {
-    const { rerender } = renderTabView({ contentSignals: { knowledge: 0 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
+    rerenderWith({ knowledge: 1 });
     expect(queryBadge("knowledge")).not.toBeNull();
 
     fireEvent.click(getTabButton("Journal")); // Knowledge tab label in TABS is "Journal"
@@ -198,60 +153,33 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
   });
 
   it("clears Gallery badge immediately when the Gallery tab is clicked", () => {
-    const { rerender } = renderTabView({ contentSignals: { gallery: 0 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { gallery: 1 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { gallery: 0 } });
+    rerenderWith({ gallery: 1 });
     expect(queryBadge("gallery")).not.toBeNull();
 
     fireEvent.click(getTabButton("Gallery"));
     expect(queryBadge("gallery")).toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-6: Active tab never gets a badge — "updated since last time that
   // tab was active" means the currently-active tab has, by definition,
   // already been seen.
-  // ─────────────────────────────────────────────────────────────
-
   it("does NOT badge the currently active tab when its signal changes", () => {
     // Narrative is the default active tab on mount. Click Knowledge to make
     // it active, then bump the knowledge signal — the badge should NOT
     // appear because the user is already looking at it.
-    const { rerender } = renderTabView({ contentSignals: { knowledge: 0 } });
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
     fireEvent.click(getTabButton("Journal")); // switch to Knowledge tab
 
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1 } } as any)}
-      />
-    );
+    rerenderWith({ knowledge: 1 });
 
     expect(queryBadge("knowledge")).toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-7: Excluded tabs — Character and Audio never badge
-  // ─────────────────────────────────────────────────────────────
-
   it("never renders a badge on the Character tab, even if signalled", () => {
-    const { rerender } = renderTabView({ contentSignals: { character: 0 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { character: 1 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { character: 0 } });
+    rerenderWith({ character: 1 });
     expect(queryBadge("character")).toBeNull();
   });
 
@@ -260,36 +188,19 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
     // excludes it — this test guards against future regressions if Audio
     // gets added back to mobile.
     const withAudio = new Set<WidgetId>([...ALL_AVAILABLE, "audio"]);
-    const { rerender } = renderTabView({
+    const { rerenderWith } = renderTabView({
       availableWidgets: withAudio,
       contentSignals: { audio: 0 },
     });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={withAudio}
-        {...({ contentSignals: { audio: 1 } } as any)}
-      />
-    );
+    rerenderWith({ audio: 1 }, withAudio);
     expect(queryBadge("audio")).toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-8: Badge is rendered INLINE after the label text, not absolutely
   // positioned — AC explicitly calls this out to avoid clipping.
-  // ─────────────────────────────────────────────────────────────
-
   it("renders the badge inline (no 'absolute' positioning class)", () => {
-    const { rerender } = renderTabView({ contentSignals: { knowledge: 0 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
+    rerenderWith({ knowledge: 1 });
     const badge = queryBadge("knowledge");
     expect(badge).not.toBeNull();
     // Guard: the AC calls out that absolute positioning clips against the
@@ -299,15 +210,8 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
   });
 
   it("renders the badge as a descendant of the tab button (sibling of the label)", () => {
-    const { rerender } = renderTabView({ contentSignals: { knowledge: 0 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
+    rerenderWith({ knowledge: 1 });
     const badge = queryBadge("knowledge");
     expect(badge).not.toBeNull();
     // The badge must live inside the button that contains the "Journal"
@@ -317,52 +221,25 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
     expect(button.contains(badge)).toBe(true);
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-9: Badge stays when unrelated tabs' signals change
-  // ─────────────────────────────────────────────────────────────
-
   it("leaves existing Knowledge badge intact when a different tab's signal changes", () => {
-    const { rerender } = renderTabView({
+    const { rerenderWith } = renderTabView({
       contentSignals: { knowledge: 0, gallery: 0 },
     });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1, gallery: 0 } } as any)}
-      />
-    );
+    rerenderWith({ knowledge: 1, gallery: 0 });
     expect(queryBadge("knowledge")).not.toBeNull();
     expect(queryBadge("gallery")).toBeNull();
 
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 1, gallery: 1 } } as any)}
-      />
-    );
+    rerenderWith({ knowledge: 1, gallery: 1 });
     expect(queryBadge("knowledge")).not.toBeNull();
     expect(queryBadge("gallery")).not.toBeNull();
   });
 
-  // ─────────────────────────────────────────────────────────────
   // AC-10: Signal re-render with same value does not create a badge
   // (re-renders should not be mistaken for content updates).
-  // ─────────────────────────────────────────────────────────────
-
   it("does not create a badge when rerendered with the same signal value", () => {
-    const { rerender } = renderTabView({ contentSignals: { knowledge: 5 } });
-    rerender(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <MobileTabView
-        renderWidget={renderWidgetStub}
-        availableWidgets={ALL_AVAILABLE}
-        {...({ contentSignals: { knowledge: 5 } } as any)}
-      />
-    );
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 5 } });
+    rerenderWith({ knowledge: 5 });
     expect(queryBadge("knowledge")).toBeNull();
   });
 });
@@ -379,7 +256,7 @@ describe("MobileTabView — contentSignals prop contract (Story 33-11 wiring)", 
 
   it("MobileTabViewProps declares a `contentSignals` field", async () => {
     // Source-level guard: the prop must be declared on the interface so
-    // GameBoard can pass it without `as any` once wired.
+    // GameBoard can pass it without casts.
     const src = (await import("@/components/GameBoard/MobileTabView?raw")) as unknown as {
       default: string;
     };
