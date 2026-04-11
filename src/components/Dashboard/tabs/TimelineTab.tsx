@@ -65,7 +65,7 @@ export function TimelineTab({ turns, selectedTurn, onSelectTurn }: Props) {
                     }}
                   >
                     <span>
-                      #{f.turn_id || i + 1} {agent} {dur}s
+                      #{f.turn_id ?? i + 1} {agent} {dur}s
                     </span>
                     {f.is_degraded && (
                       <span style={badgeStyle(THEME.red)}>DEGRADED</span>
@@ -86,7 +86,7 @@ export function TimelineTab({ turns, selectedTurn, onSelectTurn }: Props) {
         <Card
           title={
             fields
-              ? `Turn ${fields.turn_id || "?"} · ${fields.classified_intent || "?"} → ${fields.agent_name || "?"} · ${(totalMs / 1000).toFixed(1)}s`
+              ? `Turn ${fields.turn_id ?? "?"} · ${fields.classified_intent ?? "?"} → ${fields.agent_name ?? "?"} · ${(totalMs / 1000).toFixed(1)}s`
               : "Select a turn"
           }
         >

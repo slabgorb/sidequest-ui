@@ -472,6 +472,12 @@ function AppInner() {
       setMessages((prev) => [...prev, msg]);
       send(msg);
       setCanType(false); // Sealed — wait for narration before typing again
+      // Optimistic thinking indicator: show the three-dinkus pulse + themed
+      // placeholder immediately on submit instead of waiting for the server's
+      // THINKING message. The server will confirm via its own setThinking(true)
+      // at line 201; setting it here just eliminates the blank-input-between-
+      // submit-and-server-ack gap that made submits feel like they no-oped.
+      setThinking(true);
     },
     [send, executeSlashCommand, toggleWidget],
   );
