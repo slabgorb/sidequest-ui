@@ -21,7 +21,7 @@ import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
-import type { ConfrontationData } from "@/components/ConfrontationOverlay";
+import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 
 const LazyDashboard = lazy(() =>
@@ -482,6 +482,40 @@ function AppInner() {
     [send, executeSlashCommand, toggleWidget],
   );
 
+  // Parley / confrontation beat dispatch. When the player clicks a structured
+  // beat button (Make Your Case / Threaten / etc.), we look up the beat in the
+  // current ConfrontationData and translate it into a natural-language
+  // PLAYER_ACTION. The server's narrator sees the beat list in its prompt and
+  // dispatch/beat.rs does label-match fallback, so "<label> (<stat_check>)"
+  // routes through dispatch_beat_selection() reliably.
+  //
+  // This closes the wiring gap that caused playtest 2026-04-11 to report
+  // "buttons enter active state but no WebSocket frame fires" — prior to this
+  // handler, onBeatSelect was undefined all the way down to BeatActions, so
+  // the button's onClick was a silent no-op.
+  const handleBeatSelect = useCallback(
+    (beatId: string) => {
+      if (!confrontationData) {
+        console.warn(
+          `[beat-dispatch] onBeatSelect fired for "${beatId}" but no active confrontationData — ignoring.`,
+        );
+        return;
+      }
+      const beat: BeatOption | undefined = confrontationData.beats.find(
+        (b) => b.id === beatId,
+      );
+      if (!beat) {
+        console.warn(
+          `[beat-dispatch] beat id "${beatId}" not found in active confrontation (${confrontationData.label}).`,
+        );
+        return;
+      }
+      const actionText = `${beat.label} (${beat.stat_check})`;
+      handleSend(actionText, false);
+    },
+    [confrontationData, handleSend],
+  );
+
   const handleRequestJournal = useCallback(
     (category?: string) => {
       send({
@@ -679,6 +713,7 @@ function AppInner() {
                 resourceAlerts={gameState.resourceAlerts}
                 onRequestJournal={handleRequestJournal}
                 confrontationData={confrontationData}
+                onBeatSelect={handleBeatSelect}
                 currentPlayerId={currentPlayerId ?? undefined}
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
