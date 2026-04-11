@@ -20,6 +20,7 @@ import "@/styles/dockview-theme.css";
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 import InputBar from "@/components/InputBar";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
+import { useImageBus } from "@/providers/ImageBusProvider";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
 import { useGameBoardHotkeys } from "@/hooks/useGameBoardHotkeys";
 import { TurnStatusPanel, type TurnStatusEntry } from "@/components/TurnStatusPanel";
@@ -259,6 +260,24 @@ export function GameBoard({
 
   const { chapterTitle } = useRunningHeader(messages);
 
+  // Story 33-11: content signals drive the mobile tab notification badges.
+  // Each entry is a monotonic counter for a tab's visible content — when
+  // the value rises while that tab is inactive, MobileTabView flashes a
+  // dot badge. `inventory` uses a composite scalar so either items-count
+  // or gold changes are picked up as a single delta.
+  const galleryImages = useImageBus();
+  const contentSignals = useMemo<Partial<Record<WidgetId, number>>>(
+    () => ({
+      knowledge: knowledgeEntries?.length ?? 0,
+      gallery: galleryImages.length,
+      map: mapData?.explored?.length ?? 0,
+      inventory: inventoryData
+        ? inventoryData.items.length * 10000 + inventoryData.gold
+        : 0,
+    }),
+    [knowledgeEntries, galleryImages, mapData, inventoryData],
+  );
+
   // Render a widget by ID. Character/inventory/map data is guaranteed
   // present via PARTY_STATUS (collapsed CHARACTER_SHEET / INVENTORY model),
   // so the null branches below exist only for the brief window between
@@ -462,6 +481,7 @@ export function GameBoard({
       <MobileTabView
         renderWidget={renderWidgetContent}
         availableWidgets={availableWidgets}
+        contentSignals={contentSignals}
       >
         {inputBar}
       </MobileTabView>
