@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { buildSegments, groupPortraitSegments } from "@/lib/narrativeSegments";
+import { buildSegments, buildTurnPages } from "@/lib/narrativeSegments";
 import type { GameMessage } from "@/types/protocol";
 import { renderSegment } from "./narrativeRenderers";
 import { ThinkingIndicator } from "./NarrationShared";
@@ -9,32 +9,47 @@ export interface NarrationFocusProps {
   thinking?: boolean;
 }
 
+/**
+ * Focus mode: one TURN PAGE at a time, not one segment at a time.
+ *
+ * A turn page collects the player's action (if any) plus every narrator
+ * paragraph and side-effect that followed, until the next player action.
+ * See `buildTurnPages` in lib/narrativeSegments.ts for the grouping rule.
+ *
+ * Playtest 2026-04-11 fix: previously each segment (single paragraph, single
+ * gallery notice, raw player action text) was its own page — so the player
+ * read one sentence at a time and typically landed on a side-effect toast.
+ */
 export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
-  const segments = useMemo(
-    () => groupPortraitSegments(buildSegments(messages)).filter((s) => s.kind !== "separator"),
+  const pages = useMemo(
+    () => buildTurnPages(buildSegments(messages)),
     [messages],
   );
 
-  // Reset cursor to the latest segment when the segment list grows.
+  // Reset cursor to the newest page when the page list grows.
   // Derive-during-render pattern (no useEffect → setState → re-render).
-  const [lastSegmentCount, setLastSegmentCount] = useState(segments.length);
-  const [index, setIndex] = useState(Math.max(0, segments.length - 1));
-  if (segments.length !== lastSegmentCount) {
-    setLastSegmentCount(segments.length);
-    if (segments.length > 0) {
-      setIndex(segments.length - 1);
+  const [lastPageCount, setLastPageCount] = useState(pages.length);
+  const [index, setIndex] = useState(Math.max(0, pages.length - 1));
+  if (pages.length !== lastPageCount) {
+    setLastPageCount(pages.length);
+    if (pages.length > 0) {
+      setIndex(pages.length - 1);
     }
   }
 
+  const hasPages = pages.length > 0;
   const isFirst = index <= 0;
-  const isLast = index >= segments.length - 1;
+  const isLast = index >= pages.length - 1;
+  const currentPage = hasPages ? pages[Math.min(index, pages.length - 1)] : [];
 
   return (
     <div data-testid="narration-focus" className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center px-6 py-8">
-        {segments.length > 0 && (
-          <div className="max-w-[85ch] w-full">
-            {renderSegment(segments[index], index, { maxTextWidth: "max-w-[85ch]" })}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-8">
+        {currentPage.length > 0 && (
+          <div className="max-w-[85ch] w-full mx-auto">
+            {currentPage.map((seg, i) =>
+              renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
+            )}
           </div>
         )}
       </div>
@@ -51,10 +66,10 @@ export function NarrationFocus({ messages, thinking }: NarrationFocusProps) {
           ← Prev
         </button>
         <span className="text-xs text-muted-foreground/50">
-          {segments.length > 0 ? `${index + 1} / ${segments.length}` : "—"}
+          {hasPages ? `${index + 1} / ${pages.length}` : "—"}
         </span>
         <button
-          onClick={() => setIndex((i) => Math.min(segments.length - 1, i + 1))}
+          onClick={() => setIndex((i) => Math.min(pages.length - 1, i + 1))}
           disabled={isLast}
           aria-label="Next"
           className="px-3 py-1.5 text-sm rounded border border-border/50 hover:bg-muted/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
