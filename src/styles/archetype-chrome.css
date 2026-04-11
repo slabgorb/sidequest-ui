@@ -44,6 +44,50 @@
   background: linear-gradient(to top, var(--surface), transparent);
 }
 
+/* Parchment widgets — primary-tinted drop shadow, L-shaped corner flourishes
+   at top-left / bottom-right, primary-into-surface gradient header. */
+[data-archetype="parchment"] [data-widget] {
+  position: relative;
+  border-width: 1px;
+  box-shadow:
+    0 2px 8px color-mix(in srgb, var(--primary) 15%, transparent),
+    0 1px 2px color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+[data-archetype="parchment"] [data-widget] .widget-drag-handle {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--primary) 8%, var(--surface)),
+    var(--surface)
+  );
+  font-family: var(--font-ui);
+}
+
+[data-archetype="parchment"] [data-widget]::before,
+[data-archetype="parchment"] [data-widget]::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  border-color: var(--primary);
+  opacity: 0.5;
+}
+
+[data-archetype="parchment"] [data-widget]::before {
+  top: 2px;
+  left: 2px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+[data-archetype="parchment"] [data-widget]::after {
+  bottom: 2px;
+  right: 2px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
 /* ── Terminal ──────────────────────────────────────────────────────────────
    CRT/hacker aesthetic — scanline overlay, neon glow, monospace headers,
    hard borders, glow effects on accent text.
@@ -99,6 +143,42 @@
   background: var(--surface);
 }
 
+/* Terminal widgets — accent-colored border with outer + inset accent glow
+   box-shadow, full-widget scanline ::after overlay, background-dominant
+   (70% background / 30% surface) header with uppercase letter-spaced title. */
+[data-archetype="terminal"] [data-widget] {
+  position: relative;
+  border-width: 1px;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--accent) 40%, transparent),
+    inset 0 0 6px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+[data-archetype="terminal"] [data-widget] .widget-drag-handle {
+  background: color-mix(in srgb, var(--background) 70%, var(--surface));
+  border-bottom-color: var(--accent);
+  font-family: var(--font-ui);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-shadow: 0 0 6px var(--glow-primary);
+}
+
+[data-archetype="terminal"] [data-widget]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    color-mix(in srgb, var(--accent) 4%, transparent) 2px,
+    color-mix(in srgb, var(--accent) 4%, transparent) 3px
+  );
+  z-index: 1;
+}
+
 /* ── Rugged ────────────────────────────────────────────────────────────────
    Industrial/post-apocalyptic — dusty vignette, heavy 2px borders,
    condensed uppercase headers, muted surface backgrounds.
@@ -145,4 +225,50 @@
 [data-archetype="rugged"] .history-section {
   opacity: 0.4;
   border-bottom: 2px solid var(--border);
+}
+
+/* Rugged widgets — 3px solid border with inset bevel, accent-tinted surface header,
+   L-shaped accent brackets at inner top-left and bottom-right corners drawn inside
+   the border box so they survive the parent's overflow:hidden clip. */
+[data-archetype="rugged"] [data-widget] {
+  position: relative;
+  border-width: 3px;
+  border-style: solid;
+  border-color: var(--border);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--background) 50%, transparent),
+    0 3px 6px color-mix(in srgb, var(--background) 60%, transparent);
+}
+
+[data-archetype="rugged"] [data-widget] .widget-drag-handle {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-bottom: 2px solid var(--border);
+  font-family: var(--font-ui);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[data-archetype="rugged"] [data-widget]::before,
+[data-archetype="rugged"] [data-widget]::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  border-color: var(--accent);
+  z-index: 2;
+}
+
+[data-archetype="rugged"] [data-widget]::before {
+  top: 0;
+  left: 0;
+  border-top: 3px solid;
+  border-left: 3px solid;
+}
+
+[data-archetype="rugged"] [data-widget]::after {
+  bottom: 0;
+  right: 0;
+  border-bottom: 3px solid;
+  border-right: 3px solid;
 }
