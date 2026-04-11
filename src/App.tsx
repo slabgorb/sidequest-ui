@@ -588,18 +588,46 @@ function AppInner() {
     handleConnect(saved.playerName, saved.genre, saved.world);
   }, [handleConnect]);
 
-  // WebSocket reconnect handler: when the socket transitions to OPEN after
-  // being previously connected, clear stale state and re-handshake.
-  // Without this, `thinking` gets stuck true after a server crash (the server
-  // never sent the narration response that would clear it), and the connect
-  // handshake is never re-sent so the server stays in AwaitingConnect.
+  // WebSocket OPEN transitions — two separate concerns, split into two effects
+  // so the cleanup path doesn't depend on App-level `connected` state.
+  //
+  // Playtest 2026-04-11: this used to be a single effect gated on
+  // `readyState === OPEN && wasDisconnected && connected`. The `&& connected`
+  // guard is a foot-gun on the initial page-reload path: when the WebSocket
+  // first transitions to OPEN, App's `connected` state is still `false`
+  // (handleConnect hasn't completed yet). The effect's guard fails. By the
+  // time `connected` flips to true, `prevReadyState.current` has already been
+  // set to OPEN, so `wasDisconnected` is now false and the effect fails the
+  // guard a second time. Net result: on a server-restart + page-reload cycle,
+  // the cleanup never runs, and any state that gets stuck during restoration
+  // (canType=false, thinking=true) stays stuck until the user leaves the
+  // session. See ping-pong playtest 2026-04-11 "InputBar stuck disabled".
   const prevReadyState = useRef(readyState);
+
+  // (1) Defensive state reset — fires on ANY OPEN transition regardless of
+  // whether we were "already connected" in App state. Clearing `canType` to
+  // `true` and `thinking` to `false` is always safe here: the only path that
+  // sets them to "busy" is `handleSend`, which the user cannot call while the
+  // input is disabled. Over-firing is intentional — stuck state is the bug,
+  // clearing redundantly is not.
+  useEffect(() => {
+    if (readyState === WebSocket.OPEN && prevReadyState.current !== WebSocket.OPEN) {
+      setThinking(false);
+      setCanType(true);
+    }
+  }, [readyState]);
+
+  // (2) Re-handshake on reconnect — keeps the original conservative gate.
+  // Only re-sends the SESSION_EVENT "connect" payload when the app was
+  // previously `connected` (i.e. this is a genuine mid-session reconnect,
+  // not the first page-load handshake, which is already handled by
+  // `handleConnect` via the autoReconnect effect above). The ref-flip has
+  // to happen in this effect — effect (1) only reads `prevReadyState.current`
+  // and leaves it untouched so effect (2) can still observe the transition.
   useEffect(() => {
     const wasDisconnected = prevReadyState.current !== WebSocket.OPEN;
     prevReadyState.current = readyState;
     if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
-      setThinking(false);
-      setCanType(true);
       const saved = loadSession();
       if (saved) {
         send({
