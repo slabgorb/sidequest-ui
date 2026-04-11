@@ -272,3 +272,57 @@ describe("Wiring: ConfrontationOverlay in GameBoard", () => {
     expect(typeof mod.ConfrontationOverlay).toBe("function");
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Production wiring test — verify App.tsx actually hands an onBeatSelect
+// handler to <GameBoard>. The component-level tests above pass vi.fn() and
+// only prove the callback plumbing inside GameBoard; they cannot catch the
+// failure mode that shipped in playtest 2026-04-11: <GameBoard> instantiated
+// with no onBeatSelect prop at all, so clicks were silent no-ops in production.
+//
+// This test reads App.tsx as source and asserts the wire-up is present.
+// Follows the grep-style wiring-check convention used in sidequest-api tests
+// (see npc_turns_beat_system_story_28_8_tests.rs:23).
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("Wiring: App.tsx → GameBoard onBeatSelect handler", () => {
+  it("App.tsx declares a handleBeatSelect callback", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const appSrc = fs.readFileSync(
+      path.resolve(__dirname, "../App.tsx"),
+      "utf-8",
+    );
+    expect(appSrc).toMatch(/const handleBeatSelect\s*=\s*useCallback/);
+  });
+
+  it("App.tsx passes onBeatSelect={handleBeatSelect} to <GameBoard>", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const appSrc = fs.readFileSync(
+      path.resolve(__dirname, "../App.tsx"),
+      "utf-8",
+    );
+    // The <GameBoard .../> block must contain onBeatSelect={handleBeatSelect}.
+    // Without this, confrontation buttons are silent no-ops in production.
+    const gameBoardBlock = appSrc.match(/<GameBoard[\s\S]*?\/>/);
+    expect(gameBoardBlock).not.toBeNull();
+    expect(gameBoardBlock?.[0]).toContain("onBeatSelect={handleBeatSelect}");
+  });
+
+  it("handleBeatSelect routes beat clicks through handleSend (PLAYER_ACTION path)", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const appSrc = fs.readFileSync(
+      path.resolve(__dirname, "../App.tsx"),
+      "utf-8",
+    );
+    // The handler must actually call handleSend — otherwise the button click
+    // is still a no-op even with the prop wired.
+    const handlerBlock = appSrc.match(
+      /const handleBeatSelect\s*=\s*useCallback[\s\S]*?\[confrontationData,\s*handleSend\],?\s*\)/,
+    );
+    expect(handlerBlock).not.toBeNull();
+    expect(handlerBlock?.[0]).toContain("handleSend(");
+  });
+});
