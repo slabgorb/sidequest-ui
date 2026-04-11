@@ -29,7 +29,7 @@ import type { ResourceThreshold } from "@/components/GenericResourceBar";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
+import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
@@ -483,25 +483,25 @@ export function GameBoard({
     }
   }, [availableWidgets]);
 
-  // Confrontation overlay — renders as a modal on top of whichever layout
-  // branch is active (mobile tab view OR desktop dockview). It's a narrative
-  // event, not a persistent panel, so it lives outside the panel system.
-  const confrontationOverlay = confrontationData ? (
-    <ConfrontationOverlay data={confrontationData} onBeatSelect={onBeatSelect} />
-  ) : null;
+  // Confrontation rendering is handled entirely by the dockview
+  // `ConfrontationWidget` tab (see `renderWidgetContent("confrontation")`
+  // and the auto-show effect above). The old bottom-docked
+  // `<ConfrontationOverlay/>` was a book-era artifact retained after the
+  // UI redesign that moved confrontations into the persistent sidebar —
+  // it double-rendered the same data AND its `fixed inset-x-0 bottom-0`
+  // positioning overlapped the InputBar, absorbing all input and blocking
+  // every action. Removed outright. The tab auto-opens on
+  // `confrontationData` arrival and auto-closes when it clears.
 
   // Mobile fallback
   if (isMobile) {
     return (
-      <>
-        <MobileTabView
-          renderWidget={renderWidgetContent}
-          availableWidgets={availableWidgets}
-        >
-          {inputBar}
-        </MobileTabView>
-        {confrontationOverlay}
-      </>
+      <MobileTabView
+        renderWidget={renderWidgetContent}
+        availableWidgets={availableWidgets}
+      >
+        {inputBar}
+      </MobileTabView>
     );
   }
 
@@ -586,9 +586,6 @@ export function GameBoard({
       <div className="input-area border-t border-border/50 px-4 py-4 bg-card/50 shrink-0 max-w-5xl mx-auto w-full">
         {inputBar}
       </div>
-
-      {/* Confrontation overlay — modal on top of the workspace when active. */}
-      {confrontationOverlay}
     </div>
     </GameBoardRenderContext.Provider>
   );
