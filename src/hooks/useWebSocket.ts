@@ -106,7 +106,27 @@ export function useWebSocket<T>({
     return current;
   }, [backoff, maxBackoffMs]);
 
+  // Detach a WebSocket's event handlers cleanly. Used before close() on the
+  // teardown path (cleanup + replacement) so that async `onclose` events
+  // fired by the browser AFTER teardown cannot re-enter React state or
+  // trigger the reconnect timer. This is the fix for the playtest 2026-04-11
+  // "OTEL dashboard 2x-4x ingest" bug — see the effect cleanup below and
+  // the comment on `intentionalCloseRef` for the full race analysis.
+  const detachHandlers = (ws: WebSocket | null) => {
+    if (!ws) return;
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onerror = null;
+    ws.onclose = null;
+  };
+
   const createSocket = useCallback(() => {
+    // Tear down any previous socket before replacing the ref. Without this,
+    // the old socket's onclose handler could fire after it's been orphaned
+    // and still call setReadyState / schedule a reconnect, leaking a ghost
+    // connection.
+    detachHandlers(wsRef.current);
+
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -171,7 +191,28 @@ export function useWebSocket<T>({
     }
   }, []);
 
-  // Auto-connect on mount + cleanup on unmount
+  // Auto-connect on mount + cleanup on unmount.
+  //
+  // Playtest 2026-04-11 fix: the cleanup path used to set
+  // `intentionalCloseRef.current = true` and call `wsRef.current?.close()`,
+  // relying on the ref flag to suppress reconnection in the async onclose
+  // handler. In React 18 StrictMode this is a race: the dev-mode double-
+  // mount runs effect → cleanup → effect in rapid succession, and the
+  // re-running effect flips the flag back to `false` BEFORE the browser
+  // actually fires `onclose` on the torn-down socket. When onclose finally
+  // fires, it sees `intentionalCloseRef.current === false` and schedules a
+  // reconnect → a ghost WS3 appears alongside the StrictMode-remounted WS2.
+  // Both sockets receive the server's history replay on connect (from
+  // `watcher.rs::get_watcher_history`) and both pipe events into the
+  // dashboard reducer → every span appears 2×. After an API restart both
+  // ghosts reconnect, compounding to 4×.
+  //
+  // The fix is to detach handlers (`ws.onclose = null`, etc.) BEFORE
+  // calling close() on the teardown path. Null handlers are unconditionally
+  // safe: any async close event from the browser is a no-op, regardless of
+  // ref-flag state. The `intentionalCloseRef` flag is still useful for the
+  // `disconnect()` path where we don't null handlers (to preserve the
+  // setReadyState call), so we keep it set here as well for safety.
   useEffect(() => {
     if (autoConnect) {
       intentionalCloseRef.current = false;
@@ -181,7 +222,11 @@ export function useWebSocket<T>({
     return () => {
       intentionalCloseRef.current = true;
       clearReconnectTimer();
-      wsRef.current?.close();
+      const ws = wsRef.current;
+      if (ws) {
+        detachHandlers(ws);
+        ws.close();
+      }
     };
   }, [url, autoConnect, createSocket, clearReconnectTimer]);
 
