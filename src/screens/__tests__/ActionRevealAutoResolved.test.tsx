@@ -13,7 +13,7 @@
  *   - Notification text describes who was auto-resolved
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { NarrativeView } from '@/screens/NarrativeView';
 import { MessageType, type GameMessage } from '@/types/protocol';

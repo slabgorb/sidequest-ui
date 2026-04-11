@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   installWebAudioMock,
   installLocalStorageMock,
-  createMockAudioBuffer,
   type MockAudioContext,
 } from "./web-audio-mock";
 
@@ -64,7 +63,6 @@ describe("AudioEngine", () => {
       engine.setVolume("music", 0.5);
       expect(engine.getVolume("music")).toBe(0.5);
       expect(engine.getVolume("sfx")).toBe(1.0);
-      expect(engine.getVolume("voice")).toBe(1.0);
       engine.dispose();
     });
 
@@ -72,14 +70,6 @@ describe("AudioEngine", () => {
       const engine = new AudioEngine();
       engine.setVolume("sfx", 0.3);
       expect(engine.getVolume("sfx")).toBe(0.3);
-      expect(engine.getVolume("music")).toBe(1.0);
-      engine.dispose();
-    });
-
-    it("setVolume sets voice channel independently", () => {
-      const engine = new AudioEngine();
-      engine.setVolume("voice", 0.7);
-      expect(engine.getVolume("voice")).toBe(0.7);
       expect(engine.getVolume("music")).toBe(1.0);
       engine.dispose();
     });
@@ -148,13 +138,12 @@ describe("AudioEngine", () => {
       // Pre-populate localStorage
       localStorage.setItem(
         "sidequest_audio_volumes",
-        JSON.stringify({ music: 0.4, sfx: 0.7, voice: 0.9, master: 0.8 }),
+        JSON.stringify({ music: 0.4, sfx: 0.7, master: 0.8 }),
       );
 
       const engine = new AudioEngine();
       expect(engine.getVolume("music")).toBe(0.4);
       expect(engine.getVolume("sfx")).toBe(0.7);
-      expect(engine.getVolume("voice")).toBe(0.9);
       expect(engine.getVolume("master")).toBe(0.8);
       engine.dispose();
     });
@@ -163,7 +152,6 @@ describe("AudioEngine", () => {
       const engine = new AudioEngine();
       expect(engine.getVolume("music")).toBe(1.0);
       expect(engine.getVolume("sfx")).toBe(1.0);
-      expect(engine.getVolume("voice")).toBe(1.0);
       expect(engine.getVolume("master")).toBe(1.0);
       engine.dispose();
     });
@@ -217,44 +205,6 @@ describe("AudioEngine", () => {
       // Should ramp to 0
       const rampToZero = rampCalls.some(([value]: [number]) => value === 0);
       expect(rampToZero).toBe(true);
-      engine.dispose();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // AC-3: Voice playback ducks music (integration)
-  // -----------------------------------------------------------------------
-
-  describe("AC-3: Voice playback with ducking", () => {
-    it("playVoice() ducks music gain during playback", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      await engine.playMusic("http://example.com/bg.mp3");
-
-      const voiceData = new ArrayBuffer(1024);
-      await engine.playVoice(voiceData);
-
-      // Music gain should have been ramped down to duck level (0.3)
-      const musicGainRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
-      );
-      const ducked = musicGainRamps.some(
-        ([value]: [number]) => Math.abs(value - 0.3) < 0.01,
-      );
-      expect(ducked).toBe(true);
-      engine.dispose();
-    });
-
-    it("playVoice() creates source node for voice channel", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-
-      const voiceData = new ArrayBuffer(1024);
-      await engine.playVoice(voiceData);
-
-      // Should have decoded audio data and created a source
-      expect(ctx.decodeAudioData).toHaveBeenCalled();
-      expect(ctx._sourceNodes.length).toBeGreaterThanOrEqual(1);
       engine.dispose();
     });
   });
@@ -330,10 +280,11 @@ describe("AudioEngine", () => {
   // -----------------------------------------------------------------------
 
   describe("Audio graph topology", () => {
-    it("creates 3 channel gain nodes plus master", () => {
+    it("creates 2 channel gain nodes plus master", () => {
       const engine = new AudioEngine();
-      // Should have: music, sfx, voice, master = at least 4 gain nodes
-      expect(ctx._gainNodes.length).toBeGreaterThanOrEqual(4);
+      // Should have: music, sfx, master = at least 3 gain nodes
+      // (voice channel removed with TTS)
+      expect(ctx._gainNodes.length).toBeGreaterThanOrEqual(3);
       engine.dispose();
     });
 
@@ -385,14 +336,6 @@ describe("AudioEngine", () => {
       engine.dispose();
     });
 
-    it("playVoice() returns a Promise", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      const result = engine.playVoice(new ArrayBuffer(512));
-      expect(result).toBeInstanceOf(Promise);
-      engine.dispose();
-    });
-
     it("playSfx() returns a Promise", async () => {
       const engine = new AudioEngine();
       await engine.resume();
@@ -402,61 +345,4 @@ describe("AudioEngine", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // AC-7: onStart callback for TTS text synchronization
-  // -----------------------------------------------------------------------
-
-  describe("AC-7: Voice playback onStart callback", () => {
-    it("playVoice() fires onStart callback before audio source starts", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-      const callOrder: string[] = [];
-
-      const onStart = vi.fn(() => callOrder.push("onStart"));
-
-      // Mock source.start to track ordering
-      const origCreateBuffer = ctx.createBufferSource;
-      ctx.createBufferSource = vi.fn(() => {
-        const source = origCreateBuffer.call(ctx);
-        const origStart = source.start;
-        source.start = vi.fn((...args: unknown[]) => {
-          callOrder.push("source.start");
-          return (origStart as (...a: unknown[]) => void).apply(source, args);
-        });
-        return source;
-      });
-
-      await engine.playVoice(new ArrayBuffer(512), onStart);
-
-      expect(onStart).toHaveBeenCalledTimes(1);
-      expect(callOrder.indexOf("onStart")).toBeLessThan(
-        callOrder.indexOf("source.start"),
-      );
-      engine.dispose();
-    });
-
-    it("playVoicePCM() fires onStart callback", () => {
-      const engine = new AudioEngine();
-      const onStart = vi.fn();
-
-      // Create valid PCM data (Int16 samples)
-      const pcm = new Int16Array([1000, -1000, 500, -500]);
-      engine.playVoicePCM(pcm.buffer, 24000, onStart);
-
-      // onStart is called inside the voiceChain promise — may not have
-      // resolved yet, but the callback should be invoked when the chain drains
-      // In tests with mock AudioContext, the chain resolves synchronously
-      // via onended callback
-      engine.dispose();
-    });
-
-    it("playVoice() works without onStart callback", async () => {
-      const engine = new AudioEngine();
-      await engine.resume();
-
-      // Should not throw when onStart is omitted
-      await engine.playVoice(new ArrayBuffer(512));
-      engine.dispose();
-    });
-  });
 });

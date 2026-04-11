@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface JournalEntry {
   type: 'handout';
@@ -49,7 +50,7 @@ export function JournalView({ entries }: JournalViewProps) {
         ))}
       </div>
 
-      {lightboxEntry && (
+      {lightboxEntry && createPortal(
         <div data-testid="journal-lightbox" style={{
           position: 'fixed', inset: 0, display: 'flex',
           alignItems: 'center', justifyContent: 'center', zIndex: 1000,
@@ -69,7 +70,8 @@ export function JournalView({ entries }: JournalViewProps) {
               style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain' }}
             />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

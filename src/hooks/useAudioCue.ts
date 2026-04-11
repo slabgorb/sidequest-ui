@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MessageType, type GameMessage } from "@/types/protocol";
 import type { AudioEngine } from "@/audio/AudioEngine";
 
-const DEFAULT_FADE_MS = 3000;
+let crossfadeMs = 3000;
 
 export interface NowPlaying {
   title: string;
@@ -24,6 +24,7 @@ export function useAudioCue(
 ): NowPlaying | null {
   const processedCountRef = useRef(0);
   const currentMoodRef = useRef<string | null>(null);
+  const currentTrackRef = useRef<string | null>(null);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
 
   useEffect(() => {
@@ -36,25 +37,51 @@ export function useAudioCue(
     processedCountRef.current = cues.length;
 
     for (const msg of newCues) {
-      const { mood, music_track, sfx_triggers, action } = msg.payload as {
+      const {
+        mood,
+        music_track,
+        sfx_triggers,
+        action,
+        music_volume,
+        sfx_volume,
+        crossfade_ms,
+      } = msg.payload as {
         mood?: string;
         music_track?: string;
         sfx_triggers?: string[];
         action?: string;
+        music_volume?: number;
+        sfx_volume?: number;
+        crossfade_ms?: number;
       };
 
       // Route based on action field
-      if (action === "duck") {
+      if (action === "configure") {
+        // Genre-pack mixer config — set initial channel volumes
+        if (music_volume != null) engine.setVolume("music", music_volume);
+        if (sfx_volume != null) engine.setVolume("sfx", sfx_volume);
+        if (crossfade_ms != null) crossfadeMs = crossfade_ms;
+        continue;
+      } else if (action === "duck") {
         engine.duckMusic();
       } else if (action === "restore") {
         engine.restoreMusic();
       } else if (action === "fade_out" || action === "stop") {
-        engine.stopMusic(action === "fade_out" ? DEFAULT_FADE_MS : undefined);
+        engine.stopMusic(action === "fade_out" ? crossfadeMs : undefined);
       } else {
         // action is "play", "fade_in", or absent — play the track
-        if (music_track && mood && mood !== currentMoodRef.current) {
+        // Play when mood changes OR when a different track is selected within
+        // the same mood (ThemeRotator anti-repetition produces new tracks
+        // at high intensity even when mood is unchanged).
+        if (
+          music_track &&
+          mood &&
+          (mood !== currentMoodRef.current ||
+            music_track !== currentTrackRef.current)
+        ) {
           currentMoodRef.current = mood;
-          engine.playMusic(music_track, DEFAULT_FADE_MS);
+          currentTrackRef.current = music_track;
+          engine.playMusic(music_track, crossfadeMs);
 
           // Extract filename for display
           const title = music_track.split("/").pop()?.replace(/\.\w+$/, "").replace(/[_-]/g, " ") ?? mood;

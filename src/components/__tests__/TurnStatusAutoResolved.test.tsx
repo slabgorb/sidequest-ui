@@ -38,12 +38,6 @@ const BRAK_AUTO_RESOLVED: TurnStatusEntry = {
   status: 'auto_resolved',
 };
 
-const THANE_PENDING: TurnStatusEntry = {
-  player_id: 'p4',
-  character_name: 'Thane',
-  status: 'pending',
-};
-
 // ---------------------------------------------------------------------------
 // AC-5: Auto-resolved entries show distinct timeout indicator
 // ---------------------------------------------------------------------------

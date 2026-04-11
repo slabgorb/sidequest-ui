@@ -12,10 +12,12 @@ export interface ThemeContextValue {
   setTheme: (theme: GenreTheme) => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_THEME: GenreTheme = {
   name: 'default',
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const ThemeContext = createContext<ThemeContextValue>({
   theme: DEFAULT_THEME,
   setTheme: () => {},

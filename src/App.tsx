@@ -1,25 +1,32 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
-import { GameLayout } from "@/components/GameLayout";
+import { GameBoard } from "@/components/GameBoard/GameBoard";
+import { ImageBusProvider } from "@/providers/ImageBusProvider";
+import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
+import { useChromeArchetype } from "@/hooks/useChromeArchetype";
 import { useAudioCue } from "@/hooks/useAudioCue";
 import { useAudio } from "@/hooks/useAudio";
-import { useVoiceChat } from "@/hooks/useVoiceChat";
 import { useStateMirror } from "@/hooks/useStateMirror";
-import { useSlashCommands, type OverlayType } from "@/hooks/useSlashCommands";
-import { decodeVoiceFrame, isVoiceAudioFrame } from "@/hooks/useVoicePlayback";
-import { MessageType, type GameMessage, type NarratorVerbosity, type NarratorVocabulary } from "@/types/protocol";
+import { useSlashCommands } from "@/hooks/useSlashCommands";
+import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
+import { useLayoutMode } from "@/hooks/useLayoutMode";
+import { MessageType, type GameMessage } from "@/types/protocol";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
-import type { CombatState } from "@/components/CombatOverlay";
+import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
+
+const LazyDashboard = lazy(() =>
+  import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
+);
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -102,7 +109,11 @@ function AppInner() {
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<string[]>([]);
   const [genreError, setGenreError] = useState(false);
+  const [currentGenre, setCurrentGenre] = useState<string | null>(hmrState ? loadSession()?.genre ?? null : null);
   const [thinking, setThinking] = useState(false);
+  // Unified input lock: false after submit, true when narration arrives.
+  // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
+  const [canType, setCanType] = useState(true);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
 
@@ -111,16 +122,18 @@ function AppInner() {
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [mapData, setMapData] = useState<MapState | null>(null);
 
-  // Active overlay panel — lifted from OverlayManager so slash commands can trigger it
-  const [activeOverlay, setActiveOverlay] = useState<OverlayType>(null);
+  // GameBoard layout — widget visibility managed internally by useGameBoardLayout
+  const { toggleWidget } = useGameBoardLayout(currentGenre ?? undefined);
 
-  // Narrator settings — per-session, sent to server via SESSION_EVENT{settings}
-  const [narratorVerbosity, setNarratorVerbosity] = useState<NarratorVerbosity>("standard");
-  const [narratorVocabulary, setNarratorVocabulary] = useState<NarratorVocabulary>("literary");
-  const [imageCooldown, setImageCooldown] = useState<number>(30);
+  // Layout mode — client-only, persisted to localStorage
+  const { mode: layoutMode } = useLayoutMode();
+
 
   // Party status — richer than state_delta (includes portrait_url)
   const [partyMembers, setPartyMembers] = useState<CharacterSummary[]>([]);
+
+  // Genre resources extracted from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
+  const [partyResources, setPartyResources] = useState<Record<string, ResourcePool>>({});
 
   // Multiplayer identity — who this tab is and whose turn it is
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>(
@@ -129,8 +142,8 @@ function AppInner() {
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
 
-  // Combat state from COMBAT_EVENT messages
-  const [combatState, setCombatState] = useState<CombatState | null>(null);
+  // Confrontation state from CONFRONTATION messages (structured encounters)
+  const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
 
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
@@ -160,98 +173,14 @@ function AppInner() {
     fetchGenres();
   }, [fetchGenres]);
 
-  // Audio engine — unified mixer for TTS, music, SFX
+  // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
-
-  // Narration buffer — holds NARRATION, NARRATION_END, and NARRATION_CHUNK messages
-  // so text reveals sentence-by-sentence in sync with TTS audio playback.
-  // Without this, the server sends full NARRATION text before TTS starts streaming,
-  // and prefetch causes multiple chunks to arrive before the first audio finishes.
-  const narrationBufferRef = useRef<{
-    narration: GameMessage | null;
-    narrationEnd: GameMessage | null;
-    chunks: GameMessage[];
-    flushTimer: ReturnType<typeof setTimeout> | null;
-    watchdogTimer: ReturnType<typeof setTimeout> | null;
-  }>({ narration: null, narrationEnd: null, chunks: [], flushTimer: null, watchdogTimer: null });
-
-  const flushNarrationBuffer = useCallback(() => {
-    const buf = narrationBufferRef.current;
-    if (buf.flushTimer) {
-      clearTimeout(buf.flushTimer);
-      buf.flushTimer = null;
-    }
-    if (buf.watchdogTimer) {
-      clearTimeout(buf.watchdogTimer);
-      buf.watchdogTimer = null;
-    }
-
-    const toFlush: GameMessage[] = [];
-    // Chunks first so buildSegments sets hasChunksForTurn before seeing NARRATION
-    toFlush.push(...buf.chunks);
-    buf.chunks = [];
-    if (buf.narration) {
-      toFlush.push(buf.narration);
-      buf.narration = null;
-    }
-    if (buf.narrationEnd) {
-      toFlush.push(buf.narrationEnd);
-      buf.narrationEnd = null;
-    }
-
-    if (toFlush.length > 0) {
-      setThinking(false);
-      setMessages(prev => [...prev, ...toFlush]);
-    }
-  }, []);
-
-  // Route binary WebSocket frames (TTS voice) through AudioEngine,
-  // synchronized with narration text reveal.
-  const handleBinaryMessage = useCallback(
-    (data: ArrayBuffer) => {
-      if (!audio.engine) return;
-      if (!isVoiceAudioFrame(data)) return;
-
-      const { header, audioData } = decodeVoiceFrame(data);
-      if (audioData.byteLength === 0) return;
-
-      // Pop the next buffered narration chunk — reveal its text when this
-      // audio segment actually starts playing (not when it's queued).
-      const buf = narrationBufferRef.current;
-      // Reset watchdog — audio is arriving, TTS pipeline is healthy
-      if (buf.watchdogTimer) {
-        clearTimeout(buf.watchdogTimer);
-        buf.watchdogTimer = null;
-      }
-      const nextChunk = buf.chunks.shift();
-
-      const onStart = () => {
-        if (nextChunk) {
-          setThinking(false);
-          setMessages(prev => [...prev, nextChunk]);
-        }
-      };
-
-      if (header.format === 'pcm_s16le') {
-        audio.engine.playVoicePCM(audioData, header.sample_rate || 24000, onStart);
-      } else {
-        audio.engine.playVoice(audioData, onStart);
-      }
-
-      // When all chunks have been revealed and NARRATION is waiting, flush it
-      // (adds state_delta to messages; buildSegments skips its text via dedup)
-      if (buf.chunks.length === 0 && buf.narration) {
-        setTimeout(flushNarrationBuffer, 100);
-      } else if (buf.chunks.length > 0) {
-        // Re-arm watchdog for remaining chunks
-        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
-      }
-    },
-    [audio.engine, flushNarrationBuffer],
-  );
 
   // Genre theme CSS must process in ALL phases, not just game view
   useGenreTheme(messages);
+
+  // Chrome archetype: structural CSS (fonts, borders) based on genre family
+  useChromeArchetype(currentGenre);
 
   // State mirror: process state_delta from server messages into GameStateContext
   useStateMirror(messages);
@@ -272,49 +201,15 @@ function AppInner() {
       return;
     }
 
-    // --- Narration buffer: hold messages for TTS-synchronized reveal ---
-    if (msg.type === MessageType.NARRATION) {
-      const buf = narrationBufferRef.current;
-      buf.narration = msg;
-      // Fallback: if no NARRATION_CHUNK arrives within 500ms, flush immediately.
-      // This handles the no-TTS case where only NARRATION + NARRATION_END are sent.
-      if (!buf.flushTimer && buf.chunks.length === 0) {
-        buf.flushTimer = setTimeout(flushNarrationBuffer, 500);
+    if (msg.type === MessageType.NARRATION || msg.type === MessageType.NARRATION_END) {
+      setThinking(false);
+      setMessages((prev) => [...prev, msg]);
+      // Turn-end signal: unlock input once the narrator has responded.
+      // Paired with setCanType(false) in handleSend. Without this, the input
+      // stays sealed after every turn until the player disconnects or leaves.
+      if (msg.type === MessageType.NARRATION_END) {
+        setCanType(true);
       }
-      return;
-    }
-    if (msg.type === MessageType.NARRATION_END) {
-      const buf = narrationBufferRef.current;
-      buf.narrationEnd = msg;
-      // Belt-and-suspenders: if buffer still has unflushed content, schedule a 1s flush.
-      // This catches edge cases where audio sync and watchdog both miss.
-      if (buf.chunks.length > 0 || buf.narration) {
-        if (!buf.watchdogTimer) {
-          buf.watchdogTimer = setTimeout(flushNarrationBuffer, 1000);
-        }
-      }
-      return;
-    }
-    if (msg.type === MessageType.NARRATION_CHUNK) {
-      const buf = narrationBufferRef.current;
-      // Cancel no-TTS flush timer — chunks confirm TTS is active
-      if (buf.flushTimer) {
-        clearTimeout(buf.flushTimer);
-        buf.flushTimer = null;
-      }
-      buf.chunks.push(msg);
-      // Watchdog: if TTS audio never arrives after chunks, flush after 2s.
-      // Started on first chunk; reset on each audio frame in handleBinaryMessage.
-      if (buf.chunks.length === 1 && !buf.watchdogTimer) {
-        buf.watchdogTimer = setTimeout(flushNarrationBuffer, 2000);
-      }
-      return;
-    }
-    // --- End narration buffer ---
-
-    // TTS lifecycle messages are server-side coordination signals (audio ducking,
-    // prerender scheduling). They must not leak into the narrative message feed.
-    if (msg.type === MessageType.TTS_START || msg.type === MessageType.TTS_END || msg.type === MessageType.TTS_CHUNK) {
       return;
     }
 
@@ -324,16 +219,17 @@ function AppInner() {
       // is lost when the server restarts, so clear the spinner.
       if (event === "connected" || event === "ready") {
         setThinking(false);
+        setCanType(true);
       }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
       } else if (event === "ready") {
-        // On reconnect (phase not yet "game"), clear stale messages and
-        // narration buffer to avoid duplicates.  On first connect after
-        // chargen, CHARACTER_CREATION "complete" already set phase to
-        // "game" — DON'T clear, or the opening narration (already
-        // buffered from the auto-first-turn) gets wiped.
+        // On reconnect (phase not yet "game"), clear stale messages to
+        // avoid duplicates.  On first connect after chargen,
+        // CHARACTER_CREATION "complete" already set phase to "game" —
+        // DON'T clear, or the opening narration from the auto-first-turn
+        // gets wiped.
         const isReconnect = sessionPhaseRef.current !== "game";
         sessionPhaseRef.current = "game";
         setSessionPhase("game");
@@ -341,21 +237,7 @@ function AppInner() {
           setMessages((prev) =>
             prev.filter((m) => m.type === MessageType.SESSION_EVENT),
           );
-          const buf = narrationBufferRef.current;
-          if (buf.flushTimer) clearTimeout(buf.flushTimer);
-          if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
-          buf.narration = null;
-          buf.narrationEnd = null;
-          buf.chunks = [];
-          buf.flushTimer = null;
-          buf.watchdogTimer = null;
         }
-      }
-      if (event === "settings_updated") {
-        if (msg.payload.narrator_verbosity) setNarratorVerbosity(msg.payload.narrator_verbosity as NarratorVerbosity);
-        if (msg.payload.narrator_vocabulary) setNarratorVocabulary(msg.payload.narrator_vocabulary as NarratorVocabulary);
-        if (msg.payload.image_cooldown_seconds != null) setImageCooldown(msg.payload.image_cooldown_seconds as number);
-        return;
       }
       // Let theme_css events through to the messages array for useGenreTheme
       if (event !== "theme_css") return;
@@ -382,7 +264,7 @@ function AppInner() {
 
     // Track whose turn it is — gates input in multiplayer.
     // TURN_STATUS is state-only, not rendered in narration feed.
-    // The turn strip in GameLayout shows whose turn it is.
+    // The turn strip in GameBoard shows whose turn it is.
     if (msg.type === MessageType.TURN_STATUS) {
       const name = msg.payload.player_name as string | undefined;
       const status = msg.payload.status as string | undefined;
@@ -423,7 +305,11 @@ function AppInner() {
       return;
     }
 
-    // Capture party status — richer data with portrait_url for PartyPanel
+    // Capture party status — single source of truth for party + per-character
+    // state. As of 2026-04 PartyMember also carries `sheet` (race/stats/
+    // abilities/backstory/etc.) and `inventory` (items/gold) facets, replacing
+    // the deleted CHARACTER_SHEET and INVENTORY message types. We fan out the
+    // local player's slice into characterSheet / inventoryData here.
     if (msg.type === MessageType.PARTY_STATUS) {
       const members = (msg.payload.members as Array<Record<string, unknown>>) ?? [];
       const mapped = members.map((m) => ({
@@ -446,25 +332,56 @@ function AppInner() {
         return true;
       });
       setPartyMembers(deduped);
+
+      // Fan out the local player's sheet + inventory facets. The local
+      // player is identified by matching `name` against connectedPlayerName,
+      // then falling back to the first member (single-player case).
+      const localName = connectedPlayerName;
+      const rawLocal =
+        (localName && members.find((m) => (m.name as string) === localName)) ||
+        members[0];
+      if (rawLocal) {
+        const sheetFacet = rawLocal.sheet as Record<string, unknown> | undefined;
+        if (sheetFacet) {
+          // Assemble the UI-facing CharacterSheetData from the PartyMember
+          // root fields (name/class/level/portrait_url/current_location) plus
+          // the nested sheet facet (stats/abilities/backstory).
+          const built: CharacterSheetData = {
+            name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
+            class: (rawLocal.class as string) ?? "",
+            level: (rawLocal.level as number) ?? 1,
+            stats: (sheetFacet.stats as Record<string, number>) ?? {},
+            abilities: (sheetFacet.abilities as string[]) ?? [],
+            backstory: (sheetFacet.backstory as string) ?? "",
+            portrait_url: (rawLocal.portrait_url as string) || undefined,
+            current_location: (rawLocal.current_location as string) ?? "",
+          };
+          setCharacterSheet(built);
+        }
+        const invFacet = rawLocal.inventory as Record<string, unknown> | undefined;
+        if (invFacet) {
+          setInventoryData(invFacet as unknown as InventoryData);
+        }
+      }
+
+      // Extract genre resources from PARTY_STATUS (e.g., Luck, Humanity, Fuel)
+      const resources = msg.payload.resources as Record<string, ResourcePool> | undefined;
+      if (resources && typeof resources === "object") {
+        setPartyResources(resources);
+      }
+
       return;
     }
 
     // Capture overlay data from server — these update the panels/overlays
-    if (msg.type === MessageType.CHARACTER_SHEET) {
-      setCharacterSheet(msg.payload as unknown as CharacterSheetData);
-      return;
-    }
-    if (msg.type === MessageType.INVENTORY) {
-      setInventoryData(msg.payload as unknown as InventoryData);
-      return;
-    }
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
       return;
     }
-    if (msg.type === MessageType.COMBAT_EVENT) {
-      const payload = msg.payload as unknown as CombatState;
-      setCombatState(payload.in_combat ? payload : null);
+    // COMBAT_EVENT handler removed in story 28-9
+    if (msg.type === MessageType.CONFRONTATION) {
+      const payload = msg.payload as unknown as ConfrontationData;
+      setConfrontationData(payload.active !== false ? payload : null);
       return;
     }
 
@@ -483,47 +400,22 @@ function AppInner() {
       return; // Don't show this error in the narrative
     }
 
-    // WebRTC signaling — route to useVoiceChat, never display as narrative
-    if (msg.type === MessageType.VOICE_SIGNAL) {
-      const from = msg.payload.from as string | undefined;
-      const signal = msg.payload.signal as Record<string, unknown> | undefined;
-      if (from && signal) {
-        voiceHandleSignalRef.current(from, signal);
-      }
-      return;
-    }
-
     setMessages((prev) => [...prev, msg]);
-  }, [flushNarrationBuffer]);
+  }, [connectedPlayerName]);
 
-  const voiceHandleSignalRef = useRef<(peerId: string, signal: Record<string, unknown>) => void>(() => {});
   const sendRef = useRef<typeof send | null>(null);
 
   const { connect, disconnect, send, readyState, error } = useGameSocket({
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
     onMessage: handleMessage,
-    onBinaryMessage: handleBinaryMessage,
   });
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
 
-  // WebRTC voice chat — wire signaling through the game server
-  const voiceChat = useVoiceChat({
-    peers: [],
-    onSignal: useCallback((peerId: string, signal: Record<string, unknown>) => {
-      sendRef.current?.({
-        type: MessageType.VOICE_SIGNAL,
-        payload: { target: peerId, signal },
-        player_id: "",
-      });
-    }, []),
-  });
-  // eslint-disable-next-line react-hooks/immutability
-  voiceHandleSignalRef.current = voiceChat.handleSignal;
-
   const handleConnect = useCallback(
     (playerName: string, genre: string, world: string) => {
       saveSession(playerName, genre, world);
+      setCurrentGenre(genre);
       setConnectedPlayerName(playerName);
       connect();
       setConnected(true);
@@ -535,7 +427,7 @@ function AppInner() {
         });
       }, 300);
     },
-    [connect, send, audio.engine],
+    [connect, send],
   );
 
   const handleCreationRespond = useCallback(
@@ -556,12 +448,19 @@ function AppInner() {
       // Try slash commands first — overlay triggers resolve locally
       const slashResult = executeSlashCommand(text);
       if (slashResult.handled) {
-        if (slashResult.overlay) {
-          setActiveOverlay(slashResult.overlay);
+        if (slashResult.widget) {
+          toggleWidget(slashResult.widget);
         }
         if (slashResult.messages.length > 0) {
           setMessages((prev) => [...prev, ...slashResult.messages]);
         }
+        return;
+      }
+
+      // Never send slash-prefixed text to the server as a game action.
+      // Unrecognised commands are swallowed client-side to prevent
+      // "Unexpected message in Playing state" errors from the backend.
+      if (text.trimStart().startsWith('/')) {
         return;
       }
 
@@ -572,64 +471,23 @@ function AppInner() {
       };
       setMessages((prev) => [...prev, msg]);
       send(msg);
+      setCanType(false); // Sealed — wait for narration before typing again
     },
-    [send, executeSlashCommand],
+    [send, executeSlashCommand, toggleWidget],
   );
 
-  // Narrator settings change — optimistic update + send to server
-  const sendSettings = useCallback(
-    (overrides: { verbosity?: NarratorVerbosity; vocabulary?: NarratorVocabulary; cooldown?: number }) => {
-      const v = overrides.verbosity ?? narratorVerbosity;
-      const vocab = overrides.vocabulary ?? narratorVocabulary;
-      const cd = overrides.cooldown ?? imageCooldown;
+  const handleRequestJournal = useCallback(
+    (category?: string) => {
       send({
-        type: MessageType.SESSION_EVENT,
+        type: MessageType.JOURNAL_REQUEST,
         payload: {
-          event: "settings",
-          narrator_verbosity: v,
-          narrator_vocabulary: vocab,
-          image_cooldown_seconds: cd,
+          ...(category ? { category } : {}),
+          sort_by: 'time',
         },
-        player_id: "",
+        player_id: '',
       });
     },
-    [send, narratorVerbosity, narratorVocabulary, imageCooldown],
-  );
-
-  const handleVerbosityChange = useCallback(
-    (value: NarratorVerbosity) => {
-      setNarratorVerbosity(value);
-      sendSettings({ verbosity: value });
-    },
-    [sendSettings],
-  );
-
-  const handleVocabularyChange = useCallback(
-    (value: NarratorVocabulary) => {
-      setNarratorVocabulary(value);
-      sendSettings({ vocabulary: value });
-    },
-    [sendSettings],
-  );
-
-  const handleImageCooldownChange = useCallback(
-    (value: number) => {
-      setImageCooldown(value);
-      sendSettings({ cooldown: value });
-    },
-    [sendSettings],
-  );
-
-  const settingsProps = useMemo(
-    () => ({
-      verbosity: narratorVerbosity,
-      vocabulary: narratorVocabulary,
-      imageCooldown,
-      onVerbosityChange: handleVerbosityChange,
-      onVocabularyChange: handleVocabularyChange,
-      onImageCooldownChange: handleImageCooldownChange,
-    }),
-    [narratorVerbosity, narratorVocabulary, imageCooldown, handleVerbosityChange, handleVocabularyChange, handleImageCooldownChange],
+    [send],
   );
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby
@@ -644,23 +502,14 @@ function AppInner() {
     setCharacterSheet(null);
     setInventoryData(null);
     setMapData(null);
-    setActiveOverlay(null);
     setPartyMembers([]);
     setConnectedPlayerName("");
     setActivePlayerName(null);
-    setCombatState(null);
+    setCanType(true);
+    setConfrontationData(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
-    // Clear narration buffer
-    const buf = narrationBufferRef.current;
-    if (buf.flushTimer) clearTimeout(buf.flushTimer);
-    if (buf.watchdogTimer) clearTimeout(buf.watchdogTimer);
-    buf.narration = null;
-    buf.narrationEnd = null;
-    buf.chunks = [];
-    buf.flushTimer = null;
-    buf.watchdogTimer = null;
   }, [disconnect]);
 
   // Unlock AudioContext on first user gesture (click or keypress).
@@ -710,6 +559,7 @@ function AppInner() {
     prevReadyState.current = readyState;
     if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
       setThinking(false);
+      setCanType(true);
       const saved = loadSession();
       if (saved) {
         send({
@@ -757,11 +607,13 @@ function AppInner() {
     [partyMembers, gameState.characters],
   );
 
-  // Turn gating — only meaningful in multiplayer (partyMembers only populated from PARTY_STATUS)
-  // isMultiplayer: true if party has 2+ members OR if we've received a TURN_STATUS
-  // (which only fires in multiplayer). This handles the race condition where
-  // TURN_STATUS arrives before PARTY_STATUS populates partyMembers.
-  const isMultiplayer = partyMembers.length > 1 || activePlayerName !== null;
+  // Turn gating — two multiplayer models:
+  // 1. Sequential (FreePlay): server sends "active" for the acting player, others wait
+  // 2. Sealed-letter (Structured): ALL players submit simultaneously, no "active" player
+  //
+  // In sealed-letter mode, activePlayerName stays null. Input is disabled only
+  // when THIS player has already submitted (tracked via turnStatusEntries).
+  const isMultiplayer = partyMembers.length > 1 || turnStatusEntries.length > 0 || activePlayerName !== null;
   const currentPlayerId = useMemo(
     () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
     [partyMembers, connectedPlayerName],
@@ -770,9 +622,6 @@ function AppInner() {
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
   );
-  const isMyTurn = !isMultiplayer || !activePlayerName || activePlayerName === connectedPlayerName;
-  const waitingForPlayer = isMultiplayer && !isMyTurn ? (activePlayerName ?? undefined) : undefined;
-
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <main className="flex flex-col flex-1 min-h-0">
@@ -799,30 +648,41 @@ function AppInner() {
         )}
         {sessionPhase === "game" && (
           <ErrorBoundary name="Game">
-            <GameLayout
-              messages={gameMessages}
-              characters={characters}
-              onSend={handleSend}
-              onLeave={handleLeave}
-              disabled={readyState !== WebSocket.OPEN || thinking || (isMultiplayer && !isMyTurn)}
-              thinking={thinking}
-              characterSheet={characterSheet}
-              inventoryData={inventoryData}
-              mapData={mapData}
-              audio={audio}
-              nowPlaying={nowPlaying}
-              journalEntries={gameState.journal}
-              knowledgeEntries={gameState.knowledge}
-              combatState={combatState}
-              currentPlayerId={currentPlayerId ?? undefined}
-              activePlayerId={activePlayerId}
-              activePlayerName={activePlayerName}
-              waitingForPlayer={waitingForPlayer}
-              settingsProps={settingsProps}
-              turnStatusEntries={turnStatusEntries}
-              activeOverlay={activeOverlay}
-              onOverlayChange={setActiveOverlay}
-            />
+            <ImageBusProvider messages={gameMessages}>
+              <GameBoard
+                // `key` forces React to unmount + remount GameBoard (and with
+                // it the Dockview instance) on genre switch, so the canonical
+                // layout built in onDockviewReady always runs fresh instead
+                // of reusing a dragged/reordered in-memory state. Fixes tab
+                // order drift between genres per sq-playtest 2026-04-09.
+                key={currentGenre ?? "no-genre"}
+                messages={gameMessages}
+                characters={characters}
+                onSend={handleSend}
+                onLeave={handleLeave}
+                disabled={readyState !== WebSocket.OPEN || !canType}
+                thinking={thinking}
+                characterSheet={characterSheet}
+                inventoryData={inventoryData}
+                mapData={mapData}
+                audio={audio}
+                nowPlaying={nowPlaying}
+                journalEntries={gameState.journal}
+                knowledgeEntries={gameState.knowledge}
+                depletions={gameState.depletions}
+                resourceAlerts={gameState.resourceAlerts}
+                onRequestJournal={handleRequestJournal}
+                confrontationData={confrontationData}
+                currentPlayerId={currentPlayerId ?? undefined}
+                activePlayerId={activePlayerId}
+                activePlayerName={activePlayerName}
+                waitingForPlayer={!canType && isMultiplayer ? "other players" : undefined}
+                resources={partyResources}
+                genreSlug={currentGenre ?? undefined}
+                turnStatusEntries={turnStatusEntries}
+                layoutMode={layoutMode}
+              />
+            </ImageBusProvider>
           </ErrorBoundary>
         )}
       </main>
@@ -831,6 +691,26 @@ function AppInner() {
 }
 
 function App() {
+  const [isDashboard, setIsDashboard] = useState(
+    () => window.location.hash === "#/dashboard",
+  );
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setIsDashboard(window.location.hash === "#/dashboard");
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (isDashboard) {
+    return (
+      <Suspense fallback={<div style={{ color: "#e0e0e0", background: "#1a1a2e", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading dashboard...</div>}>
+        <LazyDashboard />
+      </Suspense>
+    );
+  }
+
   return (
     <ThemeProvider>
       <GameStateProvider>

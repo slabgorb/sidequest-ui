@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "./styles/archetype-chrome.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -126,7 +127,24 @@
     }
   html {
     @apply font-sans;
+    border-radius: var(--border-radius, var(--radius));
     }
+}
+
+/* Archetype body font — outside @layer so it beats injected genre theme CSS.
+   [data-archetype] selector ensures this only fires when useChromeArchetype is active,
+   preserving the genre theme's font-family for any genre without an archetype mapping. */
+[data-archetype] body {
+  font-family: var(--font-body, var(--font-sans));
+}
+
+/* Archetype font-ui — applied to interactive/HUD elements when an archetype is active */
+[data-archetype] button,
+[data-archetype] input,
+[data-archetype] select,
+[data-archetype] .character-panel,
+[data-archetype] .character-hud {
+  font-family: var(--font-ui, inherit);
 }
 
 /* Scroll snap for book-like page turns */
@@ -152,4 +170,35 @@
 @keyframes ptt-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+/* Narration prose typography — paragraph spacing and basic typographic rhythm.
+   Tailwind v4 has no CSS-importable typography plugin yet, so we style .prose
+   elements directly for the narration panels. */
+.prose p {
+  margin-bottom: 1em;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 600;
+}
+
+.prose hr {
+  margin-top: 2em;
+  margin-bottom: 2em;
+  border-color: oklch(0.5 0 0 / 20%);
+}
+
+.prose strong {
+  font-weight: 700;
+}
+
+.prose em {
+  font-style: italic;
 }

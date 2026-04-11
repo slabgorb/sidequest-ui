@@ -1,9 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toRoman } from "@/lib/utils";
 
-export interface CreationChoice {
+interface CreationChoice {
   label: string;
   description: string;
+}
+
+interface RolledStat {
+  name: string;
+  value: number;
 }
 
 export interface CreationScene {
@@ -18,6 +23,7 @@ export interface CreationScene {
   input_type?: string;
   loading_text?: string;
   character_preview?: Record<string, unknown>;
+  rolled_stats?: RolledStat[];
   previous_choice?: number;
   previous_input?: string;
 }
@@ -29,13 +35,22 @@ export interface CharacterCreationProps {
 }
 
 export function CharacterCreation({ scene, loading, onRespond }: CharacterCreationProps) {
+  // React idiom: reset state during render when the identifying prop changes,
+  // instead of useEffect → setState (which forces an extra render). When
+  // `scene_index` or `phase` change, snap the local input/selection back to
+  // whatever the scene was last given. See:
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const sceneKey = scene ? `${scene.scene_index}-${scene.phase}` : null;
+  const [lastSceneKey, setLastSceneKey] = useState<string | null>(sceneKey);
   const [inputValue, setInputValue] = useState(scene?.previous_input ?? "");
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(scene?.previous_choice ?? null);
-
-  useEffect(() => {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(
+    scene?.previous_choice ?? null,
+  );
+  if (sceneKey !== lastSceneKey) {
+    setLastSceneKey(sceneKey);
     setInputValue(scene?.previous_input ?? "");
     setSelectedIndex(scene?.previous_choice ?? null);
-  }, [scene?.scene_index, scene?.phase]);
+  }
 
   if (loading) {
     return (
@@ -71,6 +86,10 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
 
   const handleConfirm = () => {
     onRespond({ phase: "confirmation", choice: "1" });
+  };
+
+  const handleContinue = () => {
+    onRespond({ phase: "continue" });
   };
 
   const handleBack = () => {
@@ -154,6 +173,24 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
 
       <p className="text-lg leading-relaxed italic text-foreground/90 max-w-prose">{scene.prompt}</p>
 
+      {scene.rolled_stats && scene.rolled_stats.length > 0 && (
+        <div
+          data-testid="creation-rolled-stats"
+          className="grid grid-cols-3 gap-3 w-full max-w-md border-y border-border/40 py-4 my-2"
+        >
+          {scene.rolled_stats.map((stat) => (
+            <div key={stat.name} className="flex flex-col items-center">
+              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/60">
+                {stat.name}
+              </span>
+              <span className="text-2xl font-bold text-[var(--primary)] tabular-nums">
+                {stat.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {scene.choices && scene.choices.length > 0 && (
         <div className="flex flex-col gap-3 w-full max-w-prose">
           {scene.choices.map((choice, i) => (
@@ -217,6 +254,16 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             Go Back
           </button>
         </div>
+      )}
+
+      {scene.input_type === "continue" && (
+        <button
+          onClick={handleContinue}
+          data-testid="creation-continue"
+          className="inline-flex items-center justify-center rounded-lg text-sm font-semibold h-11 px-8 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          Continue
+        </button>
       )}
 
       {showBack && (

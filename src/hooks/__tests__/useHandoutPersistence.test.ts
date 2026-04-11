@@ -1,11 +1,10 @@
 import { renderHook } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createElement, type ReactNode } from 'react';
 import { MessageType, type GameMessage } from '@/types/protocol';
 import {
   GameStateProvider,
   useGameState,
-  type ClientGameState,
 } from '@/providers/GameStateProvider';
 import { useStateMirror } from '@/hooks/useStateMirror';
 

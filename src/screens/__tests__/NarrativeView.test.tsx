@@ -1,5 +1,4 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { NarrativeView } from "@/screens/NarrativeView";
 import { MessageType, type GameMessage } from "@/types/protocol";
@@ -9,10 +8,6 @@ function msg(
   payload: Record<string, unknown> = {},
 ): GameMessage {
   return { type, payload, player_id: "narrator" };
-}
-
-function narrationChunk(text: string): GameMessage {
-  return msg(MessageType.NARRATION_CHUNK, { text });
 }
 
 function narrationEnd(): GameMessage {
@@ -47,41 +42,25 @@ describe("NarrativeView", () => {
     ).toBeInTheDocument();
   });
 
-  // -- streaming chunks ------------------------------------------------------
-  it("appends NARRATION_CHUNK text incrementally", () => {
-    const { rerender } = render(
-      <NarrativeView messages={[narrationChunk("The door ")]} />,
-    );
-    expect(screen.getByText(/The door/)).toBeInTheDocument();
-
-    rerender(
-      <NarrativeView
-        messages={[narrationChunk("The door "), narrationChunk("creaks open.")]}
-      />,
-    );
-    expect(screen.getByText(/The door\s*creaks open\./)).toBeInTheDocument();
-  });
-
   // -- narration end ---------------------------------------------------------
   it("marks a narrative segment complete on NARRATION_END", () => {
     render(
       <NarrativeView
         messages={[
-          narrationChunk("A tale begins."),
+          narration("A tale begins."),
           narrationEnd(),
-          narrationChunk("A new chapter."),
+          narration("A new chapter."),
         ]}
       />,
     );
-    // NARRATION_END creates a page boundary — the two chunks should be
-    // in separate snap-start page containers (separators are consumed
-    // as page breaks, not rendered as <hr> elements).
-    const pages = document.querySelectorAll(".snap-start");
-    expect(pages.length).toBeGreaterThanOrEqual(2);
+    // NARRATION_END creates a separator between narrations — both should
+    // render as separate text blocks
+    const proseBlocks = document.querySelectorAll(".prose");
+    expect(proseBlocks.length).toBeGreaterThanOrEqual(2);
   });
 
-  // -- inline images ---------------------------------------------------------
-  it("renders inline images from IMAGE messages within narrative flow", () => {
+  // -- images route to gallery -----------------------------------------------
+  it("shows gallery notice instead of inline images (images route to gallery widget)", () => {
     render(
       <NarrativeView
         messages={[
@@ -91,9 +70,9 @@ describe("NarrativeView", () => {
         ]}
       />,
     );
-    const img = screen.getByAltText("A dark chamber");
-    expect(img).toBeInTheDocument();
-    expect(img).toHaveAttribute("src", "https://example.com/chamber.png");
+    // Images no longer render inline — they go to the ImageGalleryWidget
+    expect(screen.queryByAltText("A dark chamber")).not.toBeInTheDocument();
+    expect(screen.getByText("New image in gallery")).toBeInTheDocument();
   });
 
   // -- auto-scroll -----------------------------------------------------------
@@ -102,7 +81,7 @@ describe("NarrativeView", () => {
       <NarrativeView messages={[narration("Line one.")]} />,
     );
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Add more content
@@ -120,14 +99,12 @@ describe("NarrativeView", () => {
 
   // -- user scroll up stops auto-scroll --------------------------------------
   it("stops auto-scrolling when user scrolls up", async () => {
-    const user = userEvent.setup();
-
     const messages = Array.from({ length: 20 }, (_, i) =>
       narration(`Paragraph ${i + 1}. `.repeat(5)),
     );
     const { rerender } = render(<NarrativeView messages={messages} />);
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Simulate user scrolling up by setting scrollTop and firing scroll event
@@ -155,7 +132,7 @@ describe("NarrativeView", () => {
     );
     const { rerender } = render(<NarrativeView messages={messages} />);
 
-    const scrollEl = document.querySelector("[data-testid='narrative-view']");
+    const scrollEl = document.querySelector("[data-testid='narration-scroll']");
     expect(scrollEl).not.toBeNull();
 
     // Simulate scroll up
@@ -289,23 +266,9 @@ describe("NarrativeView", () => {
     expect(alert).toHaveTextContent("Connection lost to server.");
   });
 
-  // -- CHARACTER_SHEET ---------------------------------------------------------
-  it("renders CHARACTER_SHEET as system info", () => {
-    render(
-      <NarrativeView
-        messages={[
-          msg(MessageType.CHARACTER_SHEET, {
-            name: "Thrain",
-            class: "Warrior",
-            level: 3,
-          }),
-        ]}
-      />,
-    );
-    const charInfo = screen.getByText(/Thrain/);
-    expect(charInfo).toBeInTheDocument();
-    expect(charInfo.closest("[data-testid='system-message']")).toBeInTheDocument();
-  });
+  // CHARACTER_SHEET narrative-segment test removed 2026-04. The sheet now
+  // lives on PartyMember and is a panel-only concern — it no longer appears
+  // as a system message in the narrative scroll.
 
   // -- unknown message types ignored -------------------------------------------
   it("silently ignores unknown message types without crashing", () => {
@@ -320,106 +283,21 @@ describe("NarrativeView", () => {
     );
     expect(screen.getByText("Before unknown.")).toBeInTheDocument();
     expect(screen.getByText("After unknown.")).toBeInTheDocument();
-    // Should not render any content for the unknown message
-    expect(container.querySelectorAll("[data-testid='narrative-view'] > div > *").length).toBe(2);
+    // Should not render any content for the unknown message — 2 prose blocks for the 2 narrations
+    const proseBlocks = container.querySelectorAll(".prose");
+    expect(proseBlocks.length).toBe(2);
   });
 
-  // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
-  it("skips NARRATION text when NARRATION_CHUNKs follow (TTS active)", () => {
+  it("renders NARRATION as a single prose block", () => {
     render(
       <NarrativeView
         messages={[
-          narration("Full text arrives first."),
-          narrationEnd(),
-          narrationChunk("Full text "),
-          narrationChunk("arrives first."),
-        ]}
-      />,
-    );
-    // The NARRATION text should be deduplicated — only chunk text renders
-    const textElements = document.querySelectorAll(".prose");
-    // Should have exactly 1 text block (the accumulated chunks), not 2
-    expect(textElements.length).toBe(1);
-    expect(textElements[0].textContent).toMatch(/Full text\s*arrives first\./);
-  });
-
-  it("renders NARRATION normally when no chunks follow (TTS off)", () => {
-    render(
-      <NarrativeView
-        messages={[
-          narration("No TTS here, just text."),
+          narration("Just narration text."),
           narrationEnd(),
         ]}
       />,
     );
-    expect(screen.getByText("No TTS here, just text.")).toBeInTheDocument();
-  });
-
-  it("deduplicates NARRATION before chunks from server reorder", () => {
-    // Server sends NARRATION first (direct), then chunks arrive (async TTS).
-    // After buffer flush, messages arrive as: chunks, NARRATION, NARRATION_END
-    render(
-      <NarrativeView
-        messages={[
-          narrationChunk("Sentence one."),
-          narrationChunk("Sentence two."),
-          narration("Sentence one. Sentence two."),
-          narrationEnd(),
-        ]}
-      />,
-    );
-    const textElements = document.querySelectorAll(".prose");
-    expect(textElements.length).toBe(1);
-    expect(textElements[0].textContent).toMatch(/Sentence one.*Sentence two/);
-  });
-
-  // -- TTS dedup: NARRATION skipped when chunks follow --------------------------
-  it("skips NARRATION text when NARRATION_CHUNKs follow (TTS active)", () => {
-    render(
-      <NarrativeView
-        messages={[
-          narration("Full text arrives first."),
-          narrationEnd(),
-          narrationChunk("Full text "),
-          narrationChunk("arrives first."),
-        ]}
-      />,
-    );
-    // The NARRATION text should be deduplicated — only chunk text renders
-    const textElements = document.querySelectorAll(".prose");
-    // Should have exactly 1 text block (the accumulated chunks), not 2
-    expect(textElements.length).toBe(1);
-    expect(textElements[0].textContent).toMatch(/Full text\s*arrives first\./);
-  });
-
-  it("renders NARRATION normally when no chunks follow (TTS off)", () => {
-    render(
-      <NarrativeView
-        messages={[
-          narration("No TTS here, just text."),
-          narrationEnd(),
-        ]}
-      />,
-    );
-    expect(screen.getByText("No TTS here, just text.")).toBeInTheDocument();
-  });
-
-  it("deduplicates NARRATION before chunks from server reorder", () => {
-    // Server sends NARRATION first (direct), then chunks arrive (async TTS).
-    // After buffer flush, messages arrive as: chunks, NARRATION, NARRATION_END
-    render(
-      <NarrativeView
-        messages={[
-          narrationChunk("Sentence one."),
-          narrationChunk("Sentence two."),
-          narration("Sentence one. Sentence two."),
-          narrationEnd(),
-        ]}
-      />,
-    );
-    const textElements = document.querySelectorAll(".prose");
-    expect(textElements.length).toBe(1);
-    expect(textElements[0].textContent).toMatch(/Sentence one.*Sentence two/);
+    expect(screen.getByText("Just narration text.")).toBeInTheDocument();
   });
 
   // -- mixed message types render in order -------------------------------------

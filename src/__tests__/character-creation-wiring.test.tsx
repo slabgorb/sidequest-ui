@@ -10,7 +10,7 @@
  *  - Completion transitions to game view
  *  - Returning players skip creation
  */
-import { render, screen, act, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -18,16 +18,6 @@ import {
   installLocalStorageMock,
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
-
-// Mock useWhisper to avoid @huggingface/transformers dependency in tests
-vi.mock("@/hooks/useWhisper", () => ({
-  useWhisper: () => ({
-    transcribe: vi.fn().mockResolvedValue(""),
-    status: "ready" as const,
-    loadProgress: 1,
-    isWebGPU: false,
-  }),
-}));
 
 import App from "../App";
 import { MessageType, type GameMessage } from "@/types/protocol";
@@ -211,11 +201,13 @@ beforeEach(() => {
   AudioEngine.resetInstance();
   installWebAudioMock();
   installLocalStorageMock();
-  // Mock matchMedia for useBreakpoint (GameLayout uses it)
+  // Mock matchMedia for useBreakpoint. Report "mobile" so GameBoard renders
+  // via MobileTabView instead of dockview — see src/test-setup.ts for the
+  // rationale (dockview does not render panel content in jsdom).
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches: query.includes("max-width: 767px"),
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -283,7 +275,7 @@ describe("AC-1: new player enters character creation", () => {
     expect(
       screen.getByTestId("character-creation"),
     ).toBeInTheDocument();
-    expect(screen.queryByTestId("game-layout")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-board")).not.toBeInTheDocument();
   });
 
   it("displays the first scene narration text", async () => {
@@ -599,7 +591,7 @@ describe("AC-4: complete transitions to game view", () => {
 
     // GameView should now be rendered, creation should be gone
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 
   it("integrates character into GameState after completion", async () => {
@@ -676,7 +668,7 @@ describe("AC-5: returning player skips creation", () => {
 
     // Should go straight to game view — no creation
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 
   it("does not receive CHARACTER_CREATION messages for returning player", async () => {
@@ -701,7 +693,7 @@ describe("AC-5: returning player skips creation", () => {
     });
 
     expect(screen.queryByTestId("character-creation")).not.toBeInTheDocument();
-    expect(screen.getByTestId("game-layout")).toBeInTheDocument();
+    expect(screen.getByTestId("game-board")).toBeInTheDocument();
   });
 });
 

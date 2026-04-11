@@ -1,4 +1,7 @@
-const DUCK_LEVEL = 0.5;
+// Music duck level when AUDIO_CUE { action: "duck" } fires. 0.3 leaves music
+// audible but recedes it so foreground audio cues (SFX bursts, ambience
+// changes) cut through cleanly.
+const DUCK_LEVEL = 0.3;
 const DUCK_RAMP_MS = 200;
 const UNDUCK_RAMP_MS = 500;
 

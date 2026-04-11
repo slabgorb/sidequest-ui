@@ -2,7 +2,7 @@ import { AudioCache } from "./AudioCache";
 import { Crossfader } from "./Crossfader";
 import { Ducker } from "./Ducker";
 
-type ChannelName = "music" | "sfx" | "voice";
+type ChannelName = "music" | "sfx";
 type VolumeTarget = ChannelName | "master";
 
 const STORAGE_KEY = "sidequest_audio_volumes";
@@ -10,14 +10,12 @@ const STORAGE_KEY = "sidequest_audio_volumes";
 interface VolumeState {
   music: number;
   sfx: number;
-  voice: number;
   master: number;
 }
 
 const DEFAULT_VOLUMES: VolumeState = {
   music: 1.0,
   sfx: 1.0,
-  voice: 1.0,
   master: 1.0,
 };
 
@@ -29,7 +27,6 @@ function loadVolumes(): VolumeState {
     return {
       music: parsed.music ?? DEFAULT_VOLUMES.music,
       sfx: parsed.sfx ?? DEFAULT_VOLUMES.sfx,
-      voice: parsed.voice ?? DEFAULT_VOLUMES.voice,
       master: parsed.master ?? DEFAULT_VOLUMES.master,
     };
   } catch {
@@ -71,7 +68,6 @@ export class AudioEngine {
   private volumes: VolumeState;
   private preMuteVolumes: Partial<Record<ChannelName, number>> = {};
   private activeSources: AudioBufferSourceNode[] = [];
-  private voiceChain: Promise<void> = Promise.resolve();
   private cache = new AudioCache();
 
   constructor() {
@@ -91,11 +87,7 @@ export class AudioEngine {
     sfxGain.gain.value = this.volumes.sfx;
     sfxGain.connect(this.masterGain);
 
-    const voiceGain = this.ctx.createGain();
-    voiceGain.gain.value = this.volumes.voice;
-    voiceGain.connect(this.masterGain);
-
-    this.channels = { music: musicGain, sfx: sfxGain, voice: voiceGain };
+    this.channels = { music: musicGain, sfx: sfxGain };
     this.crossfader = new Crossfader();
     this.ducker = new Ducker(musicGain);
   }
@@ -177,60 +169,6 @@ export class AudioEngine {
     };
     source.start();
     this.activeSources.push(source);
-  }
-
-  async playVoice(audioData: ArrayBuffer, onStart?: () => void): Promise<void> {
-    const audioBuffer = await this.ctx.decodeAudioData(audioData);
-    this.playVoiceBuffer(audioBuffer, onStart);
-  }
-
-  /**
-   * Play raw PCM s16le audio through the voice channel with music ducking.
-   * Converts PCM int16 samples to float32 and creates an AudioBuffer directly,
-   * bypassing decodeAudioData (which can't decode raw PCM).
-   */
-  playVoicePCM(pcmData: ArrayBuffer, sampleRate = 24000, onStart?: () => void): void {
-    // Ensure alignment
-    const aligned = new ArrayBuffer(pcmData.byteLength);
-    new Uint8Array(aligned).set(new Uint8Array(pcmData));
-    const s16 = new Int16Array(aligned);
-    const float32 = new Float32Array(s16.length);
-    for (let i = 0; i < s16.length; i++) {
-      float32[i] = s16[i] / 32768;
-    }
-    if (float32.length === 0) return;
-
-    const audioBuffer = this.ctx.createBuffer(1, float32.length, sampleRate);
-    audioBuffer.getChannelData(0).set(float32);
-    this.playVoiceBuffer(audioBuffer, onStart);
-  }
-
-  /**
-   * Queue a voice segment for sequential playback with music ducking.
-   * Optional `onStart` fires just before audio begins — used to synchronize
-   * text reveal with TTS playback so narration text appears as the voice reads.
-   */
-  private playVoiceBuffer(audioBuffer: AudioBuffer, onStart?: () => void): void {
-    // Queue segments so they play sequentially, not all at once.
-    this.voiceChain = this.voiceChain.then(
-      () =>
-        new Promise<void>((resolve) => {
-          this.ducker.duck();
-
-          const source = this.ctx.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(this.channels.voice);
-          source.onended = () => {
-            this.ducker.unduck();
-            source.disconnect();
-            this.activeSources = this.activeSources.filter((s) => s !== source);
-            resolve();
-          };
-          onStart?.();
-          source.start();
-          this.activeSources.push(source);
-        }),
-    );
   }
 
   setVolume(channel: VolumeTarget, value: number): void {

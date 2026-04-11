@@ -1,0 +1,148 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Archetype Chrome — structural CSS rulesets for genre archetype families.
+   Colors come from genre theme (useGenreTheme); this file only sets
+   structural properties: textures, borders, font treatments, overlays.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Parchment ─────────────────────────────────────────────────────────────
+   Aged manuscript feel — warm vignette, soft borders, serif headers,
+   gradient panel backgrounds.
+   Genres: low_fantasy, victoria, elemental_harmony, star_chamber
+   ──────────────────────────────────────────────────────────────────────── */
+
+[data-archetype="parchment"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 50%, rgba(180, 160, 130, 0.2) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-archetype="parchment"] .running-header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(to bottom, var(--surface), transparent);
+}
+
+[data-archetype="parchment"] .narrative-scroll {
+  padding: 32px 48px;
+}
+
+[data-archetype="parchment"] .history-section {
+  opacity: 0.45;
+  border-bottom: 1px solid var(--border);
+}
+
+[data-archetype="parchment"] .character-panel {
+  border-left: 1px solid var(--border);
+  background: linear-gradient(to right, var(--surface), transparent 80%);
+}
+
+[data-archetype="parchment"] .input-area {
+  border-top: 1px solid var(--border);
+  background: linear-gradient(to top, var(--surface), transparent);
+}
+
+/* ── Terminal ──────────────────────────────────────────────────────────────
+   CRT/hacker aesthetic — scanline overlay, neon glow, monospace headers,
+   hard borders, glow effects on accent text.
+   Genres: neon_dystopia, space_opera
+   ──────────────────────────────────────────────────────────────────────── */
+
+[data-archetype="terminal"] {
+  --glow-primary: rgba(0, 255, 255, 0.15);
+  --glow-accent: rgba(57, 255, 20, 0.15);
+}
+
+[data-archetype="terminal"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 255, 255, 0.008) 2px,
+      rgba(0, 255, 255, 0.008) 4px
+    ),
+    radial-gradient(ellipse at center, transparent 60%, rgba(5, 5, 8, 0.25) 100%);
+  pointer-events: none;
+  z-index: 100;
+}
+
+[data-archetype="terminal"] .running-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="terminal"] .running-header .location {
+  font-family: var(--font-ui);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px var(--glow-primary);
+}
+
+[data-archetype="terminal"] .running-header .turn {
+  font-family: var(--font-ui);
+  text-shadow: 0 0 8px var(--glow-accent);
+}
+
+[data-archetype="terminal"] .character-panel {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="terminal"] .input-area {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* ── Rugged ────────────────────────────────────────────────────────────────
+   Industrial/post-apocalyptic — dusty vignette, heavy 2px borders,
+   condensed uppercase headers, muted surface backgrounds.
+   Genres: road_warrior, mutant_wasteland, spaghetti_western, pulp_noir,
+           caverns_and_claudes
+   ──────────────────────────────────────────────────────────────────────── */
+
+[data-archetype="rugged"]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(10, 8, 4, 0.5) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-archetype="rugged"] .running-header {
+  border-bottom: 2px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="rugged"] .running-header .location {
+  font-family: var(--font-ui);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+[data-archetype="rugged"] .running-header .turn {
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+}
+
+[data-archetype="rugged"] .character-panel {
+  border-left: 2px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="rugged"] .input-area {
+  border-top: 2px solid var(--border);
+  background: var(--surface);
+}
+
+[data-archetype="rugged"] .history-section {
+  opacity: 0.4;
+  border-bottom: 2px solid var(--border);
+}

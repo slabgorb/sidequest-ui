@@ -48,7 +48,7 @@ describe("Ducker", () => {
       expect(rampCalls.length).toBeGreaterThanOrEqual(1);
 
       // The ramp target time should be currentTime + 0.2 (200ms)
-      const [_value, time] = rampCalls[0];
+      const [, time] = rampCalls[0];
       const expectedTime = ctx.currentTime + 0.2;
       expect(Math.abs(time - expectedTime)).toBeLessThan(0.01);
     });
