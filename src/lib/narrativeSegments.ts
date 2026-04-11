@@ -128,9 +128,43 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
         break;
       }
       case MessageType.CHAPTER_MARKER: {
+        // Playtest 2026-04-11: chapter markers must render ABOVE the
+        // narration block that triggered them, not after it. The server
+        // emits the narration first (because the narrator's output is
+        // what determined the location shift) and only emits the
+        // ChapterMarker once the location change has been detected — so
+        // the message arrival order is Narration → ChapterMarker, but
+        // the visual order should be ChapterMarker → Narration.
+        //
+        // Fix: when a chapter-marker arrives, walk backwards through
+        // the segments we've already emitted to find the start of the
+        // most recent narration block, and INSERT the chapter-marker
+        // at that boundary. The narration block is the contiguous tail
+        // of "narration-flowy" segments — text, separator, gallery-notice,
+        // render-pending, image, portrait-group. We stop at any
+        // structural segment that delimits the previous turn:
+        // player-action, player-aside, system, error, action-reveal,
+        // turn-status, or another chapter-marker.
         const location = msg.payload.location as string;
         if (location && location !== lastChapterLocation) {
-          segments.push({ kind: "chapter-marker", text: location });
+          const newMarker: NarrativeSegment = {
+            kind: "chapter-marker",
+            text: location,
+          };
+          let insertAt = segments.length;
+          while (insertAt > 0) {
+            const prev = segments[insertAt - 1];
+            const isNarrationBlockMember =
+              prev.kind === "text" ||
+              prev.kind === "separator" ||
+              prev.kind === "gallery-notice" ||
+              prev.kind === "render-pending" ||
+              prev.kind === "image" ||
+              prev.kind === "portrait-group";
+            if (!isNarrationBlockMember) break;
+            insertAt -= 1;
+          }
+          segments.splice(insertAt, 0, newMarker);
           lastChapterLocation = location;
         }
         break;
