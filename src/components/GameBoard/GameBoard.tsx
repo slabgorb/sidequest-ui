@@ -28,7 +28,6 @@ import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
 import type { ConfrontationData } from "@/components/ConfrontationOverlay";
-import type { JournalEntry } from "@/components/JournalView";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import type { CharacterSummary } from "@/components/PartyPanel";
@@ -44,7 +43,8 @@ import { NarrativeWidget } from "./widgets/NarrativeWidget";
 import { CharacterWidget } from "./widgets/CharacterWidget";
 import { MapWidget } from "./widgets/MapWidget";
 import { InventoryWidget } from "./widgets/InventoryWidget";
-import { JournalWidget } from "./widgets/JournalWidget";
+// JournalWidget removed playtest 2026-04-11 — see widgetRegistry.ts comment.
+// JournalView and the journal data pipeline are intentionally retained.
 import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { ConfrontationWidget } from "./widgets/ConfrontationWidget";
 import { AudioWidget } from "./widgets/AudioWidget";
@@ -115,7 +115,9 @@ export interface GameBoardProps {
   mapData?: MapState | null;
   audio?: ReturnType<typeof useAudio>;
   nowPlaying?: NowPlaying | null;
-  journalEntries?: JournalEntry[];
+  // journalEntries prop removed playtest 2026-04-11 along with the Handouts
+  // tab. The JournalEntry type and gameState.journal pipeline are kept in
+  // the provider so the feature can be revived without re-plumbing data.
   knowledgeEntries?: KnowledgeEntry[];
   confrontationData?: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
@@ -144,7 +146,6 @@ export function GameBoard({
   mapData = null,
   audio,
   nowPlaying = null,
-  journalEntries,
   knowledgeEntries,
   confrontationData,
   onBeatSelect,
@@ -198,7 +199,6 @@ export function GameBoard({
     available.add("inventory");
     available.add("map");
     available.add("knowledge");
-    available.add("journal");
     available.add("gallery");
     available.add("audio");
     if (confrontationData) available.add("confrontation");
@@ -285,8 +285,6 @@ export function GameBoard({
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
       case "map":
         return <MapWidget mapData={mapData ?? null} />;
-      case "journal":
-        return journalEntries ? <JournalWidget entries={journalEntries} /> : null;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
@@ -308,7 +306,7 @@ export function GameBoard({
       default:
         return null;
     }
-  }, [messages, thinking, characterSheet, inventoryData, mapData, journalEntries,
+  }, [messages, thinking, characterSheet, inventoryData, mapData,
       knowledgeEntries, confrontationData, onBeatSelect, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug,
       onRequestJournal, handleResourceThresholdCrossed, characters, currentPlayerId,
@@ -366,7 +364,6 @@ export function GameBoard({
       "inventory",
       "map",
       "knowledge",
-      "journal",
       "gallery",
       "audio",
     ];

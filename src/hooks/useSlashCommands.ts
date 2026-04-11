@@ -28,8 +28,9 @@ export function useSlashCommands() {
         return { handled: true, messages: [], widget: 'character' };
       case '/map':
         return { handled: true, messages: [], widget: 'map' };
-      case '/journal':
-        return { handled: true, messages: [], widget: 'journal' };
+      // /journal removed playtest 2026-04-11 — Handouts tab was removed from
+      // the right-panel tab strip. The slash command had no surface to
+      // toggle. Restore both together if/when the feature is revived.
       case '/knowledge':
         return { handled: true, messages: [], widget: 'knowledge' };
       case '/settings':

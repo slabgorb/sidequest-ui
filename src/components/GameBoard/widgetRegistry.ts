@@ -1,9 +1,20 @@
+// Playtest 2026-04-11: the "journal" widget (labeled "Handouts" in the UI)
+// was removed from the right-side tab strip per Keith's playtest decision —
+// the empty tab was clutter, never populated, and invited "what's this for?"
+// questions. The render pipeline's handout classification code is kept on
+// the server side (sidequest-server/src/render_integration.rs) so the
+// concept can be revived later with a clear trigger and populated example.
+//
+// Underlying client-side surfaces still alive (intentionally not removed):
+//   - JournalEntry type and gameState.journal pipeline (provider/hook level)
+//   - JournalView component (the UI shell, ready for re-mounting)
+// These can be reattached when the feature ships properly. Only the
+// visible tab + JournalWidget wrapper + /journal slash command were removed.
 export type WidgetId =
   | "narrative"
   | "character"
   | "inventory"
   | "map"
-  | "journal"
   | "knowledge"
   | "gallery"
   | "confrontation"
@@ -63,17 +74,6 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
     minH: 3,
     defaultW: 4,
     defaultH: 5,
-    closable: true,
-    dataGated: true,
-  },
-  journal: {
-    id: "journal",
-    label: "Handouts",
-    hotkey: "j",
-    minW: 2,
-    minH: 2,
-    defaultW: 4,
-    defaultH: 4,
     closable: true,
     dataGated: true,
   },
