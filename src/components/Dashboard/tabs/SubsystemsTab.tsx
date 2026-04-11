@@ -40,13 +40,31 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
     });
   }, [components, gridTurns]);
 
-  // Silence detection: components not seen in last 5 turns
+  // Silence detection: components not seen in last 5 turns.
+  //
+  // Playtest 2026-04-11 note: "SILENT" is a NOISE label, not a BROKEN label.
+  // Many subsystems only fire during specific phases (character_creation,
+  // chargen, inventory, render, session_restore, world_materialization, etc.)
+  // and will naturally go quiet during ordinary turn-by-turn play. Keith
+  // flagged that "16 events labeled SILENT is confusing" — the fix is to
+  // explain it via tooltip (see SILENT badges below) so operators know it
+  // means "idle, not failed."
   const silentComponents = useMemo(() => {
     if (turnBuckets.length < 5) return new Set<string>();
     const recent = turnBuckets.slice(-5);
     const recentComps = new Set(recent.flat().map((e) => e.component));
     return new Set(components.filter((c) => !recentComps.has(c)));
   }, [components, turnBuckets]);
+
+  // Tooltip text used by both SILENT badges (Activity Grid label and the
+  // Component Summary status column). Single source of truth so the two
+  // sites can't drift.
+  const SILENT_TOOLTIP =
+    "No events from this subsystem in the last 5 turns. " +
+    "This usually means the subsystem is idle (e.g. chargen and " +
+    "session_restore only fire on connect; render only fires when an " +
+    "image is queued), NOT that it's broken. Click the row to see the " +
+    "subsystem's most recent events.";
 
   // Component summary
   const summary = useMemo(() => {
@@ -109,8 +127,16 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
                 >
                   {comp}
                   {silentComponents.has(comp) && (
-                    <span style={{ color: THEME.amber, fontSize: 10, marginLeft: 4 }}>
-                      SILENT
+                    <span
+                      title={SILENT_TOOLTIP}
+                      style={{
+                        color: THEME.amber,
+                        fontSize: 10,
+                        marginLeft: 4,
+                        cursor: "help",
+                      }}
+                    >
+                      IDLE
                     </span>
                   )}
                 </div>
@@ -168,7 +194,12 @@ export function SubsystemsTab({ allEvents, componentMap, turnCount }: Props) {
                 </td>
                 <td style={tdStyle}>
                   {s.isSilent ? (
-                    <span style={{ color: THEME.amber }}>⚠ SILENT</span>
+                    <span
+                      title={SILENT_TOOLTIP}
+                      style={{ color: THEME.amber, cursor: "help" }}
+                    >
+                      ⊘ IDLE
+                    </span>
                   ) : s.errors > 0 ? (
                     <span style={{ color: THEME.red }}>✕ ERROR</span>
                   ) : (
