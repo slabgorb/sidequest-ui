@@ -26,7 +26,7 @@ const BADGE_EXCLUDED: ReadonlySet<WidgetId> = new Set<WidgetId>(["character", "a
 
 interface MobileTabViewProps {
   renderWidget: (id: WidgetId) => ReactNode;
-  availableWidgets: Set<WidgetId>;
+  availableWidgets: ReadonlySet<WidgetId>;
   /**
    * Story 33-11: per-tab monotonic content counters. Parent increments a
    * tab's counter when new content arrives for that tab (new world_learned
@@ -67,6 +67,8 @@ export function MobileTabView({
     let signalsChanged = false;
     const newBadges: WidgetId[] = [];
     for (const [key, value] of Object.entries(contentSignals)) {
+      // Safe: contentSignals is typed `Partial<Record<WidgetId, number>>`, so
+      // every key at runtime is a WidgetId. Object.entries widens to string.
       const id = key as WidgetId;
       if (seenSignals[id] !== value) {
         signalsChanged = true;

@@ -198,15 +198,20 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
 
   // AC-8: Badge is rendered INLINE after the label text, not absolutely
   // positioned — AC explicitly calls this out to avoid clipping.
-  it("renders the badge inline (no 'absolute' positioning class)", () => {
+  it("renders the badge inline (no 'absolute' or 'fixed' positioning, on itself or wrapper)", () => {
     const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
     rerenderWith({ knowledge: 1 });
-    const badge = queryBadge("knowledge");
-    expect(badge).not.toBeNull();
-    // Guard: the AC calls out that absolute positioning clips against the
-    // tab bar's bottom edge. Reject any utility class variant of `absolute`.
-    const cls = badge!.className ?? "";
-    expect(cls).not.toMatch(/(^|\s)absolute(\s|$)/);
+    const badge = screen.getByTestId("tab-badge-knowledge");
+
+    // Guard: the AC calls out that absolute/fixed positioning clips against
+    // the tab bar's bottom edge. Reject any utility class variant of
+    // `absolute` or `fixed` on the badge itself OR its immediate wrapper
+    // (either layer could remove it from the inline flow).
+    const positioned = /(^|\s)(absolute|fixed)(\s|$)/;
+    expect(badge.className).not.toMatch(positioned);
+    const wrapper = badge.parentElement;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.className).not.toMatch(positioned);
   });
 
   it("renders the badge as a descendant of the tab button (sibling of the label)", () => {
@@ -242,6 +247,34 @@ describe("MobileTabView — tab notification badges (Story 33-11)", () => {
     rerenderWith({ knowledge: 5 });
     expect(queryBadge("knowledge")).toBeNull();
   });
+
+  // AC pin: "changes" in the AC is bidirectional — inventory items
+  // decrease when consumed, gold decreases on purchase. A signal
+  // decrease must also fire a badge so the player notices the shift.
+  // This pins the implementation's "any change, not just rises"
+  // semantics against accidental narrowing.
+  it("renders a badge when a signal value decreases (not only increases)", () => {
+    const { rerenderWith } = renderTabView({ contentSignals: { inventory: 5 } });
+    rerenderWith({ inventory: 3 });
+    expect(queryBadge("inventory")).not.toBeNull();
+  });
+
+  // Re-activation path: badge fires on inactive tab, user clicks to
+  // dismiss, then a new signal lands while they are still on that tab.
+  // The "active tab never badges" rule must apply on this second arrival
+  // too — the user is already looking at the tab, so the second update
+  // has also been "seen" as it arrives.
+  it("does not re-badge an active tab when another signal fires after the initial clear", () => {
+    const { rerenderWith } = renderTabView({ contentSignals: { knowledge: 0 } });
+    rerenderWith({ knowledge: 1 });
+    expect(queryBadge("knowledge")).not.toBeNull();
+
+    fireEvent.click(getTabButton("Journal")); // knowledge is now active, badge cleared
+    expect(queryBadge("knowledge")).toBeNull();
+
+    rerenderWith({ knowledge: 2 });
+    expect(queryBadge("knowledge")).toBeNull();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -254,22 +287,34 @@ describe("MobileTabView — contentSignals prop contract (Story 33-11 wiring)", 
     expect(typeof mod.MobileTabView).toBe("function");
   });
 
-  it("MobileTabViewProps declares a `contentSignals` field", async () => {
-    // Source-level guard: the prop must be declared on the interface so
-    // GameBoard can pass it without casts.
-    const src = (await import("@/components/GameBoard/MobileTabView?raw")) as unknown as {
-      default: string;
+  it("MobileTabViewProps accepts a `contentSignals` prop at compile time", () => {
+    // Compile-time guard: if the prop is removed from MobileTabViewProps,
+    // this object literal fails to satisfy the component's prop type and
+    // TypeScript rejects the file. This is stronger than a raw-source
+    // regex — it survives interface extraction and rename refactors.
+    const props: Parameters<typeof MobileTabView>[0] = {
+      renderWidget: renderWidgetStub,
+      availableWidgets: ALL_AVAILABLE,
+      contentSignals: { knowledge: 0, gallery: 0, map: 0, inventory: 0 },
     };
-    expect(src.default).toMatch(/contentSignals\s*\??\s*:/);
+    expect(props.contentSignals).toBeDefined();
   });
 
-  it("GameBoard passes contentSignals through to MobileTabView", async () => {
-    // Integration wiring check: GameBoard must forward a contentSignals
-    // prop when rendering MobileTabView, otherwise the badges will never
-    // fire in production code paths.
+  it("GameBoard forwards contentSignals as a JSX prop to MobileTabView", async () => {
+    // Integration wiring check: GameBoard must forward contentSignals as
+    // a JSX prop to <MobileTabView>. The regex must NOT match the
+    // `const contentSignals = useMemo(...)` assignment line — only the
+    // JSX prop itself. If the JSX prop is deleted, this test must fail.
     const src = (await import("@/components/GameBoard/GameBoard?raw")) as unknown as {
       default: string;
     };
-    expect(src.default).toMatch(/contentSignals\s*=/);
+    // Look for `contentSignals={contentSignals}` specifically — the
+    // JSX prop pass, not the variable declaration. The `{contentSignals}`
+    // binding side disambiguates the JSX call site from the useMemo
+    // assignment (which is `const contentSignals =`, not `={`).
+    expect(src.default).toMatch(/contentSignals=\{contentSignals\}/);
+    // Belt-and-suspenders: the same prop must appear inside a
+    // <MobileTabView ...> JSX tag, not in some unrelated location.
+    expect(src.default).toMatch(/<MobileTabView[\s\S]*?contentSignals=\{contentSignals\}[\s\S]*?>/);
   });
 });

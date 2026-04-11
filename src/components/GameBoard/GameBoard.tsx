@@ -101,6 +101,13 @@ function PanelAdapter({
 
 const DOCKVIEW_COMPONENTS = { PanelAdapter };
 
+// Story 33-11: Multiplier used to pack inventory items count and gold into
+// a single content-signal scalar for the mobile tab badge mechanism. Must
+// be strictly greater than the largest realistic gold value in a session.
+// 10M is ~10x the practical ceiling for any genre pack; bump it if a
+// genre introduces a higher-currency economy.
+const INVENTORY_GOLD_CAP = 10_000_000;
+
 // ────────────────────────────────────────────────────────────────────────────
 
 export interface GameBoardProps {
@@ -261,18 +268,26 @@ export function GameBoard({
   const { chapterTitle } = useRunningHeader(messages);
 
   // Story 33-11: content signals drive the mobile tab notification badges.
-  // Each entry is a monotonic counter for a tab's visible content — when
-  // the value rises while that tab is inactive, MobileTabView flashes a
-  // dot badge. `inventory` uses a composite scalar so either items-count
-  // or gold changes are picked up as a single delta.
+  // Each entry is a change-detection scalar for a tab's visible content —
+  // when the value changes while that tab is inactive, MobileTabView
+  // flashes a dot badge. MobileTabView compares strict-equality on the
+  // values, so any encoding is fine as long as distinct states hash to
+  // distinct values.
+  //
+  // `inventory` is a composite of two fields packed into one scalar
+  // using INVENTORY_GOLD_CAP (module-scope const) as the multiplier.
+  // The packing is collision-free as long as gold stays below the cap
+  // (10M), which is well beyond the practical ceiling for any genre in
+  // the current sprint. The prior cut used 10_000 and collided once
+  // gold reached 10k — common mid-game in fantasy.
   const galleryImages = useImageBus();
   const contentSignals = useMemo<Partial<Record<WidgetId, number>>>(
     () => ({
       knowledge: knowledgeEntries?.length ?? 0,
       gallery: galleryImages.length,
-      map: mapData?.explored?.length ?? 0,
+      map: mapData?.explored.length ?? 0,
       inventory: inventoryData
-        ? inventoryData.items.length * 10000 + inventoryData.gold
+        ? inventoryData.items.length * INVENTORY_GOLD_CAP + inventoryData.gold
         : 0,
     }),
     [knowledgeEntries, galleryImages, mapData, inventoryData],
