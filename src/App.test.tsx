@@ -37,3 +37,68 @@ describe("App", () => {
     expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WebSocket OPEN-transition wiring tests — playtest 2026-04-11 regression guard
+//
+// Context: InputBar was reported stuck in [disabled] state after an API-server
+// restart + page reload. Root cause: the reconnect cleanup effect was a single
+// useEffect gated on `readyState === OPEN && wasDisconnected && connected`. On
+// page reload, `connected` is false when the WebSocket first transitions to
+// OPEN, so the cleanup never fired — stale canType/thinking state could stick.
+//
+// The fix splits the effect into two:
+//   (1) a defensive state reset that fires on ANY OPEN transition (no gate)
+//   (2) a handshake re-send that keeps the `connected` gate (only real reconnects)
+//
+// These grep-style source tests pin the structural shape of the fix so a
+// future refactor can't silently re-introduce the guard bug. Follows the same
+// source-level wiring convention used in confrontation-wiring.test.tsx.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("Wiring: App.tsx WebSocket OPEN-transition cleanup (playtest 2026-04-11)", () => {
+  const readAppSrc = async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    return fs.readFileSync(path.resolve(__dirname, "./App.tsx"), "utf-8");
+  };
+
+  it("has a defensive cleanup effect that clears thinking+canType on OPEN without a connected gate", async () => {
+    const src = await readAppSrc();
+    // Effect (1): must set both setThinking(false) and setCanType(true)
+    // inside an `if (readyState === WebSocket.OPEN && prevReadyState.current !== WebSocket.OPEN)`
+    // block. Crucially, this block must NOT reference `connected` — that's
+    // the foot-gun we're guarding against.
+    const defensiveBlock = src.match(
+      /if\s*\(\s*readyState\s*===\s*WebSocket\.OPEN\s*&&\s*prevReadyState\.current\s*!==\s*WebSocket\.OPEN\s*\)\s*\{[\s\S]*?\}/,
+    );
+    expect(
+      defensiveBlock,
+      "App.tsx must contain a defensive OPEN-transition cleanup block that clears canType/thinking without a `connected` gate. This prevents the playtest 2026-04-11 'InputBar stuck disabled' regression.",
+    ).not.toBeNull();
+    const body = defensiveBlock![0];
+    expect(body).toContain("setThinking(false)");
+    expect(body).toContain("setCanType(true)");
+    expect(
+      body.includes("connected"),
+      "Defensive cleanup block must NOT reference `connected` — that guard is the exact bug we're fixing.",
+    ).toBe(false);
+  });
+
+  it("keeps the reconnect handshake gated on `connected && wasDisconnected`", async () => {
+    const src = await readAppSrc();
+    // Effect (2): must still guard the re-handshake on `connected` so the
+    // first-mount path (which has its own handshake via handleConnect) doesn't
+    // double-fire.
+    expect(src).toMatch(
+      /readyState\s*===\s*WebSocket\.OPEN\s*&&\s*wasDisconnected\s*&&\s*connected/,
+    );
+  });
+
+  it("only sends SESSION_EVENT connect handshake when we have a saved session", async () => {
+    const src = await readAppSrc();
+    // The re-handshake effect must loadSession() and guard on its result,
+    // otherwise we'd send connect payloads with empty fields on fresh visits.
+    expect(src).toMatch(/const\s+saved\s*=\s*loadSession\(\)[\s\S]*?if\s*\(\s*saved\s*\)/);
+  });
+});
