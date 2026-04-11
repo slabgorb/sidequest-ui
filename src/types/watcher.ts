@@ -49,6 +49,14 @@ export interface TurnCompleteFields {
   beats_fired?: Array<{ trope: string; threshold?: number }>;
   spans?: TurnSpan[];
   delta_empty?: boolean;
+  /** Player who took this turn. Used for session grouping in the timeline. */
+  player_id?: string;
+  /** Genre slug for the active session. Added playtest 2026-04-11 to enable
+   *  session-divider rendering when the same player has Turn #1 from two
+   *  different worlds in the timeline. */
+  genre?: string;
+  /** World slug for the active session. See `genre` comment. */
+  world?: string;
 }
 
 
