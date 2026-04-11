@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   installWebAudioMock,
   installLocalStorageMock,
-  createMockAudioBuffer,
   type MockAudioContext,
 } from "./web-audio-mock";
 
@@ -64,7 +63,6 @@ describe("AudioEngine", () => {
       engine.setVolume("music", 0.5);
       expect(engine.getVolume("music")).toBe(0.5);
       expect(engine.getVolume("sfx")).toBe(1.0);
-      expect(engine.getVolume("voice")).toBe(1.0);
       engine.dispose();
     });
 
@@ -72,14 +70,6 @@ describe("AudioEngine", () => {
       const engine = new AudioEngine();
       engine.setVolume("sfx", 0.3);
       expect(engine.getVolume("sfx")).toBe(0.3);
-      expect(engine.getVolume("music")).toBe(1.0);
-      engine.dispose();
-    });
-
-    it("setVolume sets voice channel independently", () => {
-      const engine = new AudioEngine();
-      engine.setVolume("voice", 0.7);
-      expect(engine.getVolume("voice")).toBe(0.7);
       expect(engine.getVolume("music")).toBe(1.0);
       engine.dispose();
     });
@@ -148,13 +138,12 @@ describe("AudioEngine", () => {
       // Pre-populate localStorage
       localStorage.setItem(
         "sidequest_audio_volumes",
-        JSON.stringify({ music: 0.4, sfx: 0.7, voice: 0.9, master: 0.8 }),
+        JSON.stringify({ music: 0.4, sfx: 0.7, master: 0.8 }),
       );
 
       const engine = new AudioEngine();
       expect(engine.getVolume("music")).toBe(0.4);
       expect(engine.getVolume("sfx")).toBe(0.7);
-      expect(engine.getVolume("voice")).toBe(0.9);
       expect(engine.getVolume("master")).toBe(0.8);
       engine.dispose();
     });
@@ -163,7 +152,6 @@ describe("AudioEngine", () => {
       const engine = new AudioEngine();
       expect(engine.getVolume("music")).toBe(1.0);
       expect(engine.getVolume("sfx")).toBe(1.0);
-      expect(engine.getVolume("voice")).toBe(1.0);
       expect(engine.getVolume("master")).toBe(1.0);
       engine.dispose();
     });
@@ -292,10 +280,11 @@ describe("AudioEngine", () => {
   // -----------------------------------------------------------------------
 
   describe("Audio graph topology", () => {
-    it("creates 3 channel gain nodes plus master", () => {
+    it("creates 2 channel gain nodes plus master", () => {
       const engine = new AudioEngine();
-      // Should have: music, sfx, voice, master = at least 4 gain nodes
-      expect(ctx._gainNodes.length).toBeGreaterThanOrEqual(4);
+      // Should have: music, sfx, master = at least 3 gain nodes
+      // (voice channel removed with TTS)
+      expect(ctx._gainNodes.length).toBeGreaterThanOrEqual(3);
       engine.dispose();
     });
 

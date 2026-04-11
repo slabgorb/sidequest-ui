@@ -6,16 +6,6 @@ import {
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
 
-// Mock useWhisper to avoid @huggingface/transformers dependency in tests
-vi.mock("@/hooks/useWhisper", () => ({
-  useWhisper: () => ({
-    transcribe: vi.fn().mockResolvedValue(""),
-    status: "ready" as const,
-    loadProgress: 1,
-    isWebGPU: false,
-  }),
-}));
-
 import App from "./App";
 
 beforeEach(() => {

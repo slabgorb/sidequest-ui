@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CharacterPanel } from "../CharacterPanel";
 import type { CharacterPanelProps, ResourcePool } from "../CharacterPanel";
 import type { CharacterSheetData } from "../CharacterSheet";
-import type { ResourceThreshold } from "../GenericResourceBar";
 
 // ═══════════════════════════════════════════════════════════
 // Test fixtures
@@ -408,8 +407,6 @@ describe("25-10 Wiring: GenericResourceBar imported in CharacterPanel", () => {
   it("CharacterPanel imports and renders GenericResourceBar (non-test consumer)", async () => {
     // This verifies that CharacterPanel actually imports GenericResourceBar,
     // not just that the test file can import both independently
-    const mod = await import("../CharacterPanel");
-    const source = mod.CharacterPanel.toString();
     // The compiled function should reference GenericResourceBar or resource-bar testid
     // This is a structural wiring check — if CharacterPanel doesn't import it, this fails
     render(

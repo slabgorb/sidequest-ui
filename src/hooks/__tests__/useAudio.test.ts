@@ -36,10 +36,14 @@ describe("useAudio", () => {
       expect(result.current.engine).not.toBeNull();
     });
 
-    it("disposes engine on unmount", () => {
+    it("does NOT dispose the singleton AudioEngine on unmount", () => {
+      // AudioEngine is a process-wide singleton (see useAudio.ts comment).
+      // Closing the AudioContext kills all audio and the ref can't recover,
+      // so unmount must NOT call close. Re-mounting the hook (e.g., after
+      // a route change) reuses the same engine via getInstance().
       const { unmount } = renderHook(() => useAudio());
       unmount();
-      expect(ctx.close).toHaveBeenCalled();
+      expect(ctx.close).not.toHaveBeenCalled();
     });
 
     it("engine is stable across re-renders (same reference)", () => {

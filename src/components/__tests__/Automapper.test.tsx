@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { Automapper } from "../Automapper";
-import type { AutomapperProps, ExploredRoom, ExitInfo, ThemeConfig } from "../Automapper";
+import type { ExploredRoom, ExitInfo, ThemeConfig } from "../Automapper";
 
 // ============================================================================
 // Test Fixtures

@@ -54,6 +54,7 @@ export function TurnStatusPanel({
   const showWaiting = localStatus !== undefined && isResolved(localStatus) && !allResolved;
   const isStructured = gameMode === 'structured';
   const sealedCount = deduped.filter((e) => isResolved(e.status)).length;
+  const localAutoResolved = localStatus === 'auto_resolved';
 
   // Track previous status to deduplicate callback fires
   const prevStatusRef = useRef<TurnStatusEntry['status'] | undefined>(undefined);
@@ -118,10 +119,15 @@ export function TurnStatusPanel({
         <span className="text-muted-foreground ml-2">({sealedCount}/{deduped.length})</span>
       )}
       {isStructured && allResolved && (
-        <span className="text-emerald-400 ml-2 font-medium">All sealed — resolving…</span>
+        <span className="text-emerald-400 ml-2 font-medium">All letters sealed — resolving…</span>
       )}
       {!isStructured && showWaiting && <span>Waiting for other players...</span>}
       {!isStructured && allResolved && <span>Resolving turn...</span>}
+      {localAutoResolved && (
+        <span className="text-amber-500 ml-2 font-medium">
+          Your action timed out
+        </span>
+      )}
     </div>
   );
 }

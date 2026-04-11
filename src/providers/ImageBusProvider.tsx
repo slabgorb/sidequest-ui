@@ -62,6 +62,9 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
   );
 }
 
+// Co-located hook for the same reason as GameStateProvider — splitting one
+// context+hook+component into 3 files for HMR is more churn than it's worth.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useImageBus(): GalleryImage[] {
   return useContext(ImageBusContext).images;
 }

@@ -10,7 +10,7 @@
  *  - Completion transitions to game view
  *  - Returning players skip creation
  */
-import { render, screen, act, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -18,16 +18,6 @@ import {
   installLocalStorageMock,
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
-
-// Mock useWhisper to avoid @huggingface/transformers dependency in tests
-vi.mock("@/hooks/useWhisper", () => ({
-  useWhisper: () => ({
-    transcribe: vi.fn().mockResolvedValue(""),
-    status: "ready" as const,
-    loadProgress: 1,
-    isWebGPU: false,
-  }),
-}));
 
 import App from "../App";
 import { MessageType, type GameMessage } from "@/types/protocol";

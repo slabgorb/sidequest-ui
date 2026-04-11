@@ -1,4 +1,4 @@
-import { render, screen, renderHook, act } from '@testing-library/react';
+import { render, screen, renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import {
   GameStateProvider,
@@ -21,14 +21,6 @@ function narrationWithDelta(delta: Record<string, unknown>): GameMessage {
     type: MessageType.NARRATION,
     payload: { text: 'The wind howls.', state_delta: delta },
     player_id: 'p1',
-  };
-}
-
-function turnStatusWithDelta(delta: Record<string, unknown>): GameMessage {
-  return {
-    type: MessageType.TURN_STATUS,
-    payload: { state_delta: delta },
-    player_id: 'server',
   };
 }
 

@@ -60,6 +60,11 @@ export interface GameStateContextValue {
   setLocalPlayerId: (id: string) => void;
 }
 
+// react-refresh would prefer this constant lived in a non-component file, but
+// 11 importers across the codebase reach for it from this module. The rule's
+// concern (HMR state loss when this file changes) is moot in practice — the
+// provider is touched maybe twice a year. Suppress and stay co-located.
+// eslint-disable-next-line react-refresh/only-export-components
 export const EMPTY_GAME_STATE: ClientGameState = {
   characters: [],
   location: '',
@@ -155,6 +160,8 @@ export function GameStateProvider({ children }: GameStateProviderProps) {
   );
 }
 
+// Co-located hook — see comment on EMPTY_GAME_STATE for the rationale.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGameState(): GameStateContextValue {
   return useContext(GameStateContext);
 }

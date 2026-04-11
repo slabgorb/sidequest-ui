@@ -1,10 +1,9 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import type {
   TacticalGridData,
   TacticalThemeConfig,
   TacticalCell,
-  FeatureType,
   GridPos,
 } from "@/types/tactical";
 
@@ -106,11 +105,6 @@ function makeAllCellTypesGrid(): TacticalGridData {
 async function importRenderer() {
   const mod = await import("@/components/TacticalGridRenderer");
   return mod.TacticalGridRenderer;
-}
-
-async function importAutomapper() {
-  const mod = await import("@/components/Automapper");
-  return mod.Automapper;
 }
 
 // ── AC-1: SVG renders all 8 cell types with visually distinct styles ──────────

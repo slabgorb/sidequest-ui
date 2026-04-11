@@ -5,7 +5,6 @@ import { MessageType, type GameMessage } from "@/types/protocol";
 import {
   installWebAudioMock,
   installLocalStorageMock,
-  type MockAudioContext,
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
 
@@ -13,11 +12,9 @@ import { AudioEngine } from "@/audio/AudioEngine";
 // Setup
 // ---------------------------------------------------------------------------
 
-let ctx: MockAudioContext;
-
 beforeEach(() => {
   AudioEngine.resetInstance();
-  ctx = installWebAudioMock();
+  installWebAudioMock();
   installLocalStorageMock();
   // Mock fetch for AudioEngine.playMusic/playSfx which call fetch(url)
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({

@@ -11,7 +11,7 @@ export interface UseWebSocketOptions<T> {
   url: string;
   /** Called for each parsed JSON message. */
   onMessage: (message: T) => void;
-  /** Called for binary (Blob) frames — used for TTS audio. */
+  /** Called for binary (Blob) frames. */
   onBinaryMessage?: (data: ArrayBuffer) => void;
   /** Called on WebSocket error events. */
   onError?: (error: Event) => void;
@@ -117,7 +117,7 @@ export function useWebSocket<T>({
     };
 
     ws.onmessage = (ev: MessageEvent) => {
-      // Binary frame — delegate to onBinaryMessage for TTS/audio routing
+      // Binary frame — delegate to onBinaryMessage if a handler is set.
       if (ev.data instanceof Blob) {
         ev.data
           .arrayBuffer()
