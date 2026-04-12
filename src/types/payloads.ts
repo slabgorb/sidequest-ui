@@ -240,6 +240,69 @@ export interface AchievementEarnedPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Dice types (story 34-2, mirroring sidequest-protocol wire types)
+// ---------------------------------------------------------------------------
+
+/** One group of dice in a pool — e.g., `{ sides: 20, count: 1 }` for a d20. */
+export interface DieSpec {
+  /** Die face count (4, 6, 8, 10, 12, 20, 100). 0 = Unknown. */
+  sides: number;
+  /** How many dice of this type to throw (1-255). */
+  count: number;
+}
+
+/** Throw gesture parameters — controls animation, NOT outcome (ADR-074). */
+export interface DiceThrowParams {
+  /** Initial linear velocity `[x, y, z]`. */
+  velocity: [number, number, number];
+  /** Initial angular velocity `[x, y, z]`. */
+  angular: [number, number, number];
+  /** Release point, normalized `[x, y]` in `[0.0, 1.0]`. */
+  position: [number, number];
+}
+
+/** Outcome classification — feeds narrator tone. */
+export type RollOutcome = "CritSuccess" | "Success" | "Fail" | "CritFail";
+
+/** Per-group face values paired with the originating DieSpec. */
+export interface DieGroupResult {
+  spec: DieSpec;
+  faces: number[];
+}
+
+/** Server -> all clients: request a dice roll during the reveal phase. */
+export interface DiceRequestPayload {
+  request_id: string;
+  rolling_player_id: string;
+  character_name: string;
+  dice: DieSpec[];
+  modifier: number;
+  stat: string;
+  difficulty: number;
+  context: string;
+}
+
+/** Client -> server: player submits throw gesture. */
+export interface DiceThrowPayload {
+  request_id: string;
+  throw_params: DiceThrowParams;
+}
+
+/** Server -> all clients: resolved dice roll outcome. */
+export interface DiceResultPayload {
+  request_id: string;
+  rolling_player_id: string;
+  character_name: string;
+  rolls: DieGroupResult[];
+  modifier: number;
+  total: number;
+  difficulty: number;
+  outcome: RollOutcome;
+  seed: number;
+  throw_params: DiceThrowParams;
+}
+
+// ---------------------------------------------------------------------------
 // Discriminated union
 // ---------------------------------------------------------------------------
 
@@ -342,6 +405,21 @@ export interface JournalResponseMessage extends BaseMessage {
   payload: JournalResponsePayload;
 }
 
+export interface DiceRequestMessage extends BaseMessage {
+  type: MessageType.DICE_REQUEST;
+  payload: DiceRequestPayload;
+}
+
+export interface DiceThrowMessage extends BaseMessage {
+  type: MessageType.DICE_THROW;
+  payload: DiceThrowPayload;
+}
+
+export interface DiceResultMessage extends BaseMessage {
+  type: MessageType.DICE_RESULT;
+  payload: DiceResultPayload;
+}
+
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -361,7 +439,9 @@ export type TypedGameMessage =
   | ActionRevealMessage
   | ItemDepletedMessage
   | ResourceMinReachedMessage
-  | JournalResponseMessage;
+  | JournalResponseMessage
+  | DiceRequestMessage
+  | DiceResultMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -433,6 +513,18 @@ export function isResourceMinReached(msg: TypedGameMessage): msg is ResourceMinR
 
 export function isJournalResponse(msg: TypedGameMessage): msg is JournalResponseMessage {
   return msg.type === MessageType.JOURNAL_RESPONSE;
+}
+
+export function isDiceRequest(msg: TypedGameMessage): msg is DiceRequestMessage {
+  return msg.type === MessageType.DICE_REQUEST;
+}
+
+export function isDiceThrow(msg: TypedGameMessage): msg is DiceThrowMessage {
+  return msg.type === MessageType.DICE_THROW;
+}
+
+export function isDiceResult(msg: TypedGameMessage): msg is DiceResultMessage {
+  return msg.type === MessageType.DICE_RESULT;
 }
 
 // ---------------------------------------------------------------------------

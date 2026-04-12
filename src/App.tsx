@@ -23,10 +23,13 @@ import type { MapState } from "@/components/MapOverlay";
 import type { CharacterSummary } from "@/components/PartyPanel";
 import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
 );
+
+const LazyDiceOverlay = lazy(() => import("@/dice/DiceOverlay"));
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -144,6 +147,10 @@ function AppInner() {
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
+
+  // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
+  const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
+  const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
 
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
@@ -385,6 +392,17 @@ function AppInner() {
       return;
     }
 
+    // Dice overlay — driven by DICE_REQUEST and DICE_RESULT (story 34-5)
+    if (msg.type === MessageType.DICE_REQUEST) {
+      setDiceRequest(msg.payload as unknown as DiceRequestPayload);
+      setDiceResult(null);
+      return;
+    }
+    if (msg.type === MessageType.DICE_RESULT) {
+      setDiceResult(msg.payload as unknown as DiceResultPayload);
+      return;
+    }
+
     // Server says the session is gone — re-send the connect handshake so the
     // server can restore (or start fresh).  This happens after a server restart
     // when the client's WebSocket auto-reconnects but never re-sent the connect.
@@ -541,6 +559,22 @@ function AppInner() {
     [send],
   );
 
+  // Dice throw — send gesture params to server as DICE_THROW (story 34-5)
+  const handleDiceThrow = useCallback(
+    (params: DiceThrowParams) => {
+      if (!diceRequest) return;
+      send({
+        type: MessageType.DICE_THROW,
+        payload: {
+          request_id: diceRequest.request_id,
+          throw_params: params,
+        },
+        player_id: "",
+      });
+    },
+    [diceRequest, send],
+  );
+
   // Bug 6: Leave game — disconnect, clear state, return to lobby
   const handleLeave = useCallback(() => {
     disconnect();
@@ -558,6 +592,8 @@ function AppInner() {
     setActivePlayerName(null);
     setCanType(true);
     setConfrontationData(null);
+    setDiceRequest(null);
+    setDiceResult(null);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
@@ -762,6 +798,16 @@ function AppInner() {
                 layoutMode={layoutMode}
               />
             </ImageBusProvider>
+            {diceRequest && (
+              <Suspense fallback={null}>
+                <LazyDiceOverlay
+                  diceRequest={diceRequest}
+                  diceResult={diceResult}
+                  playerId={currentPlayerId ?? ""}
+                  onThrow={handleDiceThrow}
+                />
+              </Suspense>
+            )}
           </ErrorBoundary>
         )}
       </main>
