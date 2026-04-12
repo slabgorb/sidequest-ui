@@ -482,38 +482,43 @@ function AppInner() {
     [send, executeSlashCommand, toggleWidget],
   );
 
-  // Parley / confrontation beat dispatch. When the player clicks a structured
-  // beat button (Make Your Case / Threaten / etc.), we look up the beat in the
-  // current ConfrontationData and translate it into a natural-language
-  // PLAYER_ACTION. The server's narrator sees the beat list in its prompt and
-  // dispatch/beat.rs does label-match fallback, so "<label> (<stat_check>)"
-  // routes through dispatch_beat_selection() reliably.
+  // Structured beat dispatch via BEAT_SELECTION protocol message.
   //
-  // This closes the wiring gap that caused playtest 2026-04-11 to report
-  // "buttons enter active state but no WebSocket frame fires" — prior to this
-  // handler, onBeatSelect was undefined all the way down to BeatActions, so
-  // the button's onClick was a silent no-op.
+  // Sends the exact beat_id from ConfrontationDef — NO text synthesis, NO
+  // natural-language label, NO dependency on narrator interpretation or
+  // label_fallback fuzzy matching. The server validates the beat_id strictly
+  // and applies the mechanical delta before the narrator runs.
+  //
+  // Replaces commit 05a3dfb which synthesized `"${beat.label} (${beat.stat_check})"`
+  // as a PLAYER_ACTION text string — violating: no keyword matching (Zork Problem,
+  // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
     (beatId: string) => {
       if (!confrontationData) {
         console.warn(
-          `[beat-dispatch] onBeatSelect fired for "${beatId}" but no active confrontationData — ignoring.`,
+          `[beat-dispatch] onBeatSelect fired for "${beatId}" but no active confrontationData — dropping.`,
         );
         return;
       }
+      // Validate client-side — the server also validates strictly.
       const beat: BeatOption | undefined = confrontationData.beats.find(
         (b) => b.id === beatId,
       );
       if (!beat) {
         console.warn(
-          `[beat-dispatch] beat id "${beatId}" not found in active confrontation (${confrontationData.label}).`,
+          `[beat-dispatch] beat id "${beatId}" not found in active confrontation (${confrontationData.label}) — dropping.`,
         );
         return;
       }
-      const actionText = `${beat.label} (${beat.stat_check})`;
-      handleSend(actionText, false);
+      send({
+        type: MessageType.BEAT_SELECTION,
+        payload: { beat_id: beatId, actor: "player" },
+        player_id: "",
+      });
+      setCanType(false);
+      setThinking(true);
     },
-    [confrontationData, handleSend],
+    [confrontationData, send],
   );
 
   const handleRequestJournal = useCallback(
