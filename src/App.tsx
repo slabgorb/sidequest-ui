@@ -494,6 +494,12 @@ function AppInner() {
   // ADR-010/032), no silent fallbacks (CLAUDE.md × 4 repos), no half-wired features.
   const handleBeatSelect = useCallback(
     (beatId: string) => {
+      if (thinking) {
+        console.warn(
+          `[beat-dispatch] onBeatSelect fired for "${beatId}" while thinking — duplicate suppressed.`,
+        );
+        return;
+      }
       if (!confrontationData) {
         console.warn(
           `[beat-dispatch] onBeatSelect fired for "${beatId}" but no active confrontationData — dropping.`,
@@ -518,7 +524,7 @@ function AppInner() {
       setCanType(false);
       setThinking(true);
     },
-    [confrontationData, send],
+    [confrontationData, send, thinking],
   );
 
   const handleRequestJournal = useCallback(
