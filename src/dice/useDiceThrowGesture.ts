@@ -33,17 +33,29 @@ interface UseDiceThrowGestureOptions {
   onThrow: (params: ThrowParams) => void;
 }
 
+function randomRotation(): [number, number, number] {
+  return [
+    Math.random() * Math.PI * 2,
+    Math.random() * Math.PI * 2,
+    Math.random() * Math.PI * 2,
+  ];
+}
+
+function randomAngularVelocity(): [number, number, number] {
+  return [
+    (Math.random() - 0.5) * 20,
+    (Math.random() - 0.5) * 20,
+    (Math.random() - 0.5) * 20,
+  ];
+}
+
 function buildThrowParams(
   vx: number,
   vz: number,
   speed: number,
 ): ThrowParams {
   const throwSpeed = Math.min(speed * PX_TO_VELOCITY, MAX_THROW_SPEED);
-  const dir = { x: speed > 0 ? vx / speed : 0, z: speed > 0 ? vz / speed : 0 };
-
-  const rx = Math.random() * Math.PI * 2;
-  const ry = Math.random() * Math.PI * 2;
-  const rz = Math.random() * Math.PI * 2;
+  const dir = { x: vx / speed, z: vz / speed };
 
   return {
     position: [0, 0.5, 0],
@@ -52,20 +64,12 @@ function buildThrowParams(
       2 + Math.random() * 2,
       dir.z * throwSpeed,
     ],
-    angularVelocity: [
-      (Math.random() - 0.5) * 20,
-      (Math.random() - 0.5) * 20,
-      (Math.random() - 0.5) * 20,
-    ],
-    rotation: [rx, ry, rz],
+    angularVelocity: randomAngularVelocity(),
+    rotation: randomRotation(),
   };
 }
 
 function buildDefaultThrowParams(): ThrowParams {
-  const rx = Math.random() * Math.PI * 2;
-  const ry = Math.random() * Math.PI * 2;
-  const rz = Math.random() * Math.PI * 2;
-
   return {
     position: [0, 0.5, 0],
     linearVelocity: [
@@ -73,12 +77,8 @@ function buildDefaultThrowParams(): ThrowParams {
       3 + Math.random() * 2,
       -5 - Math.random() * 3,
     ],
-    angularVelocity: [
-      (Math.random() - 0.5) * 20,
-      (Math.random() - 0.5) * 20,
-      (Math.random() - 0.5) * 20,
-    ],
-    rotation: [rx, ry, rz],
+    angularVelocity: randomAngularVelocity(),
+    rotation: randomRotation(),
   };
 }
 
