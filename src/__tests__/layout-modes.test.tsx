@@ -16,10 +16,34 @@ function narration(text: string): GameMessage {
   return msg(MessageType.NARRATION, { text });
 }
 
+function narrationEnd(): GameMessage {
+  return msg(MessageType.NARRATION_END, {});
+}
+
+function playerAction(action: string): GameMessage {
+  return msg(MessageType.PLAYER_ACTION, { action });
+}
+
 const SAMPLE_MESSAGES: GameMessage[] = [
   narration("The ancient door creaks open."),
   narration("A chill wind sweeps through the chamber."),
   narration("Torchlight flickers on weathered stone walls."),
+];
+
+// Multi-turn data for testing Focus-mode turn-page navigation.
+// Each player action + narrator response = one page. The opening narration
+// (before any player action) collapses into a single first page.
+const MULTI_TURN_MESSAGES: GameMessage[] = [
+  narration("The ancient door creaks open."),
+  narration("A chill wind sweeps through the chamber."),
+  narrationEnd(),
+  playerAction("I step inside, torch held high."),
+  narration("Your boots echo on weathered stone."),
+  narration("Something stirs in the darkness ahead."),
+  narrationEnd(),
+  playerAction("I ready my blade and advance."),
+  narration("A skeletal figure rises from the shadow."),
+  narrationEnd(),
 ];
 
 const LAYOUT_PREFS_KEY = "sq-narrative-layout";
@@ -64,11 +88,14 @@ describe("NarrationScroll", () => {
 });
 
 describe("NarrationFocus", () => {
-  it("renders only the current passage", async () => {
+  it("groups all narrator paragraphs of a turn onto a single page", async () => {
     const { NarrationFocus } = await import("@/components/NarrationFocus");
     render(<NarrationFocus messages={SAMPLE_MESSAGES} />);
 
-    // Focus mode shows the most recent segment by default
+    // All three narration lines belong to the same opening turn (no player
+    // action boundary between them), so they must all render on one page.
+    expect(screen.getByText(/ancient door creaks open/)).toBeInTheDocument();
+    expect(screen.getByText(/chill wind sweeps/)).toBeInTheDocument();
     expect(screen.getByText(/Torchlight flickers/)).toBeInTheDocument();
   });
 
@@ -87,49 +114,63 @@ describe("NarrationFocus", () => {
     expect(screen.getByRole("button", { name: /next/i })).toBeInTheDocument();
   });
 
-  it("navigates to previous passage when prev button is clicked", async () => {
-    const user = userEvent.setup();
+  it("starts on the newest turn page", async () => {
     const { NarrationFocus } = await import("@/components/NarrationFocus");
-    render(<NarrationFocus messages={SAMPLE_MESSAGES} />);
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
 
-    // Initially on last segment
-    expect(screen.getByText(/Torchlight flickers/)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /prev/i }));
-    expect(screen.getByText(/chill wind sweeps/)).toBeInTheDocument();
+    // Newest turn: the skeletal figure turn (started by "ready my blade")
+    expect(screen.getByText(/skeletal figure rises/)).toBeInTheDocument();
+    // Older turns' narrator text should not be visible from the newest page
+    expect(screen.queryByText(/ancient door creaks open/)).not.toBeInTheDocument();
   });
 
-  it("navigates to next passage when next button is clicked", async () => {
+  it("navigates to previous turn when prev button is clicked", async () => {
     const user = userEvent.setup();
     const { NarrationFocus } = await import("@/components/NarrationFocus");
-    render(<NarrationFocus messages={SAMPLE_MESSAGES} />);
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
 
-    // Go back first
+    // Start on newest turn
+    expect(screen.getByText(/skeletal figure rises/)).toBeInTheDocument();
+
+    // Back to previous turn (the "step inside" turn)
     await user.click(screen.getByRole("button", { name: /prev/i }));
-    expect(screen.getByText(/chill wind sweeps/)).toBeInTheDocument();
+    expect(screen.getByText(/boots echo on weathered stone/)).toBeInTheDocument();
+    expect(screen.getByText(/Something stirs in the darkness/)).toBeInTheDocument();
+  });
 
-    // Then forward
+  it("navigates to next turn when next button is clicked", async () => {
+    const user = userEvent.setup();
+    const { NarrationFocus } = await import("@/components/NarrationFocus");
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
+
+    // Go back one turn
+    await user.click(screen.getByRole("button", { name: /prev/i }));
+    expect(screen.getByText(/boots echo on weathered stone/)).toBeInTheDocument();
+
+    // Then forward to newest
     await user.click(screen.getByRole("button", { name: /next/i }));
-    expect(screen.getByText(/Torchlight flickers/)).toBeInTheDocument();
+    expect(screen.getByText(/skeletal figure rises/)).toBeInTheDocument();
   });
 
-  it("disables prev button on first passage", async () => {
+  it("disables prev button on first turn page", async () => {
     const user = userEvent.setup();
     const { NarrationFocus } = await import("@/components/NarrationFocus");
-    render(<NarrationFocus messages={SAMPLE_MESSAGES} />);
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
 
-    // Navigate to the first segment
+    // Three pages: opening → step inside → ready blade. Navigate back twice.
     await user.click(screen.getByRole("button", { name: /prev/i }));
     await user.click(screen.getByRole("button", { name: /prev/i }));
 
     expect(screen.getByRole("button", { name: /prev/i })).toBeDisabled();
+    // First page content visible
+    expect(screen.getByText(/ancient door creaks open/)).toBeInTheDocument();
   });
 
-  it("disables next button on last passage", async () => {
+  it("disables next button on newest turn page", async () => {
     const { NarrationFocus } = await import("@/components/NarrationFocus");
-    render(<NarrationFocus messages={SAMPLE_MESSAGES} />);
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
 
-    // Already on last segment by default
+    // Already on newest page by default
     expect(screen.getByRole("button", { name: /next/i })).toBeDisabled();
   });
 
@@ -138,6 +179,16 @@ describe("NarrationFocus", () => {
     render(<NarrationFocus messages={SAMPLE_MESSAGES} thinking={true} />);
 
     expect(screen.getByTestId("thinking-indicator")).toBeInTheDocument();
+  });
+
+  it("renders player action banner together with the narrator response", async () => {
+    const { NarrationFocus } = await import("@/components/NarrationFocus");
+    render(<NarrationFocus messages={MULTI_TURN_MESSAGES} />);
+
+    // Newest page must include BOTH the triggering player action and the
+    // narrator response — they live on the same page, not separate pages.
+    expect(screen.getByText(/ready my blade and advance/)).toBeInTheDocument();
+    expect(screen.getByText(/skeletal figure rises/)).toBeInTheDocument();
   });
 });
 

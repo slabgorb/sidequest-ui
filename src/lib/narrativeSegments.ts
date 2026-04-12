@@ -200,3 +200,44 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
 export function groupPortraitSegments(segments: NarrativeSegment[]): NarrativeSegment[] {
   return segments;
 }
+
+/**
+ * Group segments into turn pages for Focus-mode pagination.
+ *
+ * A "turn page" is the unit the player flips through with Prev/Next. One turn
+ * page holds:
+ *   - (optional) a player-action banner that started the turn
+ *   - all narrator text paragraphs produced in response
+ *   - inline side-effects (gallery notices, chapter markers, system messages)
+ *
+ * Boundaries: each `player-action`, `player-aside`, or `action-reveal` segment
+ * starts a new page. Everything before the first boundary (opening narration)
+ * collapses into a single page. `separator` segments (emitted by NARRATION_END)
+ * are discarded — we use player action boundaries, not narration-end boundaries,
+ * so that the player's action stays visually attached to the narrator's response.
+ *
+ * This replaces the old "one segment = one page" behavior that exposed the
+ * player to raw timeline events (each paragraph, each side-effect) as its own
+ * pagination slot. Playtest 2026-04-11 BLOCKING bug.
+ */
+export function buildTurnPages(segments: NarrativeSegment[]): NarrativeSegment[][] {
+  const pages: NarrativeSegment[][] = [];
+  let current: NarrativeSegment[] = [];
+
+  const isTurnStarter = (s: NarrativeSegment): boolean =>
+    s.kind === "player-action" ||
+    s.kind === "player-aside" ||
+    s.kind === "action-reveal";
+
+  for (const seg of segments) {
+    if (seg.kind === "separator") continue;
+    if (isTurnStarter(seg)) {
+      if (current.length > 0) pages.push(current);
+      current = [seg];
+    } else {
+      current.push(seg);
+    }
+  }
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
