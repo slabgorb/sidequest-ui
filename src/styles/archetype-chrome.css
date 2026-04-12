@@ -88,6 +88,42 @@
   border-right: 1px solid;
 }
 
+/* Parchment background canvas — layered fiber texture suggesting aged vellum.
+   Horizontal fibers at varying intervals + soft noise patches.
+   All colors derived from genre CSS vars for automatic palette adaptation. */
+[data-archetype="parchment"] .background-canvas {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 28px,
+      color-mix(in srgb, var(--primary) 3%, transparent) 28px,
+      color-mix(in srgb, var(--primary) 3%, transparent) 29px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 40px,
+      color-mix(in srgb, var(--primary) 2%, transparent) 40px,
+      color-mix(in srgb, var(--primary) 2%, transparent) 41px
+    ),
+    radial-gradient(
+      ellipse at 30% 20%,
+      color-mix(in srgb, var(--primary) 4%, transparent),
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 70% 80%,
+      color-mix(in srgb, var(--primary) 3%, transparent),
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--surface) 80%, transparent),
+      color-mix(in srgb, var(--surface) 95%, transparent)
+    );
+}
+
 /* ── Terminal ──────────────────────────────────────────────────────────────
    CRT/hacker aesthetic — scanline overlay, neon glow, monospace headers,
    hard borders, glow effects on accent text.
@@ -177,6 +213,38 @@
     color-mix(in srgb, var(--accent) 4%, transparent) 3px
   );
   z-index: 1;
+}
+
+/* Terminal background canvas — digital grid with node dots suggesting a
+   circuit board or data matrix. Tight grid lines + intersection highlights.
+   All colors derived from genre CSS vars for automatic palette adaptation. */
+[data-archetype="terminal"] .background-canvas {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 39px,
+      color-mix(in srgb, var(--accent) 5%, transparent) 39px,
+      color-mix(in srgb, var(--accent) 5%, transparent) 40px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 39px,
+      color-mix(in srgb, var(--accent) 5%, transparent) 39px,
+      color-mix(in srgb, var(--accent) 5%, transparent) 40px
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--primary) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--surface) 80%, transparent),
+      color-mix(in srgb, var(--surface) 95%, transparent)
+    );
+  background-size: 40px 40px, 40px 40px, 40px 40px, 100% 100%;
 }
 
 /* ── Rugged ────────────────────────────────────────────────────────────────
@@ -271,4 +339,40 @@
   right: 0;
   border-bottom: 3px solid;
   border-right: 3px solid;
+}
+
+/* Rugged background canvas — diagonal scratch marks and asymmetric wear
+   patches suggesting cracked earth, worn metal, or desert hardpan.
+   All colors derived from genre CSS vars for automatic palette adaptation. */
+[data-archetype="rugged"] .background-canvas {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 22px,
+      color-mix(in srgb, var(--border) 4%, transparent) 22px,
+      color-mix(in srgb, var(--border) 4%, transparent) 23px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 34px,
+      color-mix(in srgb, var(--border) 3%, transparent) 34px,
+      color-mix(in srgb, var(--border) 3%, transparent) 35px
+    ),
+    radial-gradient(
+      ellipse at 20% 70%,
+      color-mix(in srgb, var(--primary) 5%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      ellipse at 80% 30%,
+      color-mix(in srgb, var(--border) 4%, transparent),
+      transparent 35%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--surface) 80%, transparent),
+      color-mix(in srgb, var(--surface) 95%, transparent)
+    );
 }

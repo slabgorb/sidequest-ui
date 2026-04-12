@@ -1,11 +1,15 @@
 /**
- * Genre-themed background visible through grid gutters.
+ * Genre-themed background visible through Dockview panel gutters.
  * Uses existing CSS custom properties from useGenreTheme/useChromeArchetype.
+ *
+ * Base: radial gradient from --surface to --background (all archetypes).
+ * Per-archetype textures layered via [data-archetype] selectors in
+ * archetype-chrome.css — no props needed, reads from the CSS cascade.
  */
 export function BackgroundCanvas() {
   return (
     <div
-      className="fixed inset-0 -z-10"
+      className="background-canvas fixed inset-0 -z-10"
       style={{
         background: `
           radial-gradient(

@@ -1,9 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { GameBoard, type GameBoardProps } from "@/components/GameBoard/GameBoard";
-import { ImageBusProvider } from "@/providers/ImageBusProvider";
-import type { ConfrontationData } from "@/components/ConfrontationOverlay";
+import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
+import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -65,52 +64,20 @@ const CHASE_DATA: ConfrontationData = {
   mood: "frantic",
 };
 
-const CHARACTER_SUMMARY = {
-  player_id: "p1",
-  name: "Sam",
-  class: "Delver",
-  level: 1,
-  hp: 10,
-  hp_max: 14,
-  status_effects: [],
-  portrait_url: "/renders/sam.png",
-};
-
-function renderLayout(overrides: Partial<GameBoardProps> = {}) {
-  const defaults: GameBoardProps = {
-    messages: [],
-    characters: [CHARACTER_SUMMARY],
-    onSend: vi.fn(),
-    disabled: false,
-  };
-  const props = { ...defaults, ...overrides };
-  return render(
-    <ImageBusProvider messages={props.messages}>
-      <GameBoard {...props} />
-    </ImageBusProvider>
-  );
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
-// AC1: GameBoard renders ConfrontationOverlay when data is provided
+// AC1: ConfrontationOverlay renders in ConfrontationWidget
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC1: ConfrontationOverlay renders in GameBoard", () => {
-  it("renders confrontation overlay when confrontationData is provided", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+describe("AC1: ConfrontationOverlay renders in ConfrontationWidget", () => {
+  it("renders confrontation overlay when data is provided", () => {
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
     expect(screen.getByText("High Noon Standoff")).toBeInTheDocument();
   });
 
-  it("does not render confrontation overlay when confrontationData is null", () => {
-    renderLayout({ confrontationData: null });
-
-    expect(screen.queryByTestId("confrontation-overlay")).not.toBeInTheDocument();
-  });
-
-  it("does not render confrontation overlay when confrontationData is undefined", () => {
-    renderLayout();
+  it("does not render confrontation overlay when data is null (via ConfrontationOverlay)", () => {
+    render(<ConfrontationOverlay data={null} />);
 
     expect(screen.queryByTestId("confrontation-overlay")).not.toBeInTheDocument();
   });
@@ -122,7 +89,7 @@ describe("AC1: ConfrontationOverlay renders in GameBoard", () => {
 
 describe("AC2: Confrontation type rendering", () => {
   it("renders standoff with data-type attribute", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     const overlay = screen.getByTestId("confrontation-overlay");
     expect(overlay).toHaveAttribute("data-type", "standoff");
@@ -130,7 +97,7 @@ describe("AC2: Confrontation type rendering", () => {
   });
 
   it("renders chase with secondary stats panel", () => {
-    renderLayout({ confrontationData: CHASE_DATA });
+    render(<ConfrontationWidget data={CHASE_DATA} />);
 
     const overlay = screen.getByTestId("confrontation-overlay");
     expect(overlay).toHaveAttribute("data-type", "chase");
@@ -138,7 +105,7 @@ describe("AC2: Confrontation type rendering", () => {
   });
 
   it("renders actor portraits for all encounter participants", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     const portraits = screen.getAllByTestId("actor-portrait");
     expect(portraits.length).toBe(2);
@@ -151,16 +118,16 @@ describe("AC2: Confrontation type rendering", () => {
 // AC3: Metric bar renders correctly
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC3: Metric bar in GameBoard context", () => {
+describe("AC3: Metric bar display", () => {
   it("renders the metric bar with correct name", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     expect(screen.getByTestId("metric-bar")).toBeInTheDocument();
     expect(screen.getByText("tension")).toBeInTheDocument();
   });
 
   it("renders the metric bar fill element", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     expect(screen.getByTestId("metric-bar-fill")).toBeInTheDocument();
   });
@@ -172,14 +139,14 @@ describe("AC3: Metric bar in GameBoard context", () => {
 
 describe("AC4: Beat action buttons", () => {
   it("renders all beat options as buttons", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     expect(screen.getByText("Stare Down")).toBeInTheDocument();
     expect(screen.getByText("Draw!")).toBeInTheDocument();
   });
 
   it("marks resolution beats with data-resolution attribute", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
+    render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
     const drawBtn = screen.getByText("Draw!").closest("button");
     expect(drawBtn).toHaveAttribute("data-resolution", "true");
@@ -188,104 +155,92 @@ describe("AC4: Beat action buttons", () => {
   it("calls onBeatSelect when a beat button is clicked", async () => {
     const user = userEvent.setup();
     const onBeatSelect = vi.fn();
-    renderLayout({ confrontationData: STANDOFF_DATA, onBeatSelect });
+    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
 
     await user.click(screen.getByText("Stare Down"));
     expect(onBeatSelect).toHaveBeenCalledWith("stare");
   });
 
-  it("does not call onBeatSelect for resolution beats without confirmation", async () => {
+  it("calls onBeatSelect for resolution beats on click", async () => {
     const user = userEvent.setup();
     const onBeatSelect = vi.fn();
-    renderLayout({ confrontationData: STANDOFF_DATA, onBeatSelect });
+    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
 
-    // Resolution beat "Draw!" should still fire onBeatSelect
     await user.click(screen.getByText("Draw!"));
     expect(onBeatSelect).toHaveBeenCalledWith("draw");
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC5: Overlay hides when confrontation resolves
+// Wiring tests — verify ConfrontationWidget and ConfrontationOverlay are connected
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC5: Overlay lifecycle", () => {
-  it("shows overlay when confrontation starts", () => {
-    renderLayout({ confrontationData: STANDOFF_DATA });
-
-    expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
-  });
-
-  it("hides overlay when confrontationData becomes null (resolution)", () => {
-    const { rerender } = render(
-      <GameBoard
-        messages={[]}
-        characters={[CHARACTER_SUMMARY]}
-        onSend={vi.fn()}
-        disabled={false}
-        activeOverlay={null}
-        onOverlayChange={vi.fn()}
-        confrontationData={STANDOFF_DATA}
-      />,
-    );
-
-    expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
-
-    rerender(
-      <GameBoard
-        messages={[]}
-        characters={[CHARACTER_SUMMARY]}
-        onSend={vi.fn()}
-        disabled={false}
-        activeOverlay={null}
-        onOverlayChange={vi.fn()}
-        confrontationData={null}
-      />,
-    );
-
-    expect(screen.queryByTestId("confrontation-overlay")).not.toBeInTheDocument();
-  });
-});
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Wiring tests — verify ConfrontationOverlay is imported and connected
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("Wiring: ConfrontationOverlay in GameBoard", () => {
-  it("GameBoard accepts confrontationData prop", () => {
-    // TypeScript ensures prop exists — this tests runtime acceptance
-    const { container } = renderLayout({ confrontationData: STANDOFF_DATA });
-    expect(container).toBeInTheDocument();
-  });
-
-  it("GameBoard accepts onBeatSelect callback prop", () => {
-    const onBeatSelect = vi.fn();
-    const { container } = renderLayout({
-      confrontationData: STANDOFF_DATA,
-      onBeatSelect,
-    });
-    expect(container).toBeInTheDocument();
+describe("Wiring: ConfrontationWidget component", () => {
+  it("ConfrontationWidget is importable", async () => {
+    const mod = await import("@/components/GameBoard/widgets/ConfrontationWidget");
+    expect(typeof mod.ConfrontationWidget).toBe("function");
   });
 
   it("ConfrontationOverlay is importable from @/components/ConfrontationOverlay", async () => {
     const mod = await import("@/components/ConfrontationOverlay");
     expect(typeof mod.ConfrontationOverlay).toBe("function");
   });
+
+  it("ConfrontationWidget renders ConfrontationOverlay with data and callback", async () => {
+    const onBeatSelect = vi.fn();
+    render(<ConfrontationWidget data={STANDOFF_DATA} onBeatSelect={onBeatSelect} />);
+
+    expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByText("Stare Down"));
+    expect(onBeatSelect).toHaveBeenCalled();
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Production wiring test — verify App.tsx actually hands an onBeatSelect
-// handler to <GameBoard>. The component-level tests above pass vi.fn() and
-// only prove the callback plumbing inside GameBoard; they cannot catch the
-// failure mode that shipped in playtest 2026-04-11: <GameBoard> instantiated
-// with no onBeatSelect prop at all, so clicks were silent no-ops in production.
-//
-// This test reads App.tsx as source and asserts the wire-up is present.
-// Follows the grep-style wiring-check convention used in sidequest-api tests
-// (see npc_turns_beat_system_story_28_8_tests.rs:23).
+// Production wiring test — verify App.tsx and GameBoard actually wire confrontations
+// 
+// The component-level tests above pass vi.fn() and only prove the callback plumbing
+// inside ConfrontationWidget/ConfrontationOverlay. This test reads source files to
+// assert the production wire-up is present: GameBoard accepts the props, GameBoard
+// renders ConfrontationWidget when data is present, and App.tsx passes the data
+// through to GameBoard.
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("Wiring: App.tsx → GameBoard onBeatSelect handler", () => {
+describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () => {
+  it("GameBoard.tsx accepts confrontationData prop", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const gameBoardSrc = fs.readFileSync(
+      path.resolve(__dirname, "../components/GameBoard/GameBoard.tsx"),
+      "utf-8",
+    );
+    expect(gameBoardSrc).toMatch(/confrontationData/);
+  });
+
+  it("GameBoard.tsx accepts onBeatSelect prop", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const gameBoardSrc = fs.readFileSync(
+      path.resolve(__dirname, "../components/GameBoard/GameBoard.tsx"),
+      "utf-8",
+    );
+    expect(gameBoardSrc).toMatch(/onBeatSelect/);
+  });
+
+  it("GameBoard.tsx renders ConfrontationWidget when confrontationData is provided", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const gameBoardSrc = fs.readFileSync(
+      path.resolve(__dirname, "../components/GameBoard/GameBoard.tsx"),
+      "utf-8",
+    );
+    // Should import ConfrontationWidget
+    expect(gameBoardSrc).toMatch(/import.*ConfrontationWidget/);
+    // Should pass confrontationData and onBeatSelect to ConfrontationWidget
+    expect(gameBoardSrc).toMatch(/ConfrontationWidget.*data=\{confrontationData\}/);
+    expect(gameBoardSrc).toMatch(/ConfrontationWidget.*onBeatSelect=\{onBeatSelect\}/);
+  });
+
   it("App.tsx declares a handleBeatSelect callback", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
@@ -310,19 +265,19 @@ describe("Wiring: App.tsx → GameBoard onBeatSelect handler", () => {
     expect(gameBoardBlock?.[0]).toContain("onBeatSelect={handleBeatSelect}");
   });
 
-  it("handleBeatSelect routes beat clicks through handleSend (PLAYER_ACTION path)", async () => {
+  it("handleBeatSelect sends BEAT_SELECTION messages to the server", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const appSrc = fs.readFileSync(
       path.resolve(__dirname, "../App.tsx"),
       "utf-8",
     );
-    // The handler must actually call handleSend — otherwise the button click
-    // is still a no-op even with the prop wired.
-    const handlerBlock = appSrc.match(
-      /const handleBeatSelect\s*=\s*useCallback[\s\S]*?\[confrontationData,\s*handleSend\],?\s*\)/,
-    );
-    expect(handlerBlock).not.toBeNull();
-    expect(handlerBlock?.[0]).toContain("handleSend(");
+    // The handler must:
+    // 1. Call send() (not just define the handler)
+    // 2. Use BEAT_SELECTION message type
+    // 3. Have [confrontationData, send] in its dependency array
+    expect(appSrc).toMatch(/const handleBeatSelect\s*=\s*useCallback/);
+    expect(appSrc).toMatch(/type:\s*MessageType\.BEAT_SELECTION/);
+    expect(appSrc).toMatch(/\[confrontationData,\s*send\]/);
   });
 });
