@@ -147,6 +147,9 @@ function AppInner() {
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
+  // Tracks whether a CONFRONTATION message arrived this turn — used by
+  // NARRATION_END to decide whether the encounter has resolved (fix: playtest-2026-04-12).
+  const confrontationReceivedThisTurnRef = useRef(false);
 
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
@@ -216,6 +219,17 @@ function AppInner() {
       // stays sealed after every turn until the player disconnects or leaves.
       if (msg.type === MessageType.NARRATION_END) {
         setCanType(true);
+        // Fix: playtest-2026-04-12 — Confrontation panel stuck after encounter
+        // resolution. The server clears the encounter snapshot BEFORE building
+        // the response, so no CONFRONTATION { active: false } message arrives.
+        // On NARRATION_END (turn boundary), if no CONFRONTATION message arrived
+        // this turn, the encounter has resolved — clear the panel. The ref
+        // avoids React batching issues (CONFRONTATION and NARRATION_END can
+        // arrive in the same batch).
+        if (!confrontationReceivedThisTurnRef.current) {
+          setConfrontationData(null);
+        }
+        confrontationReceivedThisTurnRef.current = false;
       }
       return;
     }
@@ -227,6 +241,12 @@ function AppInner() {
       if (event === "connected" || event === "ready") {
         setThinking(false);
         setCanType(true);
+      }
+      if (event === "waiting") {
+        // Server says barrier is active and this player already submitted —
+        // lock input until narration arrives (NarrationEnd re-enables it).
+        setCanType(false);
+        setThinking(true);
       }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
@@ -388,6 +408,7 @@ function AppInner() {
     // COMBAT_EVENT handler removed in story 28-9
     if (msg.type === MessageType.CONFRONTATION) {
       const payload = msg.payload as unknown as ConfrontationData;
+      confrontationReceivedThisTurnRef.current = true;
       setConfrontationData(payload.active !== false ? payload : null);
       return;
     }
@@ -660,7 +681,9 @@ function AppInner() {
   useEffect(() => {
     if (readyState === WebSocket.OPEN && prevReadyState.current !== WebSocket.OPEN) {
       setThinking(false);
-      setCanType(true);
+      // Do NOT set canType here — the server's "ready" or "waiting"
+      // SessionEvent is authoritative. Blindly enabling input races
+      // with barrier state on reconnect (see playtest 2026-04-12).
     }
   }, [readyState]);
 
