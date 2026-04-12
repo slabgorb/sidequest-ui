@@ -8,7 +8,7 @@
  * RED phase — all tests FAIL until Dev evolves the overlay.
  */
 import { render, screen, within } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // ── Mock R3F and Rapier — no WebGL in test environment ───────────────────────
 

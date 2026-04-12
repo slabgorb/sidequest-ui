@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { MessageType } from "../../types/protocol";
+import type { TypedGameMessage } from "../../types/payloads";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // AC: MessageType enum includes dice variants
@@ -40,7 +41,6 @@ describe("Protocol: DiceRequestPayload interface", () => {
   });
 
   it("DiceRequestPayload has required fields matching Rust struct", async () => {
-    const mod = await import("../../types/payloads");
     // Construct a valid payload and verify TypeScript accepts it
     const payload: import("../../types/payloads").DiceRequestPayload = {
       request_id: "req-001",
@@ -195,7 +195,7 @@ describe("Protocol: Dice type guards", () => {
         context: "The lock resists...",
       },
     };
-    expect(isDiceRequest(msg as any)).toBe(true);
+    expect(isDiceRequest(msg as unknown as TypedGameMessage)).toBe(true);
   });
 
   it("isDiceResult correctly identifies DICE_RESULT messages", async () => {
@@ -216,7 +216,7 @@ describe("Protocol: Dice type guards", () => {
         throw_params: { velocity: [0, 0, 0], angular: [0, 0, 0], position: [0, 0] },
       },
     };
-    expect(isDiceResult(msg as any)).toBe(true);
+    expect(isDiceResult(msg as unknown as TypedGameMessage)).toBe(true);
   });
 
   it("isDiceThrow correctly identifies DICE_THROW messages", async () => {
@@ -229,7 +229,7 @@ describe("Protocol: Dice type guards", () => {
         throw_params: { velocity: [0, 0, 0], angular: [0, 0, 0], position: [0, 0] },
       },
     };
-    expect(isDiceThrow(msg as any)).toBe(true);
+    expect(isDiceThrow(msg as unknown as TypedGameMessage)).toBe(true);
   });
 
   it("isDiceRequest returns false for non-dice messages", async () => {
@@ -239,7 +239,7 @@ describe("Protocol: Dice type guards", () => {
       player_id: "server",
       payload: { text: "hello" },
     };
-    expect(isDiceRequest(msg as any)).toBe(false);
+    expect(isDiceRequest(msg as unknown as TypedGameMessage)).toBe(false);
   });
 });
 
