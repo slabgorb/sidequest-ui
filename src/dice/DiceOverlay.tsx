@@ -56,7 +56,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
         velocity: params.linearVelocity,
         angular: params.angularVelocity,
         position: [
-          (params.position[0] + 0.5) / 1.0,
+          params.position[0] + 0.5,
           (params.position[2] + 0.8) / 1.6,
         ],
       });
