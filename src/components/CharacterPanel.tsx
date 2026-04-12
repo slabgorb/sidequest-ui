@@ -43,6 +43,15 @@ function toDisplayName(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Cap at 2 initials — avatar badges are ~2ch wide, and uncapped initials on
+// a long sentence-name produces noise like "TCMSTRIR".
+function toAvatarInitials(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
 export function CharacterPanel({
   character,
   resources,
@@ -168,14 +177,24 @@ export function CharacterPanel({
                   />
                 ) : (
                   <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground flex-shrink-0 border border-border">
-                    {(c.character_name || c.name).split(/\s+/).map((w) => w[0]).join("").toUpperCase()}
+                    {toAvatarInitials(c.character_name || c.name)}
                   </span>
                 )}
                 <div className="flex-1 min-w-0">
                   <span className="block text-xs font-semibold text-foreground truncate">
                     {c.character_name || c.name}
-                    {isSelf && <span className="ml-1 text-[10px] text-muted-foreground/50 font-normal">YOU</span>}
-                    {isActing && <span className="ml-1 text-[10px] text-primary font-semibold uppercase">ACTING</span>}
+                    {isSelf && (
+                      <>
+                        {" "}
+                        <span className="ml-1 text-[10px] text-muted-foreground/50 font-normal">(YOU)</span>
+                      </>
+                    )}
+                    {isActing && (
+                      <>
+                        {" "}
+                        <span className="ml-1 text-[10px] text-primary font-semibold uppercase">(ACTING)</span>
+                      </>
+                    )}
                   </span>
                   <span className="block text-[10px] text-muted-foreground">{c.class} Lv.{c.level} — {c.hp}/{c.hp_max}</span>
                   <div className="mt-0.5 h-1 w-full rounded-full bg-border/30 overflow-hidden">

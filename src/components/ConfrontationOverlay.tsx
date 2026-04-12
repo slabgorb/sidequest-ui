@@ -135,30 +135,38 @@ function ActorPortrait({
 function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelect?: (beatId: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2 mt-3">
-      {beats.map((beat) => (
-        <button
-          key={beat.id}
-          type="button"
-          data-resolution={beat.resolution ? 'true' : undefined}
-          onClick={() => onBeatSelect?.(beat.id)}
-          className={[
-            'px-3 py-1.5 rounded text-xs border transition-colors',
-            beat.resolution
-              ? 'border-destructive text-destructive hover:bg-destructive/10 font-bold'
-              : 'border-border hover:bg-muted',
-          ].join(' ')}
-        >
-          <span>{beat.label}</span>
-          <span className="ml-1 text-muted-foreground text-[10px]">
-            {beat.stat_check}
-          </span>
-          {beat.risk && (
-            <span className="ml-1 text-destructive text-[10px]">
-              ({beat.risk})
+      {beats.map((beat) => {
+        // Match the narration renderer's "Ram (Grip)" format rather than
+        // concatenating label + stat_check in the a11y text stream.
+        // Risk text was previously inlined into the label (three fields crammed
+        // into one button); move it to a native tooltip so the button stays
+        // scannable and the consequence is still surfaced on hover/long-press.
+        const tooltip = beat.risk
+          ? `${beat.label} (${beat.stat_check}) — ${beat.risk}`
+          : `${beat.label} (${beat.stat_check})`;
+        return (
+          <button
+            key={beat.id}
+            type="button"
+            title={tooltip}
+            aria-label={tooltip}
+            data-resolution={beat.resolution ? 'true' : undefined}
+            onClick={() => onBeatSelect?.(beat.id)}
+            className={[
+              'px-3 py-1.5 rounded text-xs border transition-colors',
+              beat.resolution
+                ? 'border-destructive text-destructive hover:bg-destructive/10 font-bold'
+                : 'border-border hover:bg-muted',
+            ].join(' ')}
+          >
+            <span>{beat.label}</span>
+            {' '}
+            <span className="text-muted-foreground text-[10px]">
+              ({beat.stat_check})
             </span>
-          )}
-        </button>
-      ))}
+          </button>
+        );
+      })}
     </div>
   );
 }

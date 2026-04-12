@@ -29,11 +29,13 @@ function getHpLevel(hp: number, hpMax: number): "healthy" | "warning" | "critica
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
+  // Cap at 2 initials — avatar badges are ~2ch wide, and uncapped initials on
+  // a long sentence-name (e.g. "They call me Scrap. The rig is Resurrection.")
+  // produces noise like "TCMSTRIR".
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
 }
 
 function displayName(c: CharacterSummary): string {
@@ -119,10 +121,16 @@ export function PartyPanel({ characters, collapsed, onToggle, currentPlayerId, a
               <span className="block text-sm font-semibold text-foreground truncate">
                 {displayName(c)}
                 {isSelf && (
-                  <span data-testid="you-badge" className="ml-1 text-xs text-muted-foreground/50 font-normal">YOU</span>
+                  <>
+                    {" "}
+                    <span data-testid="you-badge" className="ml-1 text-xs text-muted-foreground/50 font-normal">(YOU)</span>
+                  </>
                 )}
                 {isActing && (
-                  <span data-testid="acting-badge" className="ml-1 text-xs text-primary font-semibold uppercase tracking-wide">ACTING</span>
+                  <>
+                    {" "}
+                    <span data-testid="acting-badge" className="ml-1 text-xs text-primary font-semibold uppercase tracking-wide">(ACTING)</span>
+                  </>
                 )}
               </span>
               {c.current_location && (
