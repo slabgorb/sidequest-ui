@@ -1,20 +1,16 @@
 /**
- * Genre-themed background visible through grid gutters.
+ * Genre-themed background visible through Dockview panel gutters.
  * Uses existing CSS custom properties from useGenreTheme/useChromeArchetype.
+ *
+ * Base gradient defined in archetype-chrome.css as .background-canvas default.
+ * Per-archetype textures override via [data-archetype] selectors — no props
+ * needed, reads from the CSS cascade. Inline styles are NOT used because they
+ * have higher specificity than stylesheet rules and would block CSS overrides.
  */
 export function BackgroundCanvas() {
   return (
     <div
-      className="fixed inset-0 -z-10"
-      style={{
-        background: `
-          radial-gradient(
-            ellipse at 50% 50%,
-            color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
-            color-mix(in srgb, var(--surface, hsl(var(--background))) 95%, transparent)
-          )
-        `,
-      }}
+      className="background-canvas fixed inset-0 -z-10"
       aria-hidden="true"
     />
   );
