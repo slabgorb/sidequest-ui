@@ -101,7 +101,10 @@ export function MapOverlay({ mapData, onClose }: MapOverlayProps) {
               >
                 <span className="font-medium">{region.name}</span>
                 {region.description && (
-                  <span className="text-muted-foreground/50 ml-2">{region.description}</span>
+                  <>
+                    <span className="text-muted-foreground/30 mx-1" aria-hidden="true">—</span>
+                    <span className="text-muted-foreground/50">{region.description}</span>
+                  </>
                 )}
               </div>
             ))}

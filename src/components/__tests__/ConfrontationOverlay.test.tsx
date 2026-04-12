@@ -231,10 +231,15 @@ describe('AC3: Beat action buttons', () => {
     expect(drawButton).toHaveAttribute('data-resolution', 'true');
   });
 
-  it('shows risk indicator for risky beats', () => {
+  it('exposes risk indicator on risky beat buttons via accessible label', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    // "Stare Down" has risk: "Flinch"
-    expect(screen.getByText(/Flinch/i)).toBeInTheDocument();
+    // "Stare Down" has risk: "Flinch". The risk text lives on the button's
+    // title/aria-label (tooltip surface) so the visible label stays scannable
+    // — previously risk text was jammed inline, making 3-field button labels
+    // like "Ram Grip [Rig damage on failure...]".
+    const stareDown = screen.getByRole('button', { name: /Stare Down.*Flinch/i });
+    expect(stareDown).toBeInTheDocument();
+    expect(stareDown).toHaveAttribute('title', expect.stringMatching(/Flinch/i));
   });
 
   it('renders negotiation beats', () => {
