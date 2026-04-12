@@ -172,6 +172,22 @@ describe("AC4: Beat action buttons", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// AC5: Overlay lifecycle — hides when confrontation resolves
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("AC5: Overlay lifecycle", () => {
+  it("hides overlay when data transitions from present to null", () => {
+    const { rerender } = render(<ConfrontationOverlay data={STANDOFF_DATA} />);
+
+    expect(screen.getByTestId("confrontation-overlay")).toBeInTheDocument();
+
+    rerender(<ConfrontationOverlay data={null} />);
+
+    expect(screen.queryByTestId("confrontation-overlay")).not.toBeInTheDocument();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Wiring tests — verify ConfrontationWidget and ConfrontationOverlay are connected
 // ══════════════════════════════════════════════════════════════════════════════
 

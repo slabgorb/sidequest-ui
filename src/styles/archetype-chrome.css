@@ -4,6 +4,20 @@
    structural properties: textures, borders, font treatments, overlays.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── Background Canvas Base ───────────────────────────────────────────────
+   Default gradient for all archetypes. Per-archetype rules below override
+   this via higher-specificity [data-archetype] selectors. Defined here
+   (not as an inline style) so the cascade can override it.
+   ──────────────────────────────────────────────────────────────────────── */
+.background-canvas {
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
+      color-mix(in srgb, var(--surface, hsl(var(--background))) 95%, transparent)
+    );
+}
+
 /* ── Parchment ─────────────────────────────────────────────────────────────
    Aged manuscript feel — warm vignette, soft borders, serif headers,
    gradient panel backgrounds.
@@ -88,8 +102,8 @@
   border-right: 1px solid;
 }
 
-/* Parchment background canvas — layered fiber texture suggesting aged vellum.
-   Horizontal fibers at varying intervals + soft noise patches.
+/* Parchment background canvas — layered horizontal and vertical fiber texture
+   suggesting aged vellum, plus soft radial noise patches.
    All colors derived from genre CSS vars for automatic palette adaptation. */
 [data-archetype="parchment"] .background-canvas {
   background:
@@ -119,8 +133,8 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface) 80%, transparent),
-      color-mix(in srgb, var(--surface) 95%, transparent)
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
     );
 }
 
@@ -215,8 +229,8 @@
   z-index: 1;
 }
 
-/* Terminal background canvas — digital grid with node dots suggesting a
-   circuit board or data matrix. Tight grid lines + intersection highlights.
+/* Terminal background canvas — digital grid with cell-center node dots
+   suggesting a circuit board or data matrix. Tight grid lines at 40px intervals.
    All colors derived from genre CSS vars for automatic palette adaptation. */
 [data-archetype="terminal"] .background-canvas {
   background:
@@ -241,8 +255,8 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface) 80%, transparent),
-      color-mix(in srgb, var(--surface) 95%, transparent)
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
     );
   background-size: 40px 40px, 40px 40px, 40px 40px, 100% 100%;
 }
@@ -341,8 +355,10 @@
   border-right: 3px solid;
 }
 
-/* Rugged background canvas — diagonal scratch marks and asymmetric wear
-   patches suggesting cracked earth, worn metal, or desert hardpan.
+/* Rugged background canvas — diagonal scratch marks at non-complementary
+   intervals (22px/34px) and asymmetric wear patches suggesting cracked earth,
+   worn metal, or desert hardpan. No background-size needed — repeating-linear-
+   gradient tiles via stop positions, radial-gradients are full-bleed by design.
    All colors derived from genre CSS vars for automatic palette adaptation. */
 [data-archetype="rugged"] .background-canvas {
   background:
@@ -372,7 +388,7 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface) 80%, transparent),
-      color-mix(in srgb, var(--surface) 95%, transparent)
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
+      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
     );
 }
