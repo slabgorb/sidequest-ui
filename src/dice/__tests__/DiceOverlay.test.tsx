@@ -279,7 +279,8 @@ describe("AC: Dice result display", () => {
         onThrow={vi.fn()}
       />,
     );
-    expect(screen.getByText("20")).toBeInTheDocument();
+    const resultEl = screen.getByTestId("dice-result");
+    expect(within(resultEl).getByText("20")).toBeInTheDocument();
   });
 
   it("shows outcome label for Success", async () => {
@@ -292,7 +293,8 @@ describe("AC: Dice result display", () => {
         onThrow={vi.fn()}
       />,
     );
-    expect(screen.getByText(/success/i)).toBeInTheDocument();
+    const resultEl = screen.getByTestId("dice-result");
+    expect(within(resultEl).getByText(/success/i)).toBeInTheDocument();
   });
 
   it("shows CritSuccess with distinctive visual treatment", async () => {
@@ -334,7 +336,8 @@ describe("AC: Dice result display", () => {
       />,
     );
     // Should display the individual roll: 17
-    expect(screen.getByText("17")).toBeInTheDocument();
+    const resultEl = screen.getByTestId("dice-result");
+    expect(within(resultEl).getByText("17")).toBeInTheDocument();
   });
 });
 
