@@ -228,6 +228,12 @@ function AppInner() {
         setThinking(false);
         setCanType(true);
       }
+      if (event === "waiting") {
+        // Server says barrier is active and this player already submitted —
+        // lock input until narration arrives (NarrationEnd re-enables it).
+        setCanType(false);
+        setThinking(true);
+      }
       if (event === "connected" && !msg.payload.has_character) {
         sessionPhaseRef.current = "creation";
         setSessionPhase("creation");
@@ -660,7 +666,9 @@ function AppInner() {
   useEffect(() => {
     if (readyState === WebSocket.OPEN && prevReadyState.current !== WebSocket.OPEN) {
       setThinking(false);
-      setCanType(true);
+      // Do NOT set canType here — the server's "ready" or "waiting"
+      // SessionEvent is authoritative. Blindly enabling input races
+      // with barrier state on reconnect (see playtest 2026-04-12).
     }
   }, [readyState]);
 
