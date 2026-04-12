@@ -9,9 +9,9 @@
  * - Force-stop timeout after 5 seconds
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import {
   Physics,
   RigidBody,
@@ -22,6 +22,7 @@ import {
 
 import { Text } from "@react-three/drei";
 import { D20_COLLIDER_VERTICES, D20_RADIUS, computeFaceInfo, readD20Value } from "./d20";
+import { useDiceThrowGesture } from "./useDiceThrowGesture";
 
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();
@@ -39,10 +40,6 @@ const TRAY_HALF_DEPTH = 0.8;
 const WALL_HALF_HEIGHT = 0.5;
 /** Wall half-thickness — thick enough to prevent tunneling from fast throws */
 const WALL_HALF_THICKNESS = 0.2;
-/** Drag gesture constants */
-const DRAG_HISTORY_SIZE = 5;
-const DRAG_HEIGHT = 0.3;
-
 // --- Types ---
 
 export interface ThrowParams {
@@ -50,12 +47,6 @@ export interface ThrowParams {
   linearVelocity: [number, number, number];
   angularVelocity: [number, number, number];
   rotation: [number, number, number];
-}
-
-interface DragSample {
-  x: number;
-  z: number;
-  t: number;
 }
 
 // --- Tray Colliders ---
@@ -268,112 +259,10 @@ function PhysicsDie({
   );
 }
 
-// --- Drag Gesture ---
-
-function useDragThrow(onThrow: (params: ThrowParams) => void) {
-  const { camera, size } = useThree();
-  const draggingRef = useRef(false);
-  const historyRef = useRef<DragSample[]>([]);
-  const raycaster = useRef(new THREE.Raycaster()).current;
-  const pointer = useRef(new THREE.Vector2()).current;
-
-  const screenToWorld = useCallback(
-    (clientX: number, clientY: number): { x: number; z: number } => {
-      pointer.x = (clientX / size.width) * 2 - 1;
-      pointer.y = -(clientY / size.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      // Intersect with y=DRAG_HEIGHT plane
-      const t = (DRAG_HEIGHT - raycaster.ray.origin.y) / raycaster.ray.direction.y;
-      const hit = raycaster.ray.origin
-        .clone()
-        .add(raycaster.ray.direction.clone().multiplyScalar(t));
-      return { x: hit.x, z: hit.z };
-    },
-    [camera, size, pointer, raycaster]
-  );
-
-  const handlePointerDown = useCallback(
-    (e: { stopPropagation: () => void }) => {
-      e.stopPropagation();
-      draggingRef.current = true;
-      historyRef.current = [];
-    },
-    []
-  );
-
-  useEffect(() => {
-    const handleMove = (e: PointerEvent) => {
-      if (!draggingRef.current) return;
-      const pos = screenToWorld(e.clientX, e.clientY);
-      const history = historyRef.current;
-      history.push({ x: pos.x, z: pos.z, t: performance.now() });
-      if (history.length > DRAG_HISTORY_SIZE) history.shift();
-    };
-
-    const handleUp = () => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-
-      const history = historyRef.current;
-      if (history.length < 2) return;
-
-      // Compute average velocity from drag history
-      let totalDx = 0;
-      let totalDz = 0;
-      let totalDt = 0;
-      for (let i = 1; i < history.length; i++) {
-        totalDx += history[i].x - history[i - 1].x;
-        totalDz += history[i].z - history[i - 1].z;
-        totalDt += history[i].t - history[i - 1].t;
-      }
-
-      if (totalDt === 0) return;
-
-      const vx = (totalDx / totalDt) * 1000; // per second
-      const vz = (totalDz / totalDt) * 1000;
-      const speed = Math.sqrt(vx * vx + vz * vz);
-
-      if (speed < 0.5) return; // Too slow, ignore
-
-      const throwSpeed = Math.min(speed * 3, 15);
-      const dir = { x: vx / speed, z: vz / speed };
-
-      // Random rotation for visual variety
-      const rx = Math.random() * Math.PI * 2;
-      const ry = Math.random() * Math.PI * 2;
-      const rz = Math.random() * Math.PI * 2;
-
-      onThrow({
-        position: [0, 0.5, 0],
-        linearVelocity: [
-          dir.x * throwSpeed,
-          2 + Math.random() * 2, // slight upward loft
-          dir.z * throwSpeed,
-        ],
-        angularVelocity: [
-          (Math.random() - 0.5) * 20,
-          (Math.random() - 0.5) * 20,
-          (Math.random() - 0.5) * 20,
-        ],
-        rotation: [rx, ry, rz],
-      });
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp);
-    return () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-    };
-  }, [screenToWorld, onThrow]);
-
-  return handlePointerDown;
-}
-
 // --- Pickup Die (pre-throw, draggable) ---
 
 function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
-  const handlePointerDown = useDragThrow(onThrow);
+  const { onPointerDown: handlePointerDown } = useDiceThrowGesture({ onThrow });
 
   return (
     <group position={[0, D20_RADIUS + 0.01, 0]}>
