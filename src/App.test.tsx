@@ -63,22 +63,24 @@ describe("Wiring: App.tsx WebSocket OPEN-transition cleanup (playtest 2026-04-11
     return fs.readFileSync(path.resolve(__dirname, "./App.tsx"), "utf-8");
   };
 
-  it("has a defensive cleanup effect that clears thinking+canType on OPEN without a connected gate", async () => {
+  it("has a defensive cleanup effect that clears thinking on OPEN without a connected gate", async () => {
     const src = await readAppSrc();
-    // Effect (1): must set both setThinking(false) and setCanType(true)
-    // inside an `if (readyState === WebSocket.OPEN && prevReadyState.current !== WebSocket.OPEN)`
-    // block. Crucially, this block must NOT reference `connected` — that's
-    // the foot-gun we're guarding against.
+    // Effect (1): must set setThinking(false) inside the OPEN-transition block.
+    // Does NOT set canType — server "ready"/"waiting" event is authoritative
+    // (playtest 2026-04-12 barrier reconnect fix). Must NOT reference `connected`.
     const defensiveBlock = src.match(
       /if\s*\(\s*readyState\s*===\s*WebSocket\.OPEN\s*&&\s*prevReadyState\.current\s*!==\s*WebSocket\.OPEN\s*\)\s*\{[\s\S]*?\}/,
     );
     expect(
       defensiveBlock,
-      "App.tsx must contain a defensive OPEN-transition cleanup block that clears canType/thinking without a `connected` gate. This prevents the playtest 2026-04-11 'InputBar stuck disabled' regression.",
+      "App.tsx must contain a defensive OPEN-transition cleanup block that clears thinking without a `connected` gate.",
     ).not.toBeNull();
     const body = defensiveBlock![0];
     expect(body).toContain("setThinking(false)");
-    expect(body).toContain("setCanType(true)");
+    expect(
+      body.includes("setCanType(true)"),
+      "Defensive cleanup must NOT set canType — server barrier state is authoritative on reconnect (playtest 2026-04-12).",
+    ).toBe(false);
     expect(
       body.includes("connected"),
       "Defensive cleanup block must NOT reference `connected` — that guard is the exact bug we're fixing.",
