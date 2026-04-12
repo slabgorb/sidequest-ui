@@ -105,7 +105,7 @@ export function ConnectScreen({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-6">
+    <div className="flex flex-col items-center justify-center min-h-screen px-6">
       {/* Opening ornament */}
       <span className="text-muted-foreground/30 text-sm tracking-[0.5em] mb-12">
         ── ◇ ──
@@ -151,7 +151,7 @@ export function ConnectScreen({
             disabled={isConnecting}
             aria-label="Genre"
           >
-            <option value="">…</option>
+            <option value="" disabled>Choose a genre…</option>
             {genres.map((g) => (
               <option key={g} value={g}>{g.replace(/_/g, " ")}</option>
             ))}
@@ -174,7 +174,7 @@ export function ConnectScreen({
               disabled={isConnecting}
               aria-label="World"
             >
-              {worlds.length > 1 && <option value="">…</option>}
+              {worlds.length > 1 && <option value="" disabled>Choose a world…</option>}
               {worlds.map((w) => (
                 <option key={w} value={w}>{w.replace(/_/g, " ")}</option>
               ))}
@@ -230,6 +230,7 @@ export function ConnectScreen({
           <button
             type="submit"
             disabled={!canSubmit || isConnecting}
+            title={!canSubmit ? "Enter your name and choose a genre and world" : undefined}
             className="text-base italic text-foreground/70 hover:text-foreground
                        disabled:text-muted-foreground/30 disabled:cursor-default
                        transition-all bg-transparent border border-muted-foreground/30
