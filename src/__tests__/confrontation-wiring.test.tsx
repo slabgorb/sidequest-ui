@@ -294,6 +294,28 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () 
     // 3. Have [confrontationData, send] in its dependency array
     expect(appSrc).toMatch(/const handleBeatSelect\s*=\s*useCallback/);
     expect(appSrc).toMatch(/type:\s*MessageType\.BEAT_SELECTION/);
-    expect(appSrc).toMatch(/\[confrontationData,\s*send\]/);
+    expect(appSrc).toMatch(/\[confrontationData,\s*send[\s,\w]*\]/);
+  });
+
+  it("NARRATION_END clears confrontation when no CONFRONTATION message arrived this turn", async () => {
+    // Wiring test: App.tsx must clear confrontationData on NARRATION_END
+    // when confrontationReceivedThisTurnRef is false (encounter resolved
+    // but server didn't send active:false due to snapshot ordering).
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const appSrc = fs.readFileSync(
+      path.resolve(__dirname, "../App.tsx"),
+      "utf-8",
+    );
+    // Ref must exist to track per-turn CONFRONTATION receipt
+    expect(appSrc).toContain("confrontationReceivedThisTurnRef");
+    // NARRATION_END handler must clear confrontation when ref is false
+    expect(appSrc).toMatch(
+      /NARRATION_END[\s\S]*?confrontationReceivedThisTurnRef\.current\b/,
+    );
+    // CONFRONTATION handler must set the ref
+    expect(appSrc).toMatch(
+      /CONFRONTATION[\s\S]*?confrontationReceivedThisTurnRef\.current\s*=\s*true/,
+    );
   });
 });

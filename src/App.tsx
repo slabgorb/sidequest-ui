@@ -147,6 +147,9 @@ function AppInner() {
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
+  // Tracks whether a CONFRONTATION message arrived this turn — used by
+  // NARRATION_END to decide whether the encounter has resolved (fix: playtest-2026-04-12).
+  const confrontationReceivedThisTurnRef = useRef(false);
 
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
@@ -216,6 +219,17 @@ function AppInner() {
       // stays sealed after every turn until the player disconnects or leaves.
       if (msg.type === MessageType.NARRATION_END) {
         setCanType(true);
+        // Fix: playtest-2026-04-12 — Confrontation panel stuck after encounter
+        // resolution. The server clears the encounter snapshot BEFORE building
+        // the response, so no CONFRONTATION { active: false } message arrives.
+        // On NARRATION_END (turn boundary), if no CONFRONTATION message arrived
+        // this turn, the encounter has resolved — clear the panel. The ref
+        // avoids React batching issues (CONFRONTATION and NARRATION_END can
+        // arrive in the same batch).
+        if (!confrontationReceivedThisTurnRef.current) {
+          setConfrontationData(null);
+        }
+        confrontationReceivedThisTurnRef.current = false;
       }
       return;
     }
@@ -394,6 +408,7 @@ function AppInner() {
     // COMBAT_EVENT handler removed in story 28-9
     if (msg.type === MessageType.CONFRONTATION) {
       const payload = msg.payload as unknown as ConfrontationData;
+      confrontationReceivedThisTurnRef.current = true;
       setConfrontationData(payload.active !== false ? payload : null);
       return;
     }
