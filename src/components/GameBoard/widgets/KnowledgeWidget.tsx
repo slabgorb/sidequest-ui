@@ -1,4 +1,5 @@
-import { KnowledgeJournal, type KnowledgeEntry } from "@/components/KnowledgeJournal";
+import { KnowledgeJournal } from "@/components/KnowledgeJournal";
+import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 
 interface KnowledgeWidgetProps {
   entries: KnowledgeEntry[];

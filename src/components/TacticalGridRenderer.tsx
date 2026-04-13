@@ -200,8 +200,6 @@ export function TacticalGridRenderer({
       <g className="token-layer">
         {entities.map((entity) => {
           const r = (entity.size * cellSize) / 2;
-          const cx = entity.position.x * cellSize + r;
-          const cy = entity.position.y * cellSize + r;
           const fill = FACTION_COLORS[entity.faction];
           const initial = entity.name.charAt(0).toUpperCase();
 

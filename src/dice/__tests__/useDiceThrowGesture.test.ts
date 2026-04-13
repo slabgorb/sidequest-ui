@@ -9,51 +9,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
-// ── Test helpers ─────────────────────────────────────────────────────────────
-
-/** Simulate a pointer event sequence (down → moves → up) */
-function simulateDrag(
-  element: HTMLElement,
-  points: Array<{ x: number; y: number; dt?: number }>,
-) {
-  const startTime = performance.now();
-  let elapsed = 0;
-
-  // Pointer down at first point
-  element.dispatchEvent(
-    new PointerEvent("pointerdown", {
-      clientX: points[0].x,
-      clientY: points[0].y,
-      bubbles: true,
-    }),
-  );
-
-  // Move through intermediate points
-  for (let i = 1; i < points.length - 1; i++) {
-    elapsed += points[i].dt ?? 16;
-    vi.advanceTimersByTime(points[i].dt ?? 16);
-    window.dispatchEvent(
-      new PointerEvent("pointermove", {
-        clientX: points[i].x,
-        clientY: points[i].y,
-        bubbles: true,
-      }),
-    );
-  }
-
-  // Pointer up at last point
-  const last = points[points.length - 1];
-  elapsed += last.dt ?? 16;
-  vi.advanceTimersByTime(last.dt ?? 16);
-  window.dispatchEvent(
-    new PointerEvent("pointerup", {
-      clientX: last.x,
-      clientY: last.y,
-      bubbles: true,
-    }),
-  );
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // AC-1: useDiceThrowGesture hook exists and captures drag-and-flick
 // ══════════════════════════════════════════════════════════════════════════════

@@ -167,7 +167,7 @@ describe('AC-5: New indicators', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const f1 = screen.getByText(/grove's oldest tree/i).closest('[data-testid="journal-entry"]');
     expect(f1).toBeTruthy();
-    expect(within(f1!).getByText(/new/i)).toBeInTheDocument();
+    expect(within(f1 as HTMLElement).getByText(/new/i)).toBeInTheDocument();
   });
 });
 
@@ -180,7 +180,7 @@ describe('AC-6: Category display', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const f1 = screen.getByText(/grove's oldest tree/i).closest('[data-testid="journal-entry"]');
     expect(f1).toBeTruthy();
-    expect(within(f1!).getByText('Place')).toBeInTheDocument();
+    expect(within(f1 as HTMLElement).getByText('Place')).toBeInTheDocument();
   });
 });
 

@@ -18,6 +18,7 @@ import "dockview-react/dist/styles/dockview.css";
 import "@/styles/dockview-theme.css";
 
 import { useRunningHeader } from "@/hooks/useRunningHeader";
+
 import InputBar from "@/components/InputBar";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
@@ -50,8 +51,6 @@ import { KnowledgeWidget } from "./widgets/KnowledgeWidget";
 import { ConfrontationWidget } from "./widgets/ConfrontationWidget";
 import { AudioWidget } from "./widgets/AudioWidget";
 import { ImageGalleryWidget } from "./widgets/ImageGalleryWidget";
-
-// react-grid-layout v2 exports ResponsiveGridLayout directly (no WidthProvider)
 
 // ────────────────────────────────────────────────────────────────────────────
 // Dockview closure bridge

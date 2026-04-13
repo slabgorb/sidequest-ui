@@ -16,6 +16,7 @@ export interface ResourcePool {
 
 interface CharacterPanelPrefs {
   activeTab: TabId;
+  [key: string]: unknown;
 }
 
 const DEFAULTS: CharacterPanelPrefs = {

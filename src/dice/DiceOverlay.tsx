@@ -33,10 +33,7 @@ function formatModifier(mod: number): string {
 }
 
 /** Build the aria-live announcement string per ADR-075. */
-function buildAnnouncement(
-  request: DiceRequestPayload,
-  result: DiceResultPayload,
-): string {
+function buildAnnouncement(result: DiceResultPayload): string {
   const faces = result.rolls.flatMap((r) => r.faces).join(", ");
   return `${result.character_name} rolled ${result.total} (${faces} ${formatModifier(result.modifier)}) vs DC ${result.difficulty} — ${result.outcome}`;
 }
@@ -44,17 +41,17 @@ function buildAnnouncement(
 export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: DiceOverlayProps) {
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
-  const [replaySeed, setReplaySeed] = useState<number | undefined>(undefined);
 
   const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
 
   // Server-authoritative replay: when DiceResult arrives, switch all clients
   // (rolling player AND spectators) to the seed-driven replay params.
+  // The seed is consumed inside replayThrowParams — DiceScene plays the
+  // resulting physics inputs deterministically without needing the seed.
   useEffect(() => {
     if (!diceResult) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
     setThrowParams(sceneParams);
-    setReplaySeed(diceResult.seed);
     setRollKey((k) => k + 1);
   }, [diceResult]);
 
@@ -146,7 +143,6 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
         <DiceScene
           throwParams={throwParams}
           rollKey={rollKey}
-          seed={replaySeed}
           onThrow={handleSceneThrow}
           onSettle={handleSettle}
         />
@@ -241,7 +237,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
           whiteSpace: "nowrap",
         }}
       >
-        {diceResult && diceRequest ? buildAnnouncement(diceRequest, diceResult) : ""}
+        {diceResult && diceRequest ? buildAnnouncement(diceResult) : ""}
       </div>
     </div>
   );
