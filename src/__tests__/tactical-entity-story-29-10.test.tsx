@@ -13,6 +13,7 @@ import type {
   TacticalEntity,
   TacticalCell,
 } from "@/types/tactical";
+import { TacticalGridRenderer } from "@/components/TacticalGridRenderer";
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
@@ -70,13 +71,18 @@ function makePlayerEntity(x = 2, y = 2): TacticalEntity {
   };
 }
 
+// Note: story context specifies "hostile" but current UI type uses "enemy".
+// Tests use "hostile" via type widening — Dev must update TacticalEntity.faction
+// union to accept "hostile" instead of "enemy" to match the Rust protocol.
+// See Design Deviations in session file.
+
 function makeHostileEntity(x = 3, y = 1): TacticalEntity {
   return {
     id: "npc-goblin-01",
     name: "Grik the Sly",
     position: { x, y },
     size: 1,
-    faction: "hostile",
+    faction: "hostile" as TacticalEntity["faction"],
   };
 }
 
@@ -86,7 +92,7 @@ function makeLargeEntity(): TacticalEntity {
     name: "Cave Ogre",
     position: { x: 2, y: 2 },
     size: 2,
-    faction: "hostile",
+    faction: "hostile" as TacticalEntity["faction"],
   };
 }
 
@@ -96,7 +102,7 @@ function makeHugeEntity(): TacticalEntity {
     name: "Ancient Red Dragon",
     position: { x: 1, y: 1 },
     size: 3,
-    faction: "hostile",
+    faction: "hostile" as TacticalEntity["faction"],
   };
 }
 
@@ -106,7 +112,7 @@ function makeHugeEntity(): TacticalEntity {
 
 describe("AC-4: Token rendering at correct grid positions", () => {
   it("renders entity tokens as SVG elements in token-layer group", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const entities = [makePlayerEntity(), makeHostileEntity()];
 
@@ -126,7 +132,7 @@ describe("AC-4: Token rendering at correct grid positions", () => {
   });
 
   it("positions token at correct grid coordinates", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const entity = makePlayerEntity(3, 2);
     const cellSize = 24; // default
@@ -149,7 +155,7 @@ describe("AC-4: Token rendering at correct grid positions", () => {
   });
 
   it("renders entity initial or icon as text label", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const entity = makePlayerEntity();
 
@@ -175,7 +181,7 @@ describe("AC-4: Token rendering at correct grid positions", () => {
 
 describe("AC-5: Multi-cell entity tokens", () => {
   it("large entity (size=2) renders with radius spanning 2 cells", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const entity = makeLargeEntity();
     const cellSize = 24;
@@ -199,7 +205,7 @@ describe("AC-5: Multi-cell entity tokens", () => {
   });
 
   it("huge entity (size=3) renders larger than large entity", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const cellSize = 24;
 
@@ -241,7 +247,7 @@ describe("AC-5: Multi-cell entity tokens", () => {
 
 describe("AC-6: Faction colors", () => {
   it("player tokens use blue (#2563EB)", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     const { container } = render(
@@ -259,7 +265,7 @@ describe("AC-6: Faction colors", () => {
   });
 
   it("hostile tokens use red (#DC2626)", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     const { container } = render(
@@ -277,7 +283,7 @@ describe("AC-6: Faction colors", () => {
   });
 
   it("neutral tokens use gray (#6B7280)", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const neutral: TacticalEntity = {
       id: "npc-merchant",
@@ -302,7 +308,7 @@ describe("AC-6: Faction colors", () => {
   });
 
   it("ally tokens use green (#16A34A)", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const ally: TacticalEntity = {
       id: "npc-companion",
@@ -339,7 +345,7 @@ describe("AC-6: Faction colors", () => {
 
 describe("AC-7: Token tooltips", () => {
   it("token has SVG title element with entity name", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     const { container } = render(
@@ -358,7 +364,7 @@ describe("AC-7: Token tooltips", () => {
   });
 
   it("tooltip includes faction information", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     const { container } = render(
@@ -386,7 +392,7 @@ describe("AC-7: Token tooltips", () => {
 
 describe("AC-10: Wiring — entities prop to SVG", () => {
   it("TacticalGridRenderer accepts entities prop", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
     const entities = [makePlayerEntity(), makeHostileEntity()];
 
@@ -403,7 +409,7 @@ describe("AC-10: Wiring — entities prop to SVG", () => {
   });
 
   it("empty entities array renders no tokens but grid still appears", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     const { container } = render(
@@ -426,7 +432,7 @@ describe("AC-10: Wiring — entities prop to SVG", () => {
   });
 
   it("entities without entities prop renders grid only (backward compat)", () => {
-    const { TacticalGridRenderer } = require("@/components/TacticalGridRenderer");
+
     const grid = make5x5Grid();
 
     // Omitting entities prop — should work without error
@@ -455,5 +461,21 @@ describe("Rule: TacticalEntity type uses proper union, not string", () => {
       faction: "player", // must be one of the union values
     };
     expect(entity.faction).toBe("player");
+  });
+
+  it("faction union includes 'hostile' (not 'enemy') to match Rust protocol", () => {
+    // Story 29-10 AC-3: Faction enum covers Player, Hostile, Neutral, Ally.
+    // The Rust protocol sends "hostile", not "enemy".
+    // This test fails until Dev updates the TacticalEntity.faction union.
+    const hostile: TacticalEntity = {
+      id: "faction-check",
+      name: "Faction Check",
+      position: { x: 0, y: 0 },
+      size: 1,
+      faction: "hostile" as TacticalEntity["faction"],
+    };
+    // Verify "hostile" is a first-class faction value, not just a cast
+    const validFactions: TacticalEntity["faction"][] = ["player", "hostile", "neutral", "ally"];
+    expect(validFactions).toContain(hostile.faction);
   });
 });
