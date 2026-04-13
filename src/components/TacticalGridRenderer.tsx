@@ -5,6 +5,7 @@ import type {
   TacticalGridData,
   TacticalThemeConfig,
   TacticalCell,
+  TacticalEntity,
   FeatureDef,
   FeatureType,
   GridPos,
@@ -14,8 +15,22 @@ export interface TacticalGridRendererProps {
   grid: TacticalGridData;
   cellSize?: number;
   theme: TacticalThemeConfig;
+  entities?: TacticalEntity[];
   onCellClick?: (pos: GridPos) => void;
   onCellHover?: (pos: GridPos | null) => void;
+}
+
+/** Faction → fill color mapping (AC-3/AC-6). */
+const FACTION_COLORS: Record<TacticalEntity["faction"], string> = {
+  player: "#2563EB",
+  hostile: "#DC2626",
+  neutral: "#6B7280",
+  ally: "#16A34A",
+};
+
+/** Capitalize first letter for display. */
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const DEFAULT_CELL_SIZE = 24;
@@ -68,6 +83,7 @@ export function TacticalGridRenderer({
   grid,
   cellSize = DEFAULT_CELL_SIZE,
   theme,
+  entities = [],
   onCellClick,
   onCellHover,
 }: TacticalGridRendererProps) {
@@ -179,6 +195,45 @@ export function TacticalGridRenderer({
             );
           })
         )}
+      </g>
+
+      <g className="token-layer">
+        {entities.map((entity) => {
+          const r = (entity.size * cellSize) / 2;
+          const cx = entity.position.x * cellSize + r;
+          const cy = entity.position.y * cellSize + r;
+          const fill = FACTION_COLORS[entity.faction];
+          const initial = entity.name.charAt(0).toUpperCase();
+
+          return (
+            <g
+              key={entity.id}
+              data-entity-id={entity.id}
+              transform={`translate(${entity.position.x * cellSize}, ${entity.position.y * cellSize})`}
+            >
+              <title>{`${entity.name} (${capitalize(entity.faction)})`}</title>
+              <circle
+                cx={r}
+                cy={r}
+                r={r}
+                fill={fill}
+                stroke="#fff"
+                strokeWidth={1}
+              />
+              <text
+                x={r}
+                y={r}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={cellSize * 0.5}
+                fill="#fff"
+                pointerEvents="none"
+              >
+                {initial}
+              </text>
+            </g>
+          );
+        })}
       </g>
     </svg>
   );
