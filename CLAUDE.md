@@ -131,9 +131,9 @@ npx vitest run           # Run tests once
 
 - **WebSocket client** connects to API at `ws://localhost:8765/ws`
 - **OTEL Dashboard** at `/dashboard` — connects to `/ws/watcher` for telemetry
-- **Providers**: GameStateProvider (WebSocket state), AudioProvider (music/SFX)
-- **Screens**: CharacterCreation → GamePlay → (overlays: Confrontation, Settings)
-- **Components**: NarrationPanel, InputBar, CharacterSheet, MapPanel, KnowledgeJournal
+- **Providers** (`src/providers/`): `GameStateProvider` (WebSocket state), `ImageBusProvider` (image render pipeline), `ThemeProvider` (genre theme). Audio is wired through `useAudio` at the App level, not a context provider.
+- **Screens**: `ConnectScreen` → `CharacterCreation` → `GameBoard` (with `ConfrontationOverlay` during encounters)
+- **Components**: `GameBoard/`, `CharacterPanel`, `NarrationCards`/`NarrationFocus`/`NarrationScroll`, `InputBar`, `CharacterSheet`, `InventoryPanel`, `MapOverlay`, `KnowledgeJournal`, `Dashboard/` (GM telemetry)
 
 ## Key Directories
 
@@ -142,7 +142,7 @@ npx vitest run           # Run tests once
 | `src/components/` | React components |
 | `src/components/Dashboard/` | OTEL dashboard (tabs: Timeline, State, Subsystems, Timing, Console) |
 | `src/screens/` | Full-page views |
-| `src/providers/` | Context providers (game state, audio, settings) |
+| `src/providers/` | Context providers (game state, image bus, theme) |
 | `src/hooks/` | Custom hooks (WebSocket, state mirror, slash commands) |
 | `src/audio/` | Audio engine (music, SFX) |
 | `src/types/` | TypeScript type definitions |

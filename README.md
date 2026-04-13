@@ -33,27 +33,35 @@ The dev server proxies four paths to the Rust API at `localhost:8765`:
 
 ## Session Flow
 
-A game session moves through three phases, each rendered by its own screen:
+A game session moves through three phases:
 
-1. **ConnectScreen** — Server connection, genre/world selection via dropdowns, player name entry. Persists selections in localStorage.
-2. **CharacterCreation** — AI-driven multi-turn dialogue. The server offers choices and accepts freeform input to build a character collaboratively.
-3. **GameLayout** — Active gameplay. Orchestrates all panels described below.
+1. **ConnectScreen** (`src/screens/ConnectScreen.tsx`) — Server connection, genre/world selection via dropdowns, player name entry. Persists selections in localStorage.
+2. **CharacterCreation** (`src/components/CharacterCreation/`) — AI-driven multi-turn dialogue. The server offers choices and accepts freeform input to build a character collaboratively.
+3. **GameBoard** (`src/components/GameBoard/GameBoard.tsx`) — Active gameplay. A widget-based layout (see `widgetRegistry.ts`) that composes the narration, party, inventory, map, and overlay panels listed below.
 
 ## Components
 
-| Component          | Purpose                                                      |
-|--------------------|--------------------------------------------------------------|
-| **NarrativeView**  | Markdown narration (DOMPurify), streaming chunks, images     |
-| **PartyPanel**     | Portraits, color-coded HP bars, status effects               |
-| **CharacterSheet** | Stats grid, abilities, backstory                             |
-| **InventoryPanel** | Items grouped by type, equipped state, gold display          |
-| **MapOverlay**     | SVG nodes and connections, fog of war, current location      |
-| **JournalView**    | Handout thumbnails with lightbox modal                       |
-| **CombatOverlay**  | Enemy HP bars, turn order, health status indicators          |
-| **AudioStatus**    | 2-channel mixer UI (music/SFX), mute toggles                |
-| **InputBar**       | Text input with aside toggle                                 |
-| **GMMode**         | Watcher socket, event stream, trope timeline, state inspector|
-| **OverlayManager** | Mobile-aware consolidated panel manager                      |
+All paths are relative to `src/components/` unless noted.
+
+| Component                  | Purpose                                                       |
+|----------------------------|---------------------------------------------------------------|
+| `GameBoard/GameBoard.tsx`  | Root gameplay layout with widget registry                     |
+| `NarrationCards.tsx` + `NarrationFocus.tsx` + `NarrationScroll.tsx` | Narration rendering (current-turn focus + scrollback)         |
+| `NarrativeView.tsx` (in `src/screens/`) | Markdown narration (DOMPurify), streaming chunks, images |
+| `CharacterPanel.tsx`       | Persistent themed sidebar showing active character            |
+| `PartyPanel.tsx`           | Party portraits, HP bars, status effects                      |
+| `CharacterSheet.tsx`       | Stats grid, abilities, backstory                              |
+| `InventoryPanel.tsx`       | Items grouped by type, equipped state, currency               |
+| `MapOverlay.tsx` + `Automapper.tsx` + `DungeonMapRenderer.tsx` + `TacticalGridRenderer.tsx` | SVG / grid map rendering                     |
+| `JournalView.tsx` + `KnowledgeJournal.tsx` | Handouts and lore journal                             |
+| `ConfrontationOverlay.tsx` | Encounter / combat overlay — enemy HP, turn order, status     |
+| `TurnStatusPanel.tsx`      | Current turn + phase indicator                                |
+| `AudioStatus.tsx`          | 2-channel mixer UI (music/SFX), mute toggles                  |
+| `InputBar.tsx`             | Text input with aside toggle                                  |
+| `Dashboard/DashboardApp.tsx` | Watcher/GM telemetry app (tabs: Timeline, State, Subsystems, Timing, Console) |
+| `GenericResourceBar.tsx`   | Reusable resource bar (HP, stamina, etc.)                     |
+
+> This table is a guided tour, not an exhaustive index. Treat `src/components/` as authoritative.
 
 ## Keyboard Shortcuts
 
