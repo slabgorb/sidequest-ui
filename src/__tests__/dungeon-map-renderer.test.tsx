@@ -325,7 +325,7 @@ describe("DungeonMapRenderer — fog of war: discovered non-current (AC-4)", () 
         name: "Goblin",
         position: { x: 4, y: 1 }, // global coords in hallway
         size: 1,
-        faction: "enemy" as const,
+        faction: "hostile" as const,
       },
     ];
     const { container } = render(
@@ -907,7 +907,7 @@ describe("DungeonMapRenderer — edge cases", () => {
         name: "Ghost",
         position: { x: 100, y: 100 }, // way outside any room
         size: 1,
-        faction: "enemy" as const,
+        faction: "hostile" as const,
       },
     ];
     const { container } = render(

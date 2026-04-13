@@ -78,7 +78,7 @@ export interface TacticalEntity {
   readonly name: string;
   readonly position: GridPos;
   readonly size: number;
-  readonly faction: "player" | "ally" | "enemy" | "neutral";
+  readonly faction: "player" | "ally" | "hostile" | "neutral";
 }
 
 /**
