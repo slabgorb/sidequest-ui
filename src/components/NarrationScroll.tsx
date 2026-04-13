@@ -63,15 +63,15 @@ export function NarrationScroll({ messages, thinking }: NarrationScrollProps) {
           <EmptyNarrationState />
         ) : (
           <>
-            {/* History — dimmed at 0.4 opacity */}
+            {/* History — dimmed at 0.65 opacity for legibility (WCAG-aware) */}
             {hasHistory && historySegments.length > 0 && (
-              <div className="opacity-40 space-y-4 pb-6 mb-6 border-b-2 border-border/50">
+              <div className="history-section opacity-65 space-y-4 pb-6 mb-6 border-b-2 border-border/50">
                 {historySegments.map((seg, i) =>
-                  renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]" }),
+                  renderSegment(seg, i, { maxTextWidth: "max-w-[85ch]", isHistory: true }),
                 )}
               </div>
             )}
-            {/* Current turn — full opacity */}
+            {/* Current turn — full opacity, larger leading for serif body */}
             {currentSegments.map((seg, i) =>
               renderSegment(seg, historySegments.length + 1 + i, { maxTextWidth: "max-w-[85ch]" }),
             )}

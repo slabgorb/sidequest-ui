@@ -41,6 +41,13 @@ export interface RenderSegmentOpts {
   maxTextWidth?: string;
   chapterTitle?: string | null;
   dinkusGlyph?: string;
+  /**
+   * When true, render at history typography (smaller, tighter). Used by
+   * NarrationScroll to differentiate the historical block from the current
+   * turn block. Combined with the wrapper's opacity, this produces the
+   * "past vs present" hierarchy without sacrificing body legibility.
+   */
+  isHistory?: boolean;
 }
 
 export function renderSegment(
@@ -52,19 +59,27 @@ export function renderSegment(
     maxTextWidth = "",
     chapterTitle = null,
     dinkusGlyph = "◇",
+    isHistory = false,
   } = opts;
 
   switch (seg.kind) {
-    case "text":
+    case "text": {
+      // Current turn gets larger, looser type for serif body legibility.
+      // History uses base size + relaxed leading — still readable, visually
+      // recessed via the wrapper's opacity (see NarrationScroll).
+      const textClass = isHistory
+        ? "prose dark:prose-invert text-base leading-relaxed"
+        : "prose dark:prose-invert text-xl leading-loose";
       return (
         <div key={i} className={`${maxTextWidth} mx-auto mb-6`}>
           <div
-            className="prose dark:prose-invert text-xl leading-[1.45]"
+            className={textClass}
             dangerouslySetInnerHTML={{ __html: seg.html! }}
           />
           <FootnoteList footnotes={seg.footnotes} />
         </div>
       );
+    }
     case "gallery-notice":
       return (
         <div
