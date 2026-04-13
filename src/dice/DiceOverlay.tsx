@@ -14,10 +14,11 @@
  * diceRequest.rolling_player_id.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { DiceScene, type ThrowParams } from "./DiceScene";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import { replayThrowParams } from "./replayThrowParams";
 
 export interface DiceOverlayProps {
   diceRequest: DiceRequestPayload | null;
@@ -43,8 +44,19 @@ function buildAnnouncement(
 export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: DiceOverlayProps) {
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
+  const [replaySeed, setReplaySeed] = useState<number | undefined>(undefined);
 
   const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
+
+  // Server-authoritative replay: when DiceResult arrives, switch all clients
+  // (rolling player AND spectators) to the seed-driven replay params.
+  useEffect(() => {
+    if (!diceResult) return;
+    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    setThrowParams(sceneParams);
+    setReplaySeed(diceResult.seed);
+    setRollKey((k) => k + 1);
+  }, [diceResult]);
 
   const handleSceneThrow = useCallback(
     (params: ThrowParams) => {
@@ -134,6 +146,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
         <DiceScene
           throwParams={throwParams}
           rollKey={rollKey}
+          seed={replaySeed}
           onThrow={handleSceneThrow}
           onSettle={handleSettle}
         />
