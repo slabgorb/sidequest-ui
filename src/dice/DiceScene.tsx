@@ -24,6 +24,13 @@ import { Text } from "@react-three/drei";
 import { D20_COLLIDER_VERTICES, D20_RADIUS, computeFaceInfo, readD20Value } from "./d20";
 import { useDiceThrowGesture } from "./useDiceThrowGesture";
 
+// drei's <Text> uses troika-three-text, which requires an explicit font URL.
+// troika-three-text v0.52+ defaults `defaultFontURL` to `null` — if no `font`
+// prop is passed, the render suspends forever waiting for a font that never
+// loads, and R3F's internal Suspense boundary hides the entire canvas content
+// (the dice, the tray, the lights). See story 34-12 diagnosis.
+import FACE_LABEL_FONT from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
+
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();
 
@@ -152,6 +159,7 @@ function FaceLabels() {
         return (
           <Text
             key={i}
+            font={FACE_LABEL_FONT}
             position={labelPos.toArray()}
             rotation={[euler.x, euler.y, euler.z]}
             fontSize={0.035}
