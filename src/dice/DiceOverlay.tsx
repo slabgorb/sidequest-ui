@@ -24,7 +24,13 @@ export interface DiceOverlayProps {
   diceRequest: DiceRequestPayload | null;
   diceResult: DiceResultPayload | null;
   playerId: string;
-  onThrow: (params: DiceThrowParams) => void;
+  /**
+   * Fired after local physics settles on the rolling player's client.
+   * `face` is flat-order across the pool; single-d20 case is `[value]`.
+   * Physics-is-the-roll (story 34-12): the server treats `face` as the
+   * authoritative result.
+   */
+  onThrow: (params: DiceThrowParams, face: number[]) => void;
 }
 
 /** Format the modifier for display: "+3" or "-2". */
@@ -45,40 +51,71 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
   const [replaySeed, setReplaySeed] = useState<number | undefined>(undefined);
+  // Rolling player's in-flight local physics run. Set on gesture release,
+  // cleared when handleSettle reports the face. Gates handleSettle so the
+  // replay path can't accidentally double-send a DiceThrow message.
+  const [pendingLocalParams, setPendingLocalParams] = useState<ThrowParams | null>(null);
 
   const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
 
-  // Server-authoritative replay: when DiceResult arrives, switch all clients
-  // (rolling player AND spectators) to the seed-driven replay params.
+  // Reset local physics state every time a new DiceRequest arrives so the
+  // rolling player sees a fresh PickupDie (not the settled PhysicsDie from
+  // the previous roll). Keyed on request_id so back-to-back requests with
+  // the same rolling_player_id still reset correctly.
+  useEffect(() => {
+    setThrowParams(null);
+    setPendingLocalParams(null);
+    setReplaySeed(undefined);
+  }, [diceRequest?.request_id]);
+
+  // Spectator replay: when DiceResult arrives for players who didn't roll,
+  // run Rapier locally with seed-driven params to animate the same physics.
+  // The rolling player already watched their own physics — they skip this
+  // path to avoid watching the same roll twice.
   useEffect(() => {
     if (!diceResult) return;
+    if (isRollingPlayer) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
     setThrowParams(sceneParams);
     setReplaySeed(diceResult.seed);
     setRollKey((k) => k + 1);
-  }, [diceResult]);
+  }, [diceResult, isRollingPlayer]);
 
+  // Rolling player's drag-and-release. Starts a local PhysicsDie simulation
+  // but does NOT send DiceThrow yet — we wait for the die to settle so we
+  // can report the authoritative face value (physics-is-the-roll, 34-12).
   const handleSceneThrow = useCallback(
     (params: ThrowParams) => {
       if (!isRollingPlayer || !diceRequest) return;
       setThrowParams(params);
+      setPendingLocalParams(params);
       setRollKey((k) => k + 1);
-      // Convert DiceScene ThrowParams → wire DiceThrowParams
-      onThrow({
-        velocity: params.linearVelocity,
-        angular: params.angularVelocity,
-        position: [
-          params.position[0] + 0.5,
-          (params.position[2] + 0.8) / 1.6,
-        ],
-      });
     },
-    [isRollingPlayer, diceRequest, onThrow],
+    [isRollingPlayer, diceRequest],
   );
 
-  const handleSettle = useCallback(() => {
-    // Settle is now driven by DiceResult from server, not local physics
-  }, []);
+  // Called by PhysicsDie on settle with the face reading from readD20Value.
+  // Only fires the wire DiceThrow when we have a pending local run — that
+  // guard ensures spectator replay settles don't accidentally send anything.
+  const handleSettle = useCallback(
+    (value: number) => {
+      if (!isRollingPlayer || !diceRequest || !pendingLocalParams) return;
+      const params = pendingLocalParams;
+      setPendingLocalParams(null);
+      onThrow(
+        {
+          velocity: params.linearVelocity,
+          angular: params.angularVelocity,
+          position: [
+            params.position[0] + 0.5,
+            (params.position[2] + 0.8) / 1.6,
+          ],
+        },
+        [value],
+      );
+    },
+    [isRollingPlayer, diceRequest, pendingLocalParams, onThrow],
+  );
 
   if (!diceRequest) return null;
 

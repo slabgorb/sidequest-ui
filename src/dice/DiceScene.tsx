@@ -24,12 +24,12 @@ import { Text } from "@react-three/drei";
 import { D20_COLLIDER_VERTICES, D20_RADIUS, computeFaceInfo, readD20Value } from "./d20";
 import { useDiceThrowGesture } from "./useDiceThrowGesture";
 
-// drei's <Text> uses troika-three-text, which requires an explicit font URL.
-// troika-three-text v0.52+ defaults `defaultFontURL` to `null` — if no `font`
-// prop is passed, the render suspends forever waiting for a font that never
-// loads, and R3F's internal Suspense boundary hides the entire canvas content
-// (the dice, the tray, the lights). See story 34-12 diagnosis.
-import FACE_LABEL_FONT from "@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url";
+// drei's <Text> uses troika-three-text, whose OpenType parser only supports
+// .ttf/.otf — NOT .woff2. Pointing it at a woff2 URL causes troika to throw
+// "woff2 fonts not supported", which triggers R3F's Suspense boundary and
+// hides the entire canvas (dice + tray + lights). Serve a real .ttf from
+// /public/fonts/ instead. Story 34-12.
+const FACE_LABEL_FONT = "/fonts/Inter-Bold.ttf";
 
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();

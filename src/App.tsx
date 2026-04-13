@@ -580,15 +580,19 @@ function AppInner() {
     [send],
   );
 
-  // Dice throw — send gesture params to server as DICE_THROW (story 34-5)
+  // Dice throw — sent after local physics settles with the client-reported
+  // face values (physics-is-the-roll, story 34-12). The server treats `face`
+  // as the authoritative roll result and echoes `throw_params` to spectators
+  // for deterministic replay animation.
   const handleDiceThrow = useCallback(
-    (params: DiceThrowParams) => {
+    (params: DiceThrowParams, face: number[]) => {
       if (!diceRequest) return;
       send({
         type: MessageType.DICE_THROW,
         payload: {
           request_id: diceRequest.request_id,
           throw_params: params,
+          face,
         },
         player_id: "",
       });

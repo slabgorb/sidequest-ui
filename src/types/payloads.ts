@@ -282,10 +282,21 @@ export interface DiceRequestPayload {
   context: string;
 }
 
-/** Client -> server: player submits throw gesture. */
+/** Client -> server: rolling player submits throw after local physics settles.
+ *
+ * Physics-is-the-roll (story 34-12): the client runs Rapier locally to visual
+ * completion, reads the settled face for each die, and submits the face
+ * values alongside the throw parameters. The server uses `face` as the
+ * authoritative roll result (no server RNG) and echoes `throw_params` so
+ * spectators can replay deterministically.
+ *
+ * `face` is one entry per physical die in the pool, flat order matching the
+ * `DieSpec` iteration in the triggering `DiceRequest`.
+ */
 export interface DiceThrowPayload {
   request_id: string;
   throw_params: DiceThrowParams;
+  face: number[];
 }
 
 /** Server -> all clients: resolved dice roll outcome. */
