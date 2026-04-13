@@ -5,8 +5,8 @@
  * Tests cover: token layer rendering, faction colors, multi-cell entities,
  * hover tooltips, and wiring from entity data to SVG output.
  */
-import { render, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { render } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
 import type {
   TacticalGridData,
   TacticalThemeConfig,

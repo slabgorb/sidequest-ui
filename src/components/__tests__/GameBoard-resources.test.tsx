@@ -75,7 +75,7 @@ beforeEach(() => {
 function renderLayout(overrides: Partial<GameBoardProps> = {}) {
   const defaults: GameBoardProps = {
     messages: [],
-    characters: [{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }],
+    characters: [{ player_id: "p1", name: "Kael", character_name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png", current_location: "" }],
     onSend: vi.fn(),
     disabled: false,
     characterSheet: CHARACTER_SHEET,
@@ -283,7 +283,7 @@ describe("25-11 AC-4: End-to-end pipeline verification", () => {
       <ImageBusProvider messages={[]}>
         <GameBoard
           messages={[]}
-          characters={[{ player_id: "p1", name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png" }]}
+          characters={[{ player_id: "p1", name: "Kael", character_name: "Kael", class: "Ranger", level: 3, hp: 20, hp_max: 25, status_effects: [], portrait_url: "/renders/kael.png", current_location: "" }]}
           onSend={vi.fn()}
           disabled={false}
           characterSheet={CHARACTER_SHEET}

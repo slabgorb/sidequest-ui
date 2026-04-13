@@ -187,7 +187,7 @@ describe("AudioEngine", () => {
 
       // Should have created gain nodes for crossfade ramps
       const rampCalls = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
       expect(rampCalls.length).toBeGreaterThanOrEqual(2); // ramp down old, ramp up new
       engine.dispose();
@@ -200,10 +200,10 @@ describe("AudioEngine", () => {
       engine.stopMusic(500);
 
       const rampCalls = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
       // Should ramp to 0
-      const rampToZero = rampCalls.some(([value]: [number]) => value === 0);
+      const rampToZero = rampCalls.some(([value]) => value === 0);
       expect(rampToZero).toBe(true);
       engine.dispose();
     });
@@ -292,7 +292,7 @@ describe("AudioEngine", () => {
       // Each channel gain should be connected to the master gain
       // At least 3 connect calls for channels → master
       const totalConnects = ctx._gainNodes.reduce(
-        (sum, n) => sum + (n.connect as ReturnType<typeof vi.fn>).mock.calls.length,
+        (sum, n) => sum + n.connect.mock.calls.length,
         0,
       );
       expect(totalConnects).toBeGreaterThanOrEqual(3);

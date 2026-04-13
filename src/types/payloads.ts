@@ -311,112 +311,112 @@ interface BaseMessage {
 }
 
 export interface ThinkingMessage extends BaseMessage {
-  type: MessageType.THINKING;
+  type: typeof MessageType.THINKING;
   payload: ThinkingPayload;
 }
 
 export interface NarrationMessage extends BaseMessage {
-  type: MessageType.NARRATION;
+  type: typeof MessageType.NARRATION;
   payload: NarrationPayload;
 }
 
 export interface NarrationEndMessage extends BaseMessage {
-  type: MessageType.NARRATION_END;
+  type: typeof MessageType.NARRATION_END;
   payload: NarrationEndPayload;
 }
 
 export interface SessionEventMessage extends BaseMessage {
-  type: MessageType.SESSION_EVENT;
+  type: typeof MessageType.SESSION_EVENT;
   payload: SessionEventPayload;
 }
 
 export interface CharacterCreationMessage extends BaseMessage {
-  type: MessageType.CHARACTER_CREATION;
+  type: typeof MessageType.CHARACTER_CREATION;
   payload: CharacterCreationPayload;
 }
 
 export interface TurnStatusMessage extends BaseMessage {
-  type: MessageType.TURN_STATUS;
+  type: typeof MessageType.TURN_STATUS;
   payload: TurnStatusPayload;
 }
 
 export interface PartyStatusMessage extends BaseMessage {
-  type: MessageType.PARTY_STATUS;
+  type: typeof MessageType.PARTY_STATUS;
   payload: PartyStatusPayload;
 }
 
 export interface PlayerActionMessage extends BaseMessage {
-  type: MessageType.PLAYER_ACTION;
+  type: typeof MessageType.PLAYER_ACTION;
   payload: PlayerActionPayload;
 }
 
 export interface MapUpdateMessage extends BaseMessage {
-  type: MessageType.MAP_UPDATE;
+  type: typeof MessageType.MAP_UPDATE;
   payload: MapUpdatePayload;
 }
 
 export interface ConfrontationMessage extends BaseMessage {
-  type: MessageType.CONFRONTATION;
+  type: typeof MessageType.CONFRONTATION;
   payload: ConfrontationPayload;
 }
 
 export interface ErrorMessage extends BaseMessage {
-  type: MessageType.ERROR;
+  type: typeof MessageType.ERROR;
   payload: ErrorPayload;
 }
 
 export interface ImageMessage extends BaseMessage {
-  type: MessageType.IMAGE;
+  type: typeof MessageType.IMAGE;
   payload: ImagePayload;
 }
 
 export interface AudioCueMessage extends BaseMessage {
-  type: MessageType.AUDIO_CUE;
+  type: typeof MessageType.AUDIO_CUE;
   payload: AudioCuePayload;
 }
 
 export interface RenderQueuedMessage extends BaseMessage {
-  type: MessageType.RENDER_QUEUED;
+  type: typeof MessageType.RENDER_QUEUED;
   payload: RenderQueuedPayload;
 }
 
 export interface ChapterMarkerMessage extends BaseMessage {
-  type: MessageType.CHAPTER_MARKER;
+  type: typeof MessageType.CHAPTER_MARKER;
   payload: ChapterMarkerPayload;
 }
 
 export interface ActionRevealMessage extends BaseMessage {
-  type: MessageType.ACTION_REVEAL;
+  type: typeof MessageType.ACTION_REVEAL;
   payload: ActionRevealPayload;
 }
 
 export interface ItemDepletedMessage extends BaseMessage {
-  type: MessageType.ITEM_DEPLETED;
+  type: typeof MessageType.ITEM_DEPLETED;
   payload: ItemDepletedPayload;
 }
 
 export interface ResourceMinReachedMessage extends BaseMessage {
-  type: MessageType.RESOURCE_MIN_REACHED;
+  type: typeof MessageType.RESOURCE_MIN_REACHED;
   payload: ResourceMinReachedPayload;
 }
 
 export interface JournalResponseMessage extends BaseMessage {
-  type: MessageType.JOURNAL_RESPONSE;
+  type: typeof MessageType.JOURNAL_RESPONSE;
   payload: JournalResponsePayload;
 }
 
 export interface DiceRequestMessage extends BaseMessage {
-  type: MessageType.DICE_REQUEST;
+  type: typeof MessageType.DICE_REQUEST;
   payload: DiceRequestPayload;
 }
 
 export interface DiceThrowMessage extends BaseMessage {
-  type: MessageType.DICE_THROW;
+  type: typeof MessageType.DICE_THROW;
   payload: DiceThrowPayload;
 }
 
 export interface DiceResultMessage extends BaseMessage {
-  type: MessageType.DICE_RESULT;
+  type: typeof MessageType.DICE_RESULT;
   payload: DiceResultPayload;
 }
 
@@ -441,6 +441,7 @@ export type TypedGameMessage =
   | ResourceMinReachedMessage
   | JournalResponseMessage
   | DiceRequestMessage
+  | DiceThrowMessage
   | DiceResultMessage;
 
 // ---------------------------------------------------------------------------

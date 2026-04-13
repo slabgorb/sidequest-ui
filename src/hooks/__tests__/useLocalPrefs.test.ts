@@ -8,6 +8,7 @@ interface TestPrefs {
   theme: string;
   fontSize: number;
   sidebar: boolean;
+  [key: string]: unknown;
 }
 
 const DEFAULTS: TestPrefs = { theme: "dark", fontSize: 14, sidebar: true };

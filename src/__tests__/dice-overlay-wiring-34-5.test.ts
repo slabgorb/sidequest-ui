@@ -99,19 +99,22 @@ describe("Wiring: DICE_THROW message sending", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("Wiring: Protocol types exist in type system", () => {
-  it("MessageType enum in protocol.ts includes DICE_REQUEST", () => {
+  // Accept both the legacy enum form (`KEY = "VAL"`) and the current
+  // const-object form (`KEY: "VAL"`). protocol.ts was converted to a
+  // const object with `erasableSyntaxOnly` on the tsconfig.
+  it("MessageType in protocol.ts includes DICE_REQUEST", () => {
     const protocolSrc = readSrc("types/protocol.ts");
-    expect(protocolSrc).toMatch(/DICE_REQUEST\s*=\s*["']DICE_REQUEST["']/);
+    expect(protocolSrc).toMatch(/DICE_REQUEST\s*[:=]\s*["']DICE_REQUEST["']/);
   });
 
-  it("MessageType enum in protocol.ts includes DICE_THROW", () => {
+  it("MessageType in protocol.ts includes DICE_THROW", () => {
     const protocolSrc = readSrc("types/protocol.ts");
-    expect(protocolSrc).toMatch(/DICE_THROW\s*=\s*["']DICE_THROW["']/);
+    expect(protocolSrc).toMatch(/DICE_THROW\s*[:=]\s*["']DICE_THROW["']/);
   });
 
-  it("MessageType enum in protocol.ts includes DICE_RESULT", () => {
+  it("MessageType in protocol.ts includes DICE_RESULT", () => {
     const protocolSrc = readSrc("types/protocol.ts");
-    expect(protocolSrc).toMatch(/DICE_RESULT\s*=\s*["']DICE_RESULT["']/);
+    expect(protocolSrc).toMatch(/DICE_RESULT\s*[:=]\s*["']DICE_RESULT["']/);
   });
 
   it("payloads.ts exports DiceRequestPayload interface", () => {

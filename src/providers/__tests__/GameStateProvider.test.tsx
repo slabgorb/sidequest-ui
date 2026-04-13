@@ -229,6 +229,7 @@ describe('useStateMirror — SESSION_EVENT initial state', () => {
     ],
     location: 'Temple of Dawn',
     quests: { 'Defend the Temple': 'active' },
+    knowledge: [],
   };
 
   it('SESSION_EVENT join with initial_state populates full state', () => {

@@ -46,6 +46,12 @@ export interface ConfrontationData {
   secondary_stats: SecondaryStats | null;
   genre_slug: string;
   mood: string;
+  /**
+   * Server-side clear signal: when `false`, the confrontation has ended and
+   * the overlay should unmount. Absent or `true` means active. Handled at
+   * dispatch in App.tsx (search: `payload.active !== false`).
+   */
+  active?: boolean;
 }
 
 interface ConfrontationOverlayProps {
