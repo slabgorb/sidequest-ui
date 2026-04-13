@@ -294,11 +294,13 @@ function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
 export function DiceScene({
   throwParams,
   rollKey,
+  seed,
   onThrow,
   onSettle,
 }: {
   throwParams: ThrowParams | null;
   rollKey: number;
+  seed?: number;
   onThrow: (params: ThrowParams) => void;
   onSettle: (value: number) => void;
 }) {
