@@ -6,7 +6,7 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
   victoria: "parchment",
   elemental_harmony: "parchment",
-  star_chamber: "parchment",
+  heavy_metal: "parchment",
   neon_dystopia: "terminal",
   space_opera: "terminal",
   road_warrior: "rugged",
@@ -14,6 +14,7 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   spaghetti_western: "rugged",
   pulp_noir: "rugged",
   caverns_and_claudes: "rugged",
+  heavy_metal: "rugged",
 };
 
 export function getArchetypeForGenre(genre: string): ChromeArchetype {

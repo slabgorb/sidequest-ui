@@ -24,8 +24,8 @@ describe("getArchetypeForGenre", () => {
     expect(getArchetypeForGenre("elemental_harmony")).toBe("parchment");
   });
 
-  it("maps star_chamber to parchment", () => {
-    expect(getArchetypeForGenre("star_chamber")).toBe("parchment");
+  it("maps heavy_metal to parchment", () => {
+    expect(getArchetypeForGenre("heavy_metal")).toBe("parchment");
   });
 
   it("maps neon_dystopia to terminal", () => {
@@ -54,6 +54,10 @@ describe("getArchetypeForGenre", () => {
 
   it("maps caverns_and_claudes to rugged", () => {
     expect(getArchetypeForGenre("caverns_and_claudes")).toBe("rugged");
+  });
+
+  it("maps heavy_metal to rugged", () => {
+    expect(getArchetypeForGenre("heavy_metal")).toBe("rugged");
   });
 
   it("throws on unknown genre slug", () => {
