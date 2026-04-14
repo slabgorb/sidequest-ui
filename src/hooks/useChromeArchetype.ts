@@ -6,7 +6,7 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
   victoria: "parchment",
   elemental_harmony: "parchment",
-  star_chamber: "parchment",
+  heavy_metal: "parchment",
   neon_dystopia: "terminal",
   space_opera: "terminal",
   road_warrior: "rugged",

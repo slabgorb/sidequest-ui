@@ -82,25 +82,35 @@ describe("AC-2: Velocity calculation", () => {
   });
 
   it("produces higher velocity for faster drags", async () => {
+    // Make the random Y component deterministic. `buildThrowParams` sets
+    // `linearVelocity[1] = 2 + Math.random() * 2`, and without a stub a
+    // high slow-roll + low fast-roll can flip the magnitude comparison
+    // whenever the fast drag clamps at `MAX_THROW_SPEED`.
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+
     const { useDiceThrowGesture } = await import("../useDiceThrowGesture");
     const onThrowSlow = vi.fn();
     const onThrowFast = vi.fn();
 
-    // Slow drag
+    // Slow drag — 50 px over 1000 ms → speed 50 px/s, well under the
+    // 500 px/s cap (MAX_THROW_SPEED / PX_TO_VELOCITY) so throwSpeed stays
+    // proportional rather than clamping.
     const { result: slow } = renderHook(() => useDiceThrowGesture({ onThrow: onThrowSlow }));
     act(() => {
       slow.current.onPointerDown({ stopPropagation: () => {} } as never);
     });
     act(() => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       window.dispatchEvent(new PointerEvent("pointermove", { clientX: 400, clientY: 250, bubbles: true }));
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       window.dispatchEvent(new PointerEvent("pointermove", { clientX: 400, clientY: 200, bubbles: true }));
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       window.dispatchEvent(new PointerEvent("pointerup", { clientX: 400, clientY: 200, bubbles: true }));
     });
 
-    // Fast drag — same distance, less time
+    // Fast drag — same distance, 10 ms per step → speed 5000 px/s,
+    // hits the clamp. Magnitude difference vs the slow drag is now
+    // real and deterministic.
     const { result: fast } = renderHook(() => useDiceThrowGesture({ onThrow: onThrowFast }));
     act(() => {
       fast.current.onPointerDown({ stopPropagation: () => {} } as never);
@@ -114,22 +124,21 @@ describe("AC-2: Velocity calculation", () => {
       window.dispatchEvent(new PointerEvent("pointerup", { clientX: 400, clientY: 200, bubbles: true }));
     });
 
-    if (onThrowSlow.mock.calls.length > 0 && onThrowFast.mock.calls.length > 0) {
-      const slowSpeed = Math.sqrt(
-        onThrowSlow.mock.calls[0][0].linearVelocity.reduce(
-          (sum: number, v: number) => sum + v * v, 0,
-        ),
-      );
-      const fastSpeed = Math.sqrt(
-        onThrowFast.mock.calls[0][0].linearVelocity.reduce(
-          (sum: number, v: number) => sum + v * v, 0,
-        ),
-      );
-      expect(fastSpeed).toBeGreaterThan(slowSpeed);
-    } else {
-      // At least one should have fired
-      expect(onThrowSlow.mock.calls.length + onThrowFast.mock.calls.length).toBeGreaterThan(0);
-    }
+    expect(onThrowSlow).toHaveBeenCalledTimes(1);
+    expect(onThrowFast).toHaveBeenCalledTimes(1);
+    const slowSpeed = Math.sqrt(
+      onThrowSlow.mock.calls[0][0].linearVelocity.reduce(
+        (sum: number, v: number) => sum + v * v, 0,
+      ),
+    );
+    const fastSpeed = Math.sqrt(
+      onThrowFast.mock.calls[0][0].linearVelocity.reduce(
+        (sum: number, v: number) => sum + v * v, 0,
+      ),
+    );
+    expect(fastSpeed).toBeGreaterThan(slowSpeed);
+
+    randomSpy.mockRestore();
   });
 });
 
