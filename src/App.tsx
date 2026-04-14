@@ -24,6 +24,7 @@ import type { CharacterSummary } from "@/components/PartyPanel";
 import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import type { GenresResponse } from "@/types/genres";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
@@ -110,7 +111,7 @@ function AppInner() {
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
-  const [genres, setGenres] = useState<string[]>([]);
+  const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(hmrState ? loadSession()?.genre ?? null : null);
   const [thinking, setThinking] = useState(false);
@@ -160,21 +161,22 @@ function AppInner() {
     saveHmrState({ messages, sessionPhase, character });
   }, [messages, sessionPhase, character]);
 
-  // Fetch available genres from the server — never hardcode
+  // Fetch available genres from the server — never hardcode.
+  // Response shape is `GenresResponse` (rich metadata per genre + world);
+  // see `sidequest-server::list_genres` and `@/types/genres`.
   const fetchGenres = useCallback(() => {
     setGenreError(false);
     fetch("/api/genres")
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed");
-        return res.json();
+        return res.json() as Promise<GenresResponse>;
       })
       .then((data) => {
-        const keys = Object.keys(data).sort();
-        if (keys.length === 0) throw new Error("no genres");
-        setGenres(keys);
+        if (Object.keys(data).length === 0) throw new Error("no genres");
+        setGenres(data);
       })
       .catch(() => {
-        setGenres([]);
+        setGenres({});
         setGenreError(true);
       });
   }, []);

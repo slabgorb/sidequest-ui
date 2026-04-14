@@ -1,21 +1,112 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ConnectScreen } from "@/screens/ConnectScreen";
+import type { GenresResponse } from "@/types/genres";
 
-const GENRES = ["low_fantasy", "road_warrior", "elemental_harmony"];
 const STORAGE_KEY = "sidequest-connect";
 
+/**
+ * Shared fixture matching the enriched `/api/genres` shape.
+ *
+ * Two genres: `low_fantasy` (two worlds) and `road_warrior` (one world,
+ * to exercise the auto-select-single-world path). Both worlds carry the
+ * full WorldMeta fields so WorldPreview renders without null checks.
+ */
+const GENRES: GenresResponse = {
+  low_fantasy: {
+    name: "Low Fantasy",
+    description: "Gritty medieval adventures.",
+    worlds: [
+      {
+        slug: "greyhawk",
+        name: "Greyhawk",
+        description: "The Flanaess, a continent of warring kingdoms.",
+        era: null,
+        setting: null,
+        inspirations: [],
+        axis_snapshot: {},
+        hero_image: null,
+      },
+      {
+        slug: "forgotten_realms",
+        name: "Forgotten Realms",
+        description: "Faerûn — a world of high fantasy.",
+        era: null,
+        setting: null,
+        inspirations: [],
+        axis_snapshot: {},
+        hero_image: null,
+      },
+    ],
+  },
+  road_warrior: {
+    name: "Road Warrior",
+    description: "Vehicular post-apocalypse.",
+    worlds: [
+      {
+        slug: "wasteland",
+        name: "Wasteland",
+        description: "Nothing but dust and engines.",
+        era: null,
+        setting: null,
+        inspirations: [],
+        axis_snapshot: {},
+        hero_image: null,
+      },
+    ],
+  },
+};
+
 describe("ConnectScreen", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   // -- rendering -------------------------------------------------------------
   it("renders a player name input", () => {
     render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-    expect(screen.getByLabelText(/player name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/what name shall be yours/i)).toBeInTheDocument();
   });
 
-  it("renders a genre select", () => {
+  it("renders a genre radio group with one row per genre", () => {
     render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-    expect(screen.getByLabelText(/genre/i)).toBeInTheDocument();
+    const genreGroup = screen.getByRole("radiogroup", { name: /genre/i });
+    expect(genreGroup).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /low fantasy/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /road warrior/i })).toBeInTheDocument();
+  });
+
+  it("renders the empty-state preview when no genre is selected", () => {
+    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    expect(screen.getByText(/choose a genre to see what awaits/i)).toBeInTheDocument();
+  });
+
+  it("shows the world radio group only after a genre is picked", async () => {
+    const user = userEvent.setup();
+    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+
+    // No world group yet.
+    expect(screen.queryByRole("radiogroup", { name: /world/i })).toBeNull();
+
+    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+
+    // World group appears with both worlds from low_fantasy.
+    expect(screen.getByRole("radiogroup", { name: /world/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /greyhawk/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /forgotten realms/i })).toBeInTheDocument();
+  });
+
+  it("renders the world preview description after a world is picked", async () => {
+    const user = userEvent.setup();
+    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+
+    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+    await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+
+    expect(
+      screen.getByText(/the flanaess, a continent of warring kingdoms/i),
+    ).toBeInTheDocument();
   });
 
   // -- validation ------------------------------------------------------------
@@ -24,33 +115,35 @@ describe("ConnectScreen", () => {
     expect(screen.getByRole("button", { name: /begin/i })).toBeDisabled();
   });
 
+  it("auto-selects the sole world when a single-world genre is picked", async () => {
+    const user = userEvent.setup();
+    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+
+    await user.click(screen.getByRole("radio", { name: /road warrior/i }));
+
+    const wastelandRadio = screen.getByRole("radio", { name: /wasteland/i });
+    expect(wastelandRadio).toHaveAttribute("aria-checked", "true");
+  });
+
   // -- submit ----------------------------------------------------------------
-  it("calls onConnect with player name and genre on submit", async () => {
+  it("calls onConnect with name, genre, and world on submit", async () => {
     const user = userEvent.setup();
     const onConnect = vi.fn();
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      json: () =>
-        Promise.resolve({
-          low_fantasy: { worlds: ["greyhawk"] },
-        }),
-    });
-
     render(<ConnectScreen onConnect={onConnect} genres={GENRES} />);
 
-    await user.type(screen.getByLabelText(/player name/i), "Aberu");
-    // Select genre — interact via the combo/select role
-    await user.selectOptions(screen.getByLabelText(/genre/i), "low_fantasy");
-    // Wait for worlds to load and auto-select the single world
-    await waitFor(() => {
-      expect(screen.getByLabelText(/world/i)).toHaveValue("greyhawk");
-    });
+    await user.type(
+      screen.getByLabelText(/what name shall be yours/i),
+      "Aberu",
+    );
+    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+    await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
     await user.click(screen.getByRole("button", { name: /begin/i }));
 
     expect(onConnect).toHaveBeenCalledWith("Aberu", "low_fantasy", "greyhawk");
   });
 
   // -- loading state ---------------------------------------------------------
-  it("shows a loading spinner during connection", () => {
+  it("shows a connecting indicator during connection", () => {
     render(
       <ConnectScreen
         onConnect={vi.fn()}
@@ -58,7 +151,6 @@ describe("ConnectScreen", () => {
         isConnecting={true}
       />,
     );
-
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
@@ -71,24 +163,28 @@ describe("ConnectScreen", () => {
         error="Connection refused"
       />,
     );
-
     expect(screen.getByRole("alert")).toHaveTextContent(/connection refused/i);
+  });
+
+  it("shows a retry button when genres failed to load", async () => {
+    const user = userEvent.setup();
+    const onRetryGenres = vi.fn();
+    render(
+      <ConnectScreen
+        onConnect={vi.fn()}
+        genres={{}}
+        genreError
+        onRetryGenres={onRetryGenres}
+      />,
+    );
+
+    const retry = screen.getByRole("button", { name: /retry/i });
+    await user.click(retry);
+    expect(onRetryGenres).toHaveBeenCalled();
   });
 
   // -- localStorage persistence -----------------------------------------------
   describe("localStorage persistence", () => {
-    beforeEach(() => {
-      localStorage.clear();
-      // Mock fetch for world loading
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        json: () =>
-          Promise.resolve({
-            low_fantasy: { worlds: ["greyhawk", "forgotten_realms"] },
-            road_warrior: { worlds: ["wasteland"] },
-          }),
-      });
-    });
-
     it("pre-fills player name from localStorage on mount", () => {
       localStorage.setItem(
         STORAGE_KEY,
@@ -96,22 +192,12 @@ describe("ConnectScreen", () => {
       );
 
       render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-
-      expect(screen.getByLabelText(/player name/i)).toHaveValue("Rincewind");
+      expect(
+        screen.getByLabelText(/what name shall be yours/i),
+      ).toHaveValue("Rincewind");
     });
 
-    it("pre-fills genre from localStorage on mount", () => {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ playerName: "", genre: "low_fantasy", world: "" }),
-      );
-
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-
-      expect(screen.getByLabelText(/genre/i)).toHaveValue("low_fantasy");
-    });
-
-    it("pre-fills saved world after worlds load", async () => {
+    it("pre-selects genre and world from localStorage on mount", () => {
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -123,16 +209,20 @@ describe("ConnectScreen", () => {
 
       render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
 
-      await waitFor(() => {
-        expect(screen.getByLabelText(/world/i)).toHaveValue("greyhawk");
+      const lowFantasyRadio = screen.getByRole("radio", {
+        name: /low fantasy/i,
       });
+      expect(lowFantasyRadio).toHaveAttribute("aria-checked", "true");
+
+      const greyhawkRadio = screen.getByRole("radio", { name: /greyhawk/i });
+      expect(greyhawkRadio).toHaveAttribute("aria-checked", "true");
     });
 
     it("renders with empty fields when localStorage is empty", () => {
       render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-
-      expect(screen.getByLabelText(/player name/i)).toHaveValue("");
-      expect(screen.getByLabelText(/genre/i)).toHaveValue("");
+      expect(
+        screen.getByLabelText(/what name shall be yours/i),
+      ).toHaveValue("");
     });
 
     it("fields remain editable after pre-fill", async () => {
@@ -144,7 +234,7 @@ describe("ConnectScreen", () => {
 
       render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
 
-      const nameInput = screen.getByLabelText(/player name/i);
+      const nameInput = screen.getByLabelText(/what name shall be yours/i);
       expect(nameInput).toHaveValue("Rincewind");
 
       await user.clear(nameInput);
@@ -154,8 +244,6 @@ describe("ConnectScreen", () => {
 
     it("saves to localStorage on submit", async () => {
       const user = userEvent.setup();
-      const onConnect = vi.fn();
-
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
@@ -165,12 +253,7 @@ describe("ConnectScreen", () => {
         }),
       );
 
-      render(<ConnectScreen onConnect={onConnect} genres={GENRES} />);
-
-      // Wait for worlds to load and world to be pre-filled
-      await waitFor(() => {
-        expect(screen.getByLabelText(/world/i)).toHaveValue("greyhawk");
-      });
+      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
 
       await user.click(screen.getByRole("button", { name: /begin/i }));
 
@@ -184,11 +267,10 @@ describe("ConnectScreen", () => {
 
     it("handles corrupted localStorage gracefully", () => {
       localStorage.setItem(STORAGE_KEY, "not-valid-json{{{");
-
       render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-
-      expect(screen.getByLabelText(/player name/i)).toHaveValue("");
-      expect(screen.getByLabelText(/genre/i)).toHaveValue("");
+      expect(
+        screen.getByLabelText(/what name shall be yours/i),
+      ).toHaveValue("");
     });
   });
 });
