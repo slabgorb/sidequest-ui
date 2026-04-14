@@ -56,6 +56,10 @@ describe("getArchetypeForGenre", () => {
     expect(getArchetypeForGenre("caverns_and_claudes")).toBe("rugged");
   });
 
+  it("maps heavy_metal to rugged", () => {
+    expect(getArchetypeForGenre("heavy_metal")).toBe("rugged");
+  });
+
   it("throws on unknown genre slug", () => {
     expect(() => getArchetypeForGenre("totally_unknown")).toThrow();
   });
