@@ -85,8 +85,14 @@ function buildDefaultThrowParams(): ThrowParams {
 export function useDiceThrowGesture({ onThrow }: UseDiceThrowGestureOptions) {
   const draggingRef = useRef(false);
   const historyRef = useRef<DragSample[]>([]);
+  // Always-latest callback ref: keeps the pointer-up handler reading the
+  // current `onThrow` without re-subscribing on every render. The assignment
+  // lives in an effect (not render body) so eslint-plugin-react-hooks/refs
+  // doesn't fire — refs may not be mutated during render.
   const onThrowRef = useRef(onThrow);
-  onThrowRef.current = onThrow;
+  useEffect(() => {
+    onThrowRef.current = onThrow;
+  }, [onThrow]);
 
   const onPointerDown = useCallback(
     (e: { stopPropagation: () => void }) => {

@@ -5,7 +5,7 @@
  * mock of AudioContext, GainNode, AudioBufferSourceNode, and AudioBuffer
  * that tracks scheduling calls for assertion in tests.
  */
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 
 // ---------------------------------------------------------------------------
 // AudioParam mock
@@ -14,10 +14,10 @@ import { vi } from "vitest";
 export interface MockAudioParam {
   value: number;
   defaultValue: number;
-  setValueAtTime: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  linearRampToValueAtTime: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  exponentialRampToValueAtTime: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  cancelScheduledValues: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  setValueAtTime: Mock;
+  linearRampToValueAtTime: Mock;
+  exponentialRampToValueAtTime: Mock;
+  cancelScheduledValues: Mock;
 }
 
 export function createMockAudioParam(defaultValue = 1): MockAudioParam {
@@ -51,8 +51,8 @@ export function createMockAudioParam(defaultValue = 1): MockAudioParam {
 
 export interface MockGainNode {
   gain: MockAudioParam;
-  connect: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  disconnect: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  connect: Mock;
+  disconnect: Mock;
   context: MockAudioContext;
 }
 
@@ -64,10 +64,10 @@ export interface MockAudioBufferSourceNode {
   buffer: MockAudioBuffer | null;
   loop: boolean;
   playbackRate: MockAudioParam;
-  connect: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  disconnect: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  start: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  stop: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  connect: Mock;
+  disconnect: Mock;
+  start: Mock;
+  stop: Mock;
   onended: (() => void) | null;
   _triggerEnded: () => void;
 }
@@ -81,8 +81,8 @@ export interface MockAudioBuffer {
   length: number;
   sampleRate: number;
   numberOfChannels: number;
-  getChannelData: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  copyToChannel: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  getChannelData: Mock;
+  copyToChannel: Mock;
 }
 
 export function createMockAudioBuffer(duration = 5, length?: number, sampleRate = 44100): MockAudioBuffer {
@@ -106,13 +106,13 @@ export interface MockAudioContext {
   state: "suspended" | "running" | "closed";
   currentTime: number;
   destination: Record<string, unknown>;
-  resume: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  close: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  suspend: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  createGain: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  createBuffer: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  createBufferSource: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
-  decodeAudioData: ReturnType<typeof vi.fn<(...args: any[]) => any>>;
+  resume: Mock;
+  close: Mock;
+  suspend: Mock;
+  createGain: Mock;
+  createBuffer: Mock;
+  createBufferSource: Mock;
+  decodeAudioData: Mock;
   _gainNodes: MockGainNode[];
   _sourceNodes: MockAudioBufferSourceNode[];
 }
