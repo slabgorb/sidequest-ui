@@ -303,11 +303,9 @@ function NpcRegistry({
       );
     }
     list = [...list].sort((a, b) => {
-      let va: string | number, vb: string | number;
-      if (sort.col === "location") { va = a.location; vb = b.location; }
-      else { va = a.name; vb = b.name; }
-      if (typeof va === "number") return sort.asc ? va - (vb as number) : (vb as number) - va;
-      return sort.asc ? va.localeCompare(vb as string) : (vb as string).localeCompare(va);
+      const va = sort.col === "location" ? a.location : a.name;
+      const vb = sort.col === "location" ? b.location : b.name;
+      return sort.asc ? va.localeCompare(vb) : vb.localeCompare(va);
     });
     return list;
   }, [npcs, filter, sort]);

@@ -77,14 +77,6 @@ describe("GameBoard wiring", () => {
     }
   });
 
-  it("presetLayouts exports all preset names", async () => {
-    const mod = await import("@/components/GameBoard/presetLayouts");
-    expect(mod.PRESET_LAYOUTS.classic).toBeDefined();
-    expect(mod.PRESET_LAYOUTS.tactician).toBeDefined();
-    expect(mod.PRESET_LAYOUTS.explorer).toBeDefined();
-    expect(mod.PRESET_LAYOUTS.minimalist).toBeDefined();
-  });
-
   // Source-level regression guards for the sq-playtest 2026-04-09 fix:
   // the right tab group must land on `character`, not `audio`, and the
   // narrative panel must get focus on mount.
@@ -124,7 +116,7 @@ describe("GameBoard wiring", () => {
     });
   });
 
-  it("deleted files do not exist (GameLayout, OverlayManager, SettingsOverlay)", async () => {
+  it("deleted files do not exist (GameLayout, OverlayManager, SettingsOverlay, presetLayouts)", async () => {
     const tryImport = async (path: string) => {
       try {
         await import(path);
@@ -136,5 +128,8 @@ describe("GameBoard wiring", () => {
     expect(await tryImport("@/components/GameLayout")).toBe(false);
     expect(await tryImport("@/components/OverlayManager")).toBe(false);
     expect(await tryImport("@/components/SettingsOverlay")).toBe(false);
+    // react-grid-layout preset system removed after dockview migration —
+    // presetLayouts.ts was orphaned dead code (no runtime consumers).
+    expect(await tryImport("@/components/GameBoard/presetLayouts")).toBe(false);
   });
 });

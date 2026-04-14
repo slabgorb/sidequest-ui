@@ -84,28 +84,28 @@ describe('Source display', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const smokeEntry = screen.getByText(/smoke rising/i).closest('[data-testid="journal-entry"]');
     expect(smokeEntry).toBeTruthy();
-    expect(within(smokeEntry!).getByText(/observation/i)).toBeInTheDocument();
+    expect(within(smokeEntry as HTMLElement).getByText(/observation/i)).toBeInTheDocument();
   });
 
   it('shows source for dialogue entries', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const innEntry = screen.getByText(/innkeeper warned/i).closest('[data-testid="journal-entry"]');
     expect(innEntry).toBeTruthy();
-    expect(within(innEntry!).getByText(/dialogue/i)).toBeInTheDocument();
+    expect(within(innEntry as HTMLElement).getByText(/dialogue/i)).toBeInTheDocument();
   });
 
   it('shows source for discovery entries', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const passageEntry = screen.getByText(/hidden passage/i).closest('[data-testid="journal-entry"]');
     expect(passageEntry).toBeTruthy();
-    expect(within(passageEntry!).getByText(/discovery/i)).toBeInTheDocument();
+    expect(within(passageEntry as HTMLElement).getByText(/discovery/i)).toBeInTheDocument();
   });
 
   it('shows source for backstory entries', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const backstoryEntry = screen.getByText(/iron spire/i).closest('[data-testid="journal-entry"]');
     expect(backstoryEntry).toBeTruthy();
-    expect(within(backstoryEntry!).getByText(/backstory/i)).toBeInTheDocument();
+    expect(within(backstoryEntry as HTMLElement).getByText(/backstory/i)).toBeInTheDocument();
   });
 });
 
@@ -118,21 +118,21 @@ describe('Confidence display', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const smokeEntry = screen.getByText(/smoke rising/i).closest('[data-testid="journal-entry"]');
     expect(smokeEntry).toBeTruthy();
-    expect(within(smokeEntry!).getByText(/certain/i)).toBeInTheDocument();
+    expect(within(smokeEntry as HTMLElement).getByText(/certain/i)).toBeInTheDocument();
   });
 
   it('shows Suspected confidence level', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const innEntry = screen.getByText(/innkeeper warned/i).closest('[data-testid="journal-entry"]');
     expect(innEntry).toBeTruthy();
-    expect(within(innEntry!).getByText(/suspected/i)).toBeInTheDocument();
+    expect(within(innEntry as HTMLElement).getByText(/suspected/i)).toBeInTheDocument();
   });
 
   it('shows Rumored confidence level', () => {
     render(<KnowledgeJournal entries={ENTRIES} />);
     const dragonEntry = screen.getByText(/dragon sleeps/i).closest('[data-testid="journal-entry"]');
     expect(dragonEntry).toBeTruthy();
-    expect(within(dragonEntry!).getByText(/rumored/i)).toBeInTheDocument();
+    expect(within(dragonEntry as HTMLElement).getByText(/rumored/i)).toBeInTheDocument();
   });
 });
 

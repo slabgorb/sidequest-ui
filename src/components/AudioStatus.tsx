@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ChangeEvent } from "react";
+import { useCallback, useEffect } from "react";
 
 const STORAGE_KEY = "sq-audio-volumes";
 
@@ -42,8 +42,8 @@ export function AudioStatus({
   }, []);
 
   const handleVolumeInput = useCallback(
-    (channel: Channel, e: ChangeEvent<HTMLInputElement>) => {
-      const normalized = Number(e.target.value) / 100;
+    (channel: Channel, value: string) => {
+      const normalized = Number(value) / 100;
       onVolumeChange(channel, normalized);
       const updated = { ...volumes, [channel]: normalized };
       persistToStorage(updated, muted);
@@ -86,10 +86,8 @@ export function AudioStatus({
             value={Math.round(volumes[ch] * 100)}
             className="flex-1 h-1 accent-primary/60"
             aria-label={`${ch} volume`}
-            onChange={(e) => handleVolumeInput(ch, e)}
-            onInput={(e) =>
-              handleVolumeInput(ch, e as ChangeEvent<HTMLInputElement>)
-            }
+            onChange={(e) => handleVolumeInput(ch, e.currentTarget.value)}
+            onInput={(e) => handleVolumeInput(ch, e.currentTarget.value)}
           />
           <button
             data-testid={`mute-btn-${ch}`}

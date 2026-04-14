@@ -2,7 +2,6 @@
  * Dockview Theme for SideQuest
  *
  * Maps Dockview CSS variables to SideQuest theme variables.
- * Replaces react-grid-layout with proper docking layout.
  */
 
 .sidequest-dockview {

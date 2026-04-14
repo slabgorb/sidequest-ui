@@ -39,10 +39,7 @@ function formatModifier(mod: number): string {
 }
 
 /** Build the aria-live announcement string per ADR-075. */
-function buildAnnouncement(
-  request: DiceRequestPayload,
-  result: DiceResultPayload,
-): string {
+function buildAnnouncement(result: DiceResultPayload): string {
   const faces = result.rolls.flatMap((r) => r.faces).join(", ");
   return `${result.character_name} rolled ${result.total} (${faces} ${formatModifier(result.modifier)}) vs DC ${result.difficulty} — ${result.outcome}`;
 }
@@ -50,7 +47,6 @@ function buildAnnouncement(
 export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: DiceOverlayProps) {
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
-  const [replaySeed, setReplaySeed] = useState<number | undefined>(undefined);
   // Rolling player's in-flight local physics run. Set on gesture release,
   // cleared when handleSettle reports the face. Gates handleSettle so the
   // replay path can't accidentally double-send a DiceThrow message.
@@ -64,26 +60,25 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
   // reset. No reset-in-effect needed (avoids react-hooks/set-state-in-effect).
 
   // Spectator replay: when DiceResult arrives for players who didn't roll,
-  // run Rapier locally with seed-driven params to animate the same physics.
-  // The rolling player already watched their own physics — they skip this
-  // path to avoid watching the same roll twice.
+  // run Rapier locally with seed-driven replay params so the visual playout
+  // matches the rolling player's physics. The rolling player skips this
+  // path to avoid watching the same roll twice. Seed is consumed inside
+  // `replayThrowParams` — DiceScene plays deterministically from the
+  // resulting throw params without needing the seed directly (Keith's
+  // #128 build-fix removed the redundant seed prop from DiceScene).
   //
-  // This is a legitimate prop→state sync: three values (throwParams,
-  // replaySeed, rollKey) must change together in response to a new diceResult
-  // prop. The alternative — deriving via useMemo during render — doesn't
-  // work here because the same state is ALSO written by handleSceneThrow
-  // when the rolling player drags (mutually exclusive with this branch via
-  // the isRollingPlayer guard). Splitting into two components just to satisfy
-  // the lint rule would be a real refactor; we suppress with rationale
-  // instead. No cascading renders: the three setStates batch into one commit
-  // and the effect does not re-subscribe on its own outputs.
+  // Legitimate prop→state sync: two values (throwParams, rollKey) must
+  // change together in response to a new diceResult prop. The rolling-
+  // player and spectator branches are mutually exclusive via the
+  // isRollingPlayer guard, and the same state is also written by
+  // handleSceneThrow for the rolling-player drag path. No cascading
+  // renders — effect deps don't include its own outputs.
   useEffect(() => {
     if (!diceResult) return;
     if (isRollingPlayer) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
-    setReplaySeed(diceResult.seed);
     setRollKey((k) => k + 1);
   }, [diceResult, isRollingPlayer]);
 
@@ -189,7 +184,6 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
         <DiceScene
           throwParams={throwParams}
           rollKey={rollKey}
-          seed={replaySeed}
           onThrow={handleSceneThrow}
           onSettle={handleSettle}
         />
@@ -284,7 +278,7 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
           whiteSpace: "nowrap",
         }}
       >
-        {diceResult && diceRequest ? buildAnnouncement(diceRequest, diceResult) : ""}
+        {diceResult && diceRequest ? buildAnnouncement(diceResult) : ""}
       </div>
     </div>
   );

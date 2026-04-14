@@ -4,6 +4,7 @@ export type LayoutMode = "scroll" | "focus" | "cards";
 
 interface LayoutPrefs {
   mode: LayoutMode;
+  [key: string]: unknown;
 }
 
 const DEFAULTS: LayoutPrefs = { mode: "scroll" };

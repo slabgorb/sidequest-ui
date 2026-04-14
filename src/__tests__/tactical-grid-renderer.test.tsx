@@ -133,10 +133,10 @@ describe("TacticalGridRenderer — cell type rendering (AC-1)", () => {
     ];
     for (const cellType of cellTypes) {
       const cells = container.querySelectorAll(`[data-cell-type="${cellType}"]`);
-      expect(cells.length).toBeGreaterThan(
-        0,
-        `Expected at least one cell of type "${cellType}"`
-      );
+      expect(
+        cells.length,
+        `Expected at least one cell of type "${cellType}"`,
+      ).toBeGreaterThan(0);
     }
   });
 

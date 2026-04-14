@@ -66,9 +66,9 @@ describe("Crossfader", () => {
 
       // At least one gain node should have been ramped to 0
       const allRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
-      const rampedToZero = allRamps.some(([value]: [number]) => value === 0);
+      const rampedToZero = allRamps.some(([value]) => value === 0);
       expect(rampedToZero).toBe(true);
     });
 
@@ -86,14 +86,14 @@ describe("Crossfader", () => {
 
       // New gain should start at 0 and ramp to 1
       const allSetCalls = ctx._gainNodes.flatMap((n) =>
-        (n.gain.setValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.setValueAtTime.mock.calls as [number, number][],
       );
       const allRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
 
-      const startedAtZero = allSetCalls.some(([value]: [number]) => value === 0);
-      const rampedToOne = allRamps.some(([value]: [number]) => value === 1);
+      const startedAtZero = allSetCalls.some(([value]) => value === 0);
+      const rampedToOne = allRamps.some(([value]) => value === 1);
 
       expect(startedAtZero).toBe(true);
       expect(rampedToOne).toBe(true);
@@ -116,10 +116,10 @@ describe("Crossfader", () => {
 
       // The ramp target time should incorporate fadeMs (2 seconds from currentTime)
       const allRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
       const hasCorrectTiming = allRamps.some(
-        ([, time]: [number, number]) =>
+        ([, time]) =>
           Math.abs(time - (ctx.currentTime + fadeSec)) < 0.01,
       );
       expect(hasCorrectTiming).toBe(true);
@@ -137,10 +137,10 @@ describe("Crossfader", () => {
       );
 
       const allRamps = ctx._gainNodes.flatMap((n) =>
-        (n.gain.linearRampToValueAtTime as ReturnType<typeof vi.fn>).mock.calls,
+        n.gain.linearRampToValueAtTime.mock.calls as [number, number][],
       );
       const hasDefaultTiming = allRamps.some(
-        ([, time]: [number, number]) =>
+        ([, time]) =>
           Math.abs(time - (ctx.currentTime + 3)) < 0.01,
       );
       expect(hasDefaultTiming).toBe(true);

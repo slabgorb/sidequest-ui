@@ -121,10 +121,10 @@ describe("AC-1: back navigation between chargen steps", () => {
     // The component should signal navigation back (not submission)
     // It should NOT send a server message that ends chargen
     const calls = onRespond.mock.calls;
-    const backCall = calls.find(
-      ([payload]: [Record<string, unknown>]) =>
-        payload.action === "back" || payload.navigate === "back",
-    );
+    const backCall = calls.find((call) => {
+      const payload = call[0] as Record<string, unknown>;
+      return payload.action === "back" || payload.navigate === "back";
+    });
     expect(backCall).toBeDefined();
   });
 });
@@ -211,12 +211,14 @@ describe("AC-3: edit buttons on review screen", () => {
 
     // Should signal navigation to a specific step, not submission
     const calls = onRespond.mock.calls;
-    const editCall = calls.find(
-      ([payload]: [Record<string, unknown>]) =>
+    const editCall = calls.find((call) => {
+      const payload = call[0] as Record<string, unknown>;
+      return (
         payload.action === "edit" ||
         payload.navigate === "step" ||
-        typeof payload.targetStep === "number",
-    );
+        typeof payload.targetStep === "number"
+      );
+    });
     expect(editCall).toBeDefined();
   });
 });
@@ -284,10 +286,10 @@ describe("AC-4: no accidental submission", () => {
     await user.click(goBackBtn);
 
     // Should NOT have sent submission payload
-    const submissionCalls = onRespond.mock.calls.filter(
-      ([payload]: [Record<string, unknown>]) =>
-        payload.phase === "confirmation" && payload.choice === "2",
-    );
+    const submissionCalls = onRespond.mock.calls.filter((call) => {
+      const payload = call[0] as Record<string, unknown>;
+      return payload.phase === "confirmation" && payload.choice === "2";
+    });
     expect(submissionCalls).toHaveLength(0);
   });
 });

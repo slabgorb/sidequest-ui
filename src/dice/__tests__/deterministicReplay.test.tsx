@@ -71,11 +71,6 @@ const DICE_RESULT = {
   throw_params: WIRE_THROW_PARAMS,
 };
 
-const DIFFERENT_SEED_RESULT = {
-  ...DICE_RESULT,
-  seed: 9999,
-};
-
 // ══════════════════════════════════════════════════════════════════════════════
 // AC-1: replayThrowParams — deterministic wire→scene conversion
 // ══════════════════════════════════════════════════════════════════════════════
@@ -250,32 +245,11 @@ describe("AC-4: Seed boundary — JS safe integer range", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// AC-5: DiceScene accepts seed for deterministic replay
-// ══════════════════════════════════════════════════════════════════════════════
-
-describe("AC-5: DiceScene seed prop", () => {
-  it("DiceScene accepts an optional seed prop", async () => {
-    const { DiceScene } = await import("../DiceScene");
-    // Should accept seed without type errors
-    const element = (
-      <DiceScene
-        throwParams={{
-          position: [0, 0.5, 0],
-          linearVelocity: [1, 2, -3],
-          angularVelocity: [10, -5, 8],
-          rotation: [0, 0, 0],
-        }}
-        rollKey={1}
-        seed={42}
-        onThrow={vi.fn()}
-        onSettle={vi.fn()}
-      />
-    );
-    // Verifies the JSX compiles — seed is accepted as a prop
-    expect(element).toBeDefined();
-  });
-});
-
+// AC-5 removed: DiceScene no longer takes a seed prop. Seed handling lives
+// one layer up in replayThrowParams (tested by AC-1..4 above) — by the time
+// params reach DiceScene the seed has already been consumed to generate the
+// physics inputs. The old prop was vestigial and the test was validating a
+// stub surface.
 // ══════════════════════════════════════════════════════════════════════════════
 // AC-6: Spectator replay — DiceResult drives physics for watchers
 // ══════════════════════════════════════════════════════════════════════════════

@@ -24,11 +24,20 @@ import { Text } from "@react-three/drei";
 import { D20_COLLIDER_VERTICES, D20_RADIUS, computeFaceInfo, readD20Value } from "./d20";
 import { useDiceThrowGesture } from "./useDiceThrowGesture";
 
-// drei's <Text> uses troika-three-text, whose OpenType parser only supports
-// .ttf/.otf — NOT .woff2. Pointing it at a woff2 URL causes troika to throw
-// "woff2 fonts not supported", which triggers R3F's Suspense boundary and
-// hides the entire canvas (dice + tray + lights). Serve a real .ttf from
-// /public/fonts/ instead. Story 34-12.
+// drei's <Text> uses troika-three-text. Two bugs landed here in quick
+// succession:
+//   1. troika-three-text v0.52+ defaults `defaultFontURL` to `null` — if no
+//      `font` prop is passed at all, the render suspends forever waiting for
+//      a font that never loads, and R3F's internal Suspense boundary hides
+//      the entire canvas (dice, tray, lights). Fixed by passing an explicit
+//      `font={FACE_LABEL_FONT}` prop below.
+//   2. troika-three-text's OpenType parser only supports `.ttf`/`.otf` —
+//      NOT `.woff2`. Pointing it at a `@fontsource-variable/*` `?url` (which
+//      ships `.woff2` only) causes troika to throw "woff2 fonts not
+//      supported", which *also* triggers the Suspense-hide symptom — same
+//      visual bug, different root cause. Fixed by serving a real `.ttf`
+//      from `/public/fonts/Inter-Bold.ttf` (Google Fonts, OFL).
+// Story 34-12 — physics-is-the-roll close-out.
 const FACE_LABEL_FONT = "/fonts/Inter-Bold.ttf";
 
 // Precompute face info once at module load — same for every die instance
@@ -302,19 +311,11 @@ function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
 export function DiceScene({
   throwParams,
   rollKey,
-  // `seed` is part of the public prop contract for DiceOverlay and story
-  // 34-7's determinism tests, but under physics-is-the-roll (story 34-12)
-  // the server-reported `face` is authoritative and cross-client determinism
-  // comes from identical `throwParams` replay, not Rapier RNG. Kept in the
-  // type signature so callers compile; intentionally unused in the body.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  seed,
   onThrow,
   onSettle,
 }: {
   throwParams: ThrowParams | null;
   rollKey: number;
-  seed?: number;
   onThrow: (params: ThrowParams) => void;
   onSettle: (value: number) => void;
 }) {

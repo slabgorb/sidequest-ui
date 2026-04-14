@@ -33,8 +33,6 @@ export function useSlashCommands() {
       // toggle. Restore both together if/when the feature is revived.
       case '/knowledge':
         return { handled: true, messages: [], widget: 'knowledge' };
-      case '/settings':
-        return { handled: true, messages: [], widget: 'settings' };
       case '/gallery':
         return { handled: true, messages: [], widget: 'gallery' };
       default:

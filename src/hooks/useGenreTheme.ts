@@ -58,6 +58,15 @@ export function useGenreTheme(messages: GameMessage[]): void {
     if (appliedRef.current === css) return;
     appliedRef.current = css;
 
+    // Lie-detector: log every theme_css application so we can verify in
+    // the browser console that the expected genre theme actually arrived
+    // and was applied (vs. silently falling back to the inherited dark
+    // mode defaults). See feedback_no_silent_fallbacks.
+    console.debug("[useGenreTheme] theme_css received", {
+      bytes: css.length,
+      preview: css.slice(0, 80),
+    });
+
     let styleEl = document.getElementById(STYLE_TAG_ID) as HTMLStyleElement | null;
     if (!styleEl) {
       styleEl = document.createElement("style");
@@ -69,15 +78,32 @@ export function useGenreTheme(messages: GameMessage[]): void {
     // Bridge genre CSS variables to Tailwind design tokens.
     // Genre CSS sets --text, --background, --surface, --accent, --primary, --secondary
     // Tailwind reads --foreground, --background, --card, --accent, etc.
+    //
+    // IMPORTANT: We must NOT use getComputedStyle to read the genre values.
+    // index.css declares `.dark { --background: oklch(...) }` and `<html>`
+    // starts with class="dark". A class selector beats `:root` on
+    // specificity, so getComputedStyle(root).getPropertyValue("--background")
+    // returns the dark-mode value, not the genre's value. The luminance check
+    // would then always see a dark background and never strip the dark class
+    // — silent fallback. Parse the genre :root block directly instead.
     const root = document.documentElement;
-    const computed = getComputedStyle(root);
+    const parseRootVar = (name: string): string => {
+      // Match the LAST occurrence so a later override in the genre CSS wins.
+      const re = new RegExp(`${name}\\s*:\\s*([^;]+);`, "g");
+      let match: RegExpExecArray | null;
+      let last = "";
+      while ((match = re.exec(css)) !== null) {
+        last = match[1].trim();
+      }
+      return last;
+    };
 
-    const text = computed.getPropertyValue("--text").trim();
-    const bg = computed.getPropertyValue("--background").trim();
-    const surface = computed.getPropertyValue("--surface").trim();
-    const primary = computed.getPropertyValue("--primary").trim();
-    const secondary = computed.getPropertyValue("--secondary").trim();
-    const accent = computed.getPropertyValue("--accent").trim();
+    const text = parseRootVar("--text");
+    const bg = parseRootVar("--background");
+    const surface = parseRootVar("--surface");
+    const primary = parseRootVar("--primary");
+    const secondary = parseRootVar("--secondary");
+    const accent = parseRootVar("--accent");
 
     // Derive border from surface (slightly lighter/darker)
     const border = surface || bg;
@@ -128,12 +154,26 @@ export function useGenreTheme(messages: GameMessage[]): void {
     // Check background luminance to decide dark/light mode.
     // Only remove "dark" class if the genre background is actually light.
     if (bg) {
-      const isLight = getLuminance(bg) > 0.5;
+      const lum = getLuminance(bg);
+      const isLight = lum > 0.5;
+      console.debug("[useGenreTheme] applied", {
+        background: bg,
+        text,
+        primary,
+        accent,
+        luminance: lum.toFixed(3),
+        mode: isLight ? "light" : "dark",
+      });
       if (isLight) {
         root.classList.remove("dark");
       } else {
         root.classList.add("dark");
       }
+    } else {
+      console.warn(
+        "[useGenreTheme] theme_css applied but --background was empty; " +
+          "dark/light mode unchanged. Genre CSS likely missing :root vars.",
+      );
     }
   }, [messages]);
 }
