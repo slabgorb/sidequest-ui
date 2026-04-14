@@ -71,7 +71,11 @@ export function useSessions({
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setIsLoading(true);
+    // Note: we do NOT toggle isLoading here. The initial state is true,
+    // it flips to false after the first response, and subsequent polls
+    // refresh data silently — flickering a loading state on every 15s
+    // poll would make the lobby feel jittery. Consumers that need a
+    // "currently refreshing" indicator can derive it from the data.
 
     const params = new URLSearchParams();
     if (genre) params.set("genre", genre);

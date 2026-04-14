@@ -5,6 +5,8 @@ import { OptionList, type OptionItem } from "./lobby/OptionList";
 import { WorldPreview } from "./lobby/WorldPreview";
 import { CurrentSessions } from "./lobby/CurrentSessions";
 import { useSessions } from "./lobby/useSessions";
+import { JourneyHistory } from "./lobby/JourneyHistory";
+import { appendHistory, type JourneyEntry } from "./lobby/historyStore";
 
 export interface ConnectScreenProps {
   onConnect: (playerName: string, genre: string, world: string) => void;
@@ -182,8 +184,33 @@ export function ConnectScreen({
     }
 
     saveState(playerName, genreSlug, worldSlug);
+    appendHistory({ player_name: playerName, genre: genreSlug, world: worldSlug });
     onConnect(playerName, genreSlug, worldSlug);
   };
+
+  // Click handler for "Past journeys" rows. Prefills all three fields
+  // but does not auto-submit — the player still confirms with Begin.
+  const handleSelectHistory = useCallback((entry: JourneyEntry) => {
+    setPlayerName(entry.player_name);
+    setGenreSlug(entry.genre);
+    setWorldSlug(entry.world);
+  }, []);
+
+  // Pretty-name resolvers for JourneyHistory rows. Fall back to the
+  // prettified slug if the genre/world is no longer in the current
+  // GenresResponse (pack removed since the history was written).
+  const prettyGenreName = useCallback(
+    (slug: string) => genres[slug]?.name || prettify(slug),
+    [genres],
+  );
+  const prettyWorldName = useCallback(
+    (genreSlugInput: string, worldSlugInput: string) => {
+      const pack = genres[genreSlugInput];
+      const world = pack?.worlds.find((w) => w.slug === worldSlugInput);
+      return world?.name || prettify(worldSlugInput);
+    },
+    [genres],
+  );
 
   const showGenreError = genreError || Object.keys(genres).length === 0;
 
@@ -280,6 +307,15 @@ export function ConnectScreen({
 
         {/* Live presence panel — shows who else is in the selected world. */}
         {!showGenreError && <CurrentSessions sessions={sessionsForWorld} />}
+
+        {/* Past journeys — localStorage-backed prefill convenience. */}
+        {!showGenreError && (
+          <JourneyHistory
+            onSelect={handleSelectHistory}
+            prettyGenre={prettyGenreName}
+            prettyWorld={prettyWorldName}
+          />
+        )}
 
         {/* Error */}
         {error && (

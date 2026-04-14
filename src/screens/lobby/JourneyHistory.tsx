@@ -1,0 +1,115 @@
+import { useCallback, useState } from "react";
+import {
+  loadHistory,
+  removeHistory,
+  formatRelativeTime,
+  type JourneyEntry,
+} from "./historyStore";
+
+export interface JourneyHistoryProps {
+  /**
+   * Called when the player clicks a history row. The lobby wires this
+   * to its prefill function — name, genre, and world all populate but
+   * Begin is not auto-clicked. The player still confirms the choice.
+   */
+  onSelect: (entry: JourneyEntry) => void;
+  /** Pretty display name for a genre slug, sourced from the GenresResponse. */
+  prettyGenre: (slug: string) => string;
+  /** Pretty display name for a world slug, sourced from the GenresResponse. */
+  prettyWorld: (genre: string, world: string) => string;
+}
+
+/**
+ * "Past journeys" panel — lists up to 5 recent (player_name, genre, world)
+ * combinations from localStorage. Click a row to prefill the lobby fields.
+ * Hover a row to reveal an X button that forgets that combination.
+ *
+ * Hidden entirely when the history is empty so first-time players never
+ * see "no past journeys" — the panel appears as a delight on the second
+ * visit instead.
+ */
+export function JourneyHistory({
+  onSelect,
+  prettyGenre,
+  prettyWorld,
+}: JourneyHistoryProps) {
+  // Local state mirrors localStorage so removals re-render immediately
+  // without depending on a parent refetch. Initial load reads from disk.
+  const [entries, setEntries] = useState<JourneyEntry[]>(() => loadHistory());
+
+  const handleRemove = useCallback(
+    (entry: JourneyEntry, e: React.MouseEvent) => {
+      e.stopPropagation(); // Don't trigger row-select on X click.
+      removeHistory({
+        player_name: entry.player_name,
+        genre: entry.genre,
+        world: entry.world,
+      });
+      setEntries((prev) =>
+        prev.filter(
+          (existing) =>
+            !(
+              existing.player_name === entry.player_name &&
+              existing.genre === entry.genre &&
+              existing.world === entry.world
+            ),
+        ),
+      );
+    },
+    [],
+  );
+
+  if (entries.length === 0) return null;
+
+  return (
+    <section className="w-full max-w-4xl mt-6">
+      <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
+        Past journeys
+      </h2>
+      <ul className="flex flex-col gap-1">
+        {entries.map((entry) => {
+          const genreName = prettyGenre(entry.genre);
+          const worldName = prettyWorld(entry.genre, entry.world);
+          return (
+            <li key={`${entry.player_name}:${entry.genre}:${entry.world}`}>
+              <button
+                type="button"
+                onClick={() => onSelect(entry)}
+                className="group w-full flex items-baseline justify-between
+                           text-left bg-transparent border-0 px-3 py-1.5
+                           border-l-2 border-l-transparent
+                           hover:border-l-muted-foreground/40 hover:bg-muted/10
+                           transition-colors cursor-pointer
+                           focus-visible:outline-none focus-visible:bg-muted/20"
+              >
+                <span className="flex items-baseline gap-2 text-sm">
+                  <span className="text-foreground/85">{entry.player_name}</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="italic text-foreground/70">
+                    {genreName} / {worldName}
+                  </span>
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className="text-xs italic text-muted-foreground/50">
+                    {formatRelativeTime(entry.last_played_iso)}
+                  </span>
+                  <span
+                    role="button"
+                    aria-label={`Forget ${entry.player_name} in ${worldName}`}
+                    tabIndex={-1}
+                    onClick={(e) => handleRemove(entry, e)}
+                    className="text-xs text-muted-foreground/40 opacity-0
+                               group-hover:opacity-100 hover:text-foreground/80
+                               transition-opacity cursor-pointer px-1"
+                  >
+                    ✕
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

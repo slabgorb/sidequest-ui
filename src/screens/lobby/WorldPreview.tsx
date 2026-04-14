@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type { GenreMeta, WorldMeta } from "@/types/genres";
 import { getToneChips } from "./toneAxes";
 
@@ -19,12 +19,16 @@ export interface WorldPreviewProps {
  * content), and image-failed (hero placeholder with literary copy).
  */
 export function WorldPreview({ pack, world }: WorldPreviewProps) {
-  // Reset image-failed state when the world changes so a new world gets
-  // a fresh chance at loading its hero.
+  // Track image-failed per world. Uses the React "adjust state during
+  // render" pattern (preferred over useEffect for prop-derived resets,
+  // see https://react.dev/learn/you-might-not-need-an-effect#adjusting-state-when-a-prop-changes)
+  // so eslint-plugin-react-hooks/set-state-in-effect doesn't fire.
   const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => {
+  const [trackedSlug, setTrackedSlug] = useState<string | null>(world?.slug ?? null);
+  if ((world?.slug ?? null) !== trackedSlug) {
+    setTrackedSlug(world?.slug ?? null);
     setImageFailed(false);
-  }, [world?.slug]);
+  }
 
   if (!pack || !world) {
     return (
