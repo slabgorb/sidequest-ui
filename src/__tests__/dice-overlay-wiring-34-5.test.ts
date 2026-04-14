@@ -179,3 +179,70 @@ describe("Wiring: Player ID flows through for role determination", () => {
     expect(appSrc).toMatch(/playerId=\{/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Wiring: Physics-is-the-roll (story 34-12)
+// ──────────────────────────────────────────────────────────────────────────────
+// These assertions exist because the original implementation stubbed
+// handleSettle as a no-op, left readD20Value with no production consumer,
+// and shipped a DiceThrowPayload wire format with no face field. The composed
+// system couldn't carry a rolled face from physics back to the server, but
+// every individual story's internal wiring check passed. These regression
+// guards look at the composed end-to-end path.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("Wiring: Physics-is-the-roll (story 34-12)", () => {
+  it("DiceOverlay.handleSettle is NOT a no-op stub", () => {
+    const overlaySrc = readSrc("dice/DiceOverlay.tsx");
+    // handleSettle must actually do something with the settled face.
+    // The stub form was a useCallback body of only `// Settle is now
+    // driven by DiceResult from server, not local physics`.
+    const idx = overlaySrc.indexOf("const handleSettle");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    // Take the 1500-char window starting at handleSettle — enough to cover
+    // the callback body and deps array without being so large it collides
+    // with other callbacks defined below.
+    const body = overlaySrc.slice(idx, idx + 1500);
+    // Must call onThrow (the wire-sending callback) — the old stub did not.
+    expect(body).toMatch(/onThrow\s*\(/);
+    // Must accept the settled face as a parameter. Old stub was `()`.
+    expect(body).toMatch(/handleSettle\s*=\s*useCallback\(\s*\(\s*\w+\s*:\s*number\s*\)/);
+  });
+
+  it("readD20Value has a production consumer via onSettle", () => {
+    const sceneSrc = readSrc("dice/DiceScene.tsx");
+    // The producer exists and flows into onSettle.
+    expect(sceneSrc).toMatch(/readD20Value/);
+    expect(sceneSrc).toMatch(/onSettle\s*\(\s*value\s*\)/);
+  });
+
+  it("DiceThrowPayload wire type includes a face field", () => {
+    const payloadsSrc = readSrc("types/payloads.ts");
+    // Locate the DiceThrowPayload interface body and require `face` in it.
+    const iface = payloadsSrc.match(
+      /export\s+interface\s+DiceThrowPayload\s*\{[\s\S]*?\}/,
+    );
+    expect(iface).not.toBeNull();
+    expect(iface![0]).toMatch(/face\s*:\s*number\[\]/);
+  });
+
+  it("App.tsx.handleDiceThrow forwards face to the wire DICE_THROW message", () => {
+    const appSrc = readSrc("App.tsx");
+    // The handler signature must accept face and the sent payload must
+    // include it.
+    expect(appSrc).toMatch(/handleDiceThrow\s*=\s*useCallback\s*\(\s*\(\s*params[^,)]*,\s*face/);
+    const handlerMatch = appSrc.match(
+      /handleDiceThrow\s*=\s*useCallback\([\s\S]*?\],\s*\)/,
+    );
+    expect(handlerMatch).not.toBeNull();
+    expect(handlerMatch![0]).toMatch(/face\s*,?\s*\}/);
+  });
+
+  it("DiceOverlay.onThrow callback signature accepts face", () => {
+    const overlaySrc = readSrc("dice/DiceOverlay.tsx");
+    // The props type must declare onThrow as taking both params and face.
+    expect(overlaySrc).toMatch(
+      /onThrow\s*:\s*\(\s*params\s*:[^,]+,\s*face\s*:\s*number\[\]\s*\)\s*=>\s*void/,
+    );
+  });
+});

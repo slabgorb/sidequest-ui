@@ -79,11 +79,13 @@ describe("Protocol: DiceThrowPayload interface", () => {
         angular: [10.0, -5.0, 8.0],
         position: [0.5, 0.5],
       },
+      face: [17],
     };
     expect(payload.request_id).toBe("req-001");
     expect(payload.throw_params.velocity).toEqual([1.0, 2.0, -3.0]);
     expect(payload.throw_params.angular).toEqual([10.0, -5.0, 8.0]);
     expect(payload.throw_params.position).toEqual([0.5, 0.5]);
+    expect(payload.face).toEqual([17]);
   });
 });
 

@@ -24,7 +24,13 @@ export interface DiceOverlayProps {
   diceRequest: DiceRequestPayload | null;
   diceResult: DiceResultPayload | null;
   playerId: string;
-  onThrow: (params: DiceThrowParams) => void;
+  /**
+   * Fired after local physics settles on the rolling player's client.
+   * `face` is flat-order across the pool; single-d20 case is `[value]`.
+   * Physics-is-the-roll (story 34-12): the server treats `face` as the
+   * authoritative result.
+   */
+  onThrow: (params: DiceThrowParams, face: number[]) => void;
 }
 
 /** Format the modifier for display: "+3" or "-2". */
@@ -41,41 +47,76 @@ function buildAnnouncement(result: DiceResultPayload): string {
 export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: DiceOverlayProps) {
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
+  // Rolling player's in-flight local physics run. Set on gesture release,
+  // cleared when handleSettle reports the face. Gates handleSettle so the
+  // replay path can't accidentally double-send a DiceThrow message.
+  const [pendingLocalParams, setPendingLocalParams] = useState<ThrowParams | null>(null);
 
   const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
 
-  // Server-authoritative replay: when DiceResult arrives, switch all clients
-  // (rolling player AND spectators) to the seed-driven replay params.
-  // The seed is consumed inside replayThrowParams — DiceScene plays the
-  // resulting physics inputs deterministically without needing the seed.
+  // Fresh state on each new DiceRequest is handled by keying the overlay on
+  // `diceRequest.request_id` at the parent (App.tsx / DiceSpikePage) — the
+  // component remounts on every new request, so `useState` defaults do the
+  // reset. No reset-in-effect needed (avoids react-hooks/set-state-in-effect).
+
+  // Spectator replay: when DiceResult arrives for players who didn't roll,
+  // run Rapier locally with seed-driven replay params so the visual playout
+  // matches the rolling player's physics. The rolling player skips this
+  // path to avoid watching the same roll twice. Seed is consumed inside
+  // `replayThrowParams` — DiceScene plays deterministically from the
+  // resulting throw params without needing the seed directly (Keith's
+  // #128 build-fix removed the redundant seed prop from DiceScene).
+  //
+  // Legitimate prop→state sync: two values (throwParams, rollKey) must
+  // change together in response to a new diceResult prop. The rolling-
+  // player and spectator branches are mutually exclusive via the
+  // isRollingPlayer guard, and the same state is also written by
+  // handleSceneThrow for the rolling-player drag path. No cascading
+  // renders — effect deps don't include its own outputs.
   useEffect(() => {
     if (!diceResult) return;
+    if (isRollingPlayer) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
     setRollKey((k) => k + 1);
-  }, [diceResult]);
+  }, [diceResult, isRollingPlayer]);
 
+  // Rolling player's drag-and-release. Starts a local PhysicsDie simulation
+  // but does NOT send DiceThrow yet — we wait for the die to settle so we
+  // can report the authoritative face value (physics-is-the-roll, 34-12).
   const handleSceneThrow = useCallback(
     (params: ThrowParams) => {
       if (!isRollingPlayer || !diceRequest) return;
       setThrowParams(params);
+      setPendingLocalParams(params);
       setRollKey((k) => k + 1);
-      // Convert DiceScene ThrowParams → wire DiceThrowParams
-      onThrow({
-        velocity: params.linearVelocity,
-        angular: params.angularVelocity,
-        position: [
-          params.position[0] + 0.5,
-          (params.position[2] + 0.8) / 1.6,
-        ],
-      });
     },
-    [isRollingPlayer, diceRequest, onThrow],
+    [isRollingPlayer, diceRequest],
   );
 
-  const handleSettle = useCallback(() => {
-    // Settle is now driven by DiceResult from server, not local physics
-  }, []);
+  // Called by PhysicsDie on settle with the face reading from readD20Value.
+  // Only fires the wire DiceThrow when we have a pending local run — that
+  // guard ensures spectator replay settles don't accidentally send anything.
+  const handleSettle = useCallback(
+    (value: number) => {
+      if (!isRollingPlayer || !diceRequest || !pendingLocalParams) return;
+      const params = pendingLocalParams;
+      setPendingLocalParams(null);
+      onThrow(
+        {
+          velocity: params.linearVelocity,
+          angular: params.angularVelocity,
+          position: [
+            params.position[0] + 0.5,
+            (params.position[2] + 0.8) / 1.6,
+          ],
+        },
+        [value],
+      );
+    },
+    [isRollingPlayer, diceRequest, pendingLocalParams, onThrow],
+  );
 
   if (!diceRequest) return null;
 
