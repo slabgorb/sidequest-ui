@@ -3,6 +3,8 @@ import { AudioEngine } from "@/audio/AudioEngine";
 import type { GenresResponse, GenreMeta, WorldMeta } from "@/types/genres";
 import { OptionList, type OptionItem } from "./lobby/OptionList";
 import { WorldPreview } from "./lobby/WorldPreview";
+import { CurrentSessions } from "./lobby/CurrentSessions";
+import { useSessions } from "./lobby/useSessions";
 
 export interface ConnectScreenProps {
   onConnect: (playerName: string, genre: string, world: string) => void;
@@ -71,6 +73,14 @@ export function ConnectScreen({
     saved.world ?? null,
   );
 
+  // Live multiplayer presence — drives both the per-world "X here"
+  // annotations on the world list and the CurrentSessions panel below
+  // the preview. Polls /api/sessions every 15s while the lobby is open.
+  const { sessions: activeSessions } = useSessions({
+    pollMs: 15000,
+    genre: genreSlug,
+  });
+
   // Sorted list of genre slugs for stable rendering.
   const genreItems: OptionItem[] = useMemo(
     () =>
@@ -86,14 +96,42 @@ export function ConnectScreen({
   const currentPack: GenreMeta | null =
     genreSlug && genres[genreSlug] ? genres[genreSlug] : null;
 
-  // World list derived from the selected genre.
+  // Pre-compute "N here" annotations keyed by world slug so the world
+  // list can show at-a-glance presence without rendering the full panel.
+  // Only counts sessions in the currently-selected genre — a world named
+  // "outpost" in two different genres shouldn't share a count.
+  const worldPresence: Record<string, number> = useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!genreSlug) return counts;
+    for (const session of activeSessions) {
+      if (session.genre !== genreSlug) continue;
+      counts[session.world] =
+        (counts[session.world] ?? 0) + session.players.length;
+    }
+    return counts;
+  }, [activeSessions, genreSlug]);
+
+  // World list derived from the selected genre, with optional presence
+  // annotations attached to rows that have active players.
   const worldItems: OptionItem[] = useMemo(() => {
     if (!currentPack) return [];
-    return currentPack.worlds.map((w) => ({
-      slug: w.slug,
-      label: w.name || prettify(w.slug),
-    }));
-  }, [currentPack]);
+    return currentPack.worlds.map((w) => {
+      const count = worldPresence[w.slug] ?? 0;
+      return {
+        slug: w.slug,
+        label: w.name || prettify(w.slug),
+        annotation: count > 0 ? `· ${count} here` : undefined,
+      };
+    });
+  }, [currentPack, worldPresence]);
+
+  // Sessions matching the currently-selected world, for the panel below.
+  const sessionsForWorld = useMemo(() => {
+    if (!genreSlug || !worldSlug) return [];
+    return activeSessions.filter(
+      (s) => s.genre === genreSlug && s.world === worldSlug,
+    );
+  }, [activeSessions, genreSlug, worldSlug]);
 
   const currentWorld: WorldMeta | null = useMemo(() => {
     if (!currentPack || !worldSlug) return null;
@@ -239,6 +277,9 @@ export function ConnectScreen({
             <WorldPreview pack={currentPack} world={currentWorld} />
           </div>
         )}
+
+        {/* Live presence panel — shows who else is in the selected world. */}
+        {!showGenreError && <CurrentSessions sessions={sessionsForWorld} />}
 
         {/* Error */}
         {error && (

@@ -61,6 +61,14 @@ const GENRES: GenresResponse = {
 describe("ConnectScreen", () => {
   beforeEach(() => {
     localStorage.clear();
+    // ConnectScreen uses `useSessions` which polls /api/sessions on mount.
+    // In jsdom the call would unhandled-reject, so stub it with an empty
+    // sessions list. Tests that care about presence override this with
+    // a per-test mock.
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessions: [] }),
+    }) as unknown as typeof fetch;
   });
 
   // -- rendering -------------------------------------------------------------
