@@ -58,24 +58,30 @@ export function DiceOverlay({ diceRequest, diceResult, playerId, onThrow }: Dice
 
   const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
 
-  // Reset local physics state every time a new DiceRequest arrives so the
-  // rolling player sees a fresh PickupDie (not the settled PhysicsDie from
-  // the previous roll). Keyed on request_id so back-to-back requests with
-  // the same rolling_player_id still reset correctly.
-  useEffect(() => {
-    setThrowParams(null);
-    setPendingLocalParams(null);
-    setReplaySeed(undefined);
-  }, [diceRequest?.request_id]);
+  // Fresh state on each new DiceRequest is handled by keying the overlay on
+  // `diceRequest.request_id` at the parent (App.tsx / DiceSpikePage) — the
+  // component remounts on every new request, so `useState` defaults do the
+  // reset. No reset-in-effect needed (avoids react-hooks/set-state-in-effect).
 
   // Spectator replay: when DiceResult arrives for players who didn't roll,
   // run Rapier locally with seed-driven params to animate the same physics.
   // The rolling player already watched their own physics — they skip this
   // path to avoid watching the same roll twice.
+  //
+  // This is a legitimate prop→state sync: three values (throwParams,
+  // replaySeed, rollKey) must change together in response to a new diceResult
+  // prop. The alternative — deriving via useMemo during render — doesn't
+  // work here because the same state is ALSO written by handleSceneThrow
+  // when the rolling player drags (mutually exclusive with this branch via
+  // the isRollingPlayer guard). Splitting into two components just to satisfy
+  // the lint rule would be a real refactor; we suppress with rationale
+  // instead. No cascading renders: the three setStates batch into one commit
+  // and the effect does not re-subscribe on its own outputs.
   useEffect(() => {
     if (!diceResult) return;
     if (isRollingPlayer) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
     setReplaySeed(diceResult.seed);
     setRollKey((k) => k + 1);

@@ -302,6 +302,12 @@ function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
 export function DiceScene({
   throwParams,
   rollKey,
+  // `seed` is part of the public prop contract for DiceOverlay and story
+  // 34-7's determinism tests, but under physics-is-the-roll (story 34-12)
+  // the server-reported `face` is authoritative and cross-client determinism
+  // comes from identical `throwParams` replay, not Rapier RNG. Kept in the
+  // type signature so callers compile; intentionally unused in the body.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   seed,
   onThrow,
   onSettle,

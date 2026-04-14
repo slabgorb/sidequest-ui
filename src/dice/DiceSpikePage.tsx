@@ -57,7 +57,8 @@ function makeResult(request: DiceRequestPayload, face: number): DiceResultPayloa
           : total >= request.difficulty
             ? "Success"
             : "Fail",
-    seed: 2716124382890708151 & 0xffffffff,
+    // Harness-only — real seeds come from the server. Plain safe-integer literal.
+    seed: 42,
     throw_params: {
       velocity: [-0.6, 0.3, -0.5],
       angular: [1.5, 2.0, 0.8],
@@ -91,17 +92,14 @@ export default function DiceSpikePage() {
         console.warn("[spike] no request — click Request first");
         return;
       }
-      if (diceRequest.rolling_player_id === MOCK_PLAYER_ID) {
-        console.warn(
-          "[spike] rolling player skips server replay (already watched own physics). " +
-            "Use 'Request (spectator)' to test the replay path.",
-        );
-      }
       console.log(`[spike] → replay (face=${face})`);
       setDiceResult(makeResult(diceRequest, face));
     },
     [diceRequest],
   );
+
+  const isSpectator =
+    !!diceRequest && diceRequest.rolling_player_id !== MOCK_PLAYER_ID;
 
   const onReset = useCallback(() => {
     console.log("[spike] → reset");
@@ -110,12 +108,44 @@ export default function DiceSpikePage() {
     setThrownLocally(false);
   }, []);
 
-  const handleThrow = useCallback((params: DiceThrowParams, face: number[]) => {
-    console.log(
-      `[spike] DiceOverlay.onThrow — face=${JSON.stringify(face)} velocity=${JSON.stringify(params.velocity)}`,
-    );
-    setThrownLocally(true);
-  }, []);
+  // Rolling player's die settled. In production this payload goes on the
+  // wire as DICE_THROW with the face; the server echoes a DiceResult back.
+  // The harness doesn't talk to a server, so we synthesise the DiceResult
+  // locally using the reported face — same shape the server would produce.
+  // This exercises the result-panel display path so we can confirm the
+  // face round-trips from physics → handleSettle → onThrow → DiceResult.
+  const handleThrow = useCallback(
+    (params: DiceThrowParams, face: number[]) => {
+      console.log(
+        `[spike] DiceOverlay.onThrow — face=${JSON.stringify(face)} velocity=${JSON.stringify(params.velocity)}`,
+      );
+      setThrownLocally(true);
+      if (!diceRequest) return;
+      const rolled = face[0] ?? 0;
+      const total = rolled + diceRequest.modifier;
+      setDiceResult({
+        request_id: diceRequest.request_id,
+        rolling_player_id: diceRequest.rolling_player_id,
+        character_name: diceRequest.character_name,
+        rolls: [{ spec: { sides: 20, count: 1 }, faces: [rolled] }],
+        modifier: diceRequest.modifier,
+        total,
+        difficulty: diceRequest.difficulty,
+        outcome:
+          rolled === 20
+            ? "CritSuccess"
+            : rolled === 1
+              ? "CritFail"
+              : total >= diceRequest.difficulty
+                ? "Success"
+                : "Fail",
+        // Harness-only — real seeds come from the server. Plain safe-integer literal.
+        seed: 42,
+        throw_params: params,
+      });
+    },
+    [diceRequest],
+  );
 
   const role = !diceRequest
     ? "idle"
@@ -169,21 +199,23 @@ export default function DiceSpikePage() {
           style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
           onClick={(e) => (e.target as HTMLElement).blur?.()}
         >
-          <button onClick={() => onReplay(12)} disabled={!diceRequest}>
+          <button onClick={() => onReplay(12)} disabled={!isSpectator}>
             Replay (fail, 12)
           </button>
-          <button onClick={() => onReplay(18)} disabled={!diceRequest}>
+          <button onClick={() => onReplay(18)} disabled={!isSpectator}>
             Replay (success, 18)
           </button>
-          <button onClick={() => onReplay(20)} disabled={!diceRequest}>
+          <button onClick={() => onReplay(20)} disabled={!isSpectator}>
             Replay (crit, 20)
           </button>
           <button onClick={onReset}>Reset</button>
         </div>
         <div style={{ color: "#6a5a4a", fontSize: 11, lineHeight: 1.4 }}>
-          <b>Rolling player:</b> drag the die → settles → onThrow fires with face<br />
+          <b>Rolling player:</b> drag or press space → settles →
+          onThrow fires with face → result panel populates<br />
           <b>Spectator:</b> click Replay → seed-driven physics re-animates<br />
-          Physics-is-the-roll: rolling player skips server replay (no double anim)
+          Replay buttons only work in spectator role — rolling player
+          already watched their own physics.
         </div>
       </div>
 
@@ -207,6 +239,7 @@ export default function DiceSpikePage() {
         }
       >
         <DiceOverlay
+          key={diceRequest?.request_id ?? "idle"}
           diceRequest={diceRequest}
           diceResult={diceResult}
           playerId={MOCK_PLAYER_ID}

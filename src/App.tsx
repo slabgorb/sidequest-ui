@@ -827,7 +827,12 @@ function AppInner() {
             </ImageBusProvider>
             {diceRequest && (
               <Suspense fallback={null}>
+                {/* Key on request_id so a new DiceRequest remounts the overlay
+                    and all internal physics state resets to initial — no
+                    reset-on-prop-change useEffect needed inside the component
+                    (avoids react-hooks/set-state-in-effect for the reset path). */}
                 <LazyDiceOverlay
+                  key={diceRequest.request_id}
                   diceRequest={diceRequest}
                   diceResult={diceResult}
                   playerId={currentPlayerId ?? ""}
