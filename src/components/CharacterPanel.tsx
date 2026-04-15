@@ -112,7 +112,8 @@ export function CharacterPanel({
         )}
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-[var(--primary)] truncate">{character.name}</h2>
-          <p className="text-xs text-muted-foreground leading-tight">
+          {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
+          <p data-testid="character-subtitle" className="text-xs text-muted-foreground leading-tight">
             {toDisplayName(character.class)}
             {genreSlug ? ` · ${toDisplayName(genreSlug)}` : ""}
           </p>
