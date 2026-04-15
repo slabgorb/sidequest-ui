@@ -1,11 +1,32 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { MessageType, type GameMessage } from "@/types/protocol";
+import type { ScrapbookEntryNpcRef } from "@/types/payloads";
 
 export type NpcRole = "hostile" | "friendly" | "neutral";
 
 export interface ScrapbookNpc {
   name: string;
   role: NpcRole;
+}
+
+/**
+ * Server-authored scrapbook entry keyed by turn_id — story 33-18.
+ *
+ * These arrive on SCRAPBOOK_ENTRY WebSocket messages after the narrator
+ * finishes each turn. The gallery merges them with IMAGE messages by
+ * turn_id in the reducer below; entries without a corresponding image
+ * surface as metadata-only cards, and images without a corresponding
+ * entry surface as bare cards (matching the pre-33-18 behavior).
+ */
+interface ScrapbookEntry {
+  turn_id: number;
+  scene_title?: string;
+  scene_type?: string;
+  location: string;
+  image_url?: string;
+  narrative_excerpt: string;
+  world_facts: string[];
+  npcs_present: ScrapbookEntryNpcRef[];
 }
 
 export interface GalleryImage {
@@ -68,10 +89,105 @@ function readNpcArray(value: unknown): ScrapbookNpc[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
+function readScrapbookNpcRefs(value: unknown): ScrapbookEntryNpcRef[] {
+  if (!Array.isArray(value)) return [];
+  const out: ScrapbookEntryNpcRef[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const rec = entry as Record<string, unknown>;
+    const name = rec.name;
+    const role = rec.role;
+    const disposition = rec.disposition;
+    if (typeof name !== "string" || typeof role !== "string") continue;
+    out.push({
+      name,
+      role,
+      disposition: typeof disposition === "string" ? disposition : role,
+    });
+  }
+  return out;
+}
+
+/**
+ * Project a `SCRAPBOOK_ENTRY` payload into the richer typed form the
+ * gallery merges with images. Rejects payloads missing required fields
+ * (turn_id, location, narrative_excerpt) with an explicit drop — follows
+ * the CLAUDE.md no-silent-fallbacks rule: a malformed entry from the
+ * server is a schema drift bug, not something to paper over.
+ */
+function parseScrapbookEntry(payload: Record<string, unknown>): ScrapbookEntry | null {
+  const turnId =
+    typeof payload.turn_id === "number" ? payload.turn_id : undefined;
+  const location = payload.location;
+  const excerpt = payload.narrative_excerpt;
+  if (
+    typeof turnId !== "number" ||
+    typeof location !== "string" ||
+    location.length === 0 ||
+    typeof excerpt !== "string" ||
+    excerpt.length === 0
+  ) {
+    // eslint-disable-next-line no-console
+    console.error("SCRAPBOOK_ENTRY dropped — missing required fields", payload);
+    return null;
+  }
+  const sceneTitle =
+    typeof payload.scene_title === "string" ? payload.scene_title : undefined;
+  const sceneType =
+    typeof payload.scene_type === "string" ? payload.scene_type : undefined;
+  const imageUrl =
+    typeof payload.image_url === "string" ? payload.image_url : undefined;
+  const worldFacts = readStringArray(payload.world_facts) ?? [];
+  const npcsPresent = readScrapbookNpcRefs(payload.npcs_present);
+  return {
+    turn_id: turnId,
+    scene_title: sceneTitle,
+    scene_type: sceneType,
+    location,
+    image_url: imageUrl,
+    narrative_excerpt: excerpt,
+    world_facts: worldFacts,
+    npcs_present: npcsPresent,
+  };
+}
+
+/**
+ * Project `ScrapbookEntryNpcRef` rows into the legacy `ScrapbookNpc` shape
+ * the gallery widget expects. The server's `disposition` is a behavioral
+ * string (e.g. "gruff but fair") — we map it to the coarse role bucket the
+ * UI uses today. Anything that isn't obviously hostile stays neutral; a
+ * followup UI refresh can render the full disposition string directly.
+ */
+function projectNpcRefsToLegacy(refs: ScrapbookEntryNpcRef[]): ScrapbookNpc[] {
+  const out: ScrapbookNpc[] = [];
+  for (const ref of refs) {
+    const lowered = ref.disposition.toLowerCase();
+    const role: NpcRole =
+      lowered.includes("hostile") || lowered.includes("enemy") || lowered.includes("foe")
+        ? "hostile"
+        : lowered.includes("friend") || lowered.includes("ally")
+          ? "friendly"
+          : "neutral";
+    out.push({ name: ref.name, role });
+  }
+  return out;
+}
+
 export function ImageBusProvider({ messages, children }: ImageBusProviderProps) {
   const images = useMemo(() => {
+    // Pass 1: collect scrapbook entries keyed by turn_id. The entry carries
+    // the metadata the widget cares about; the later image merge overlays
+    // the URL when the async render lands.
+    const scrapbookByTurn = new Map<number, ScrapbookEntry>();
+    for (const msg of messages) {
+      if (msg.type !== MessageType.SCRAPBOOK_ENTRY) continue;
+      const entry = parseScrapbookEntry(msg.payload as Record<string, unknown>);
+      if (entry) scrapbookByTurn.set(entry.turn_id, entry);
+    }
+
     const result: GalleryImage[] = [];
     const seenRenderIds = new Set<string>();
+    const matchedTurnIds = new Set<number>();
 
     for (let i = 0; i < messages.length; i++) {
       const msg = messages[i];
@@ -87,6 +203,13 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
       const turnNumber =
         typeof payload.turn_number === "number" ? payload.turn_number : undefined;
 
+      // Merge scrapbook entry metadata when one exists for this turn. The
+      // IMAGE payload still carries fallbacks for pre-33-18 servers; the
+      // scrapbook entry wins when present.
+      const entry =
+        typeof turnNumber === "number" ? scrapbookByTurn.get(turnNumber) : undefined;
+      if (entry) matchedTurnIds.add(entry.turn_id);
+
       result.push({
         url: payload.url as string,
         alt: (payload.alt ?? payload.description) as string | undefined,
@@ -99,21 +222,66 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
         isHandout: payload.handout === true,
         turn_number: turnNumber,
         scene_name:
-          typeof payload.scene_name === "string" ? payload.scene_name : undefined,
+          entry?.scene_title ??
+          (typeof payload.scene_name === "string" ? payload.scene_name : undefined),
         scene_type:
-          typeof payload.scene_type === "string" ? payload.scene_type : undefined,
+          entry?.scene_type ??
+          (typeof payload.scene_type === "string" ? payload.scene_type : undefined),
         narrative_beat:
-          typeof payload.narrative_beat === "string"
+          entry?.narrative_excerpt ??
+          (typeof payload.narrative_beat === "string"
             ? payload.narrative_beat
-            : undefined,
+            : undefined),
         chapter: typeof payload.chapter === "string" ? payload.chapter : undefined,
         location:
-          typeof payload.location === "string" ? payload.location : undefined,
-        world_facts: readStringArray(payload.world_facts),
-        npcs: readNpcArray(payload.npcs),
+          entry?.location ??
+          (typeof payload.location === "string" ? payload.location : undefined),
+        world_facts:
+          entry && entry.world_facts.length > 0
+            ? entry.world_facts
+            : readStringArray(payload.world_facts),
+        npcs:
+          entry && entry.npcs_present.length > 0
+            ? projectNpcRefsToLegacy(entry.npcs_present)
+            : readNpcArray(payload.npcs),
       });
     }
 
+    // Pass 2: scrapbook entries without a matching image still deserve a
+    // gallery card — they are the entire point of 33-18 (turn metadata
+    // without a render). Emit them as entries with an empty URL so the
+    // widget renders the metadata card; 33-17's ScrapbookGallery handles
+    // empty-URL rows as "metadata only".
+    for (const [turnId, entry] of scrapbookByTurn) {
+      if (matchedTurnIds.has(turnId)) continue;
+      result.push({
+        url: entry.image_url ?? "",
+        alt: entry.scene_title ?? entry.location,
+        caption: entry.narrative_excerpt,
+        render_id: undefined,
+        tier: undefined,
+        width: undefined,
+        height: undefined,
+        timestamp: messages.length + turnId,
+        isHandout: false,
+        turn_number: entry.turn_id,
+        scene_name: entry.scene_title,
+        scene_type: entry.scene_type,
+        narrative_beat: entry.narrative_excerpt,
+        chapter: undefined,
+        location: entry.location,
+        world_facts: entry.world_facts.length > 0 ? entry.world_facts : undefined,
+        npcs:
+          entry.npcs_present.length > 0
+            ? projectNpcRefsToLegacy(entry.npcs_present)
+            : undefined,
+      });
+    }
+
+    // Sort by timestamp so scrapbook-only entries interleave with image
+    // cards in turn order. The final reverse() preserves the "newest first"
+    // gallery ordering that existed before 33-18.
+    result.sort((a, b) => a.timestamp - b.timestamp);
     return result.reverse();
   }, [messages]);
 

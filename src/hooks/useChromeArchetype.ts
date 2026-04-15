@@ -6,7 +6,6 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   low_fantasy: "parchment",
   victoria: "parchment",
   elemental_harmony: "parchment",
-  heavy_metal: "parchment",
   neon_dystopia: "terminal",
   space_opera: "terminal",
   road_warrior: "rugged",
@@ -14,6 +13,9 @@ const GENRE_TO_ARCHETYPE: Record<string, ChromeArchetype> = {
   spaghetti_western: "rugged",
   pulp_noir: "rugged",
   caverns_and_claudes: "rugged",
+  // heavy_metal was previously mapped to parchment AND rugged (duplicate key —
+  // last-wins made it effectively rugged). The 2026-04-10 rework moved
+  // heavy_metal to rugged; the stale parchment entry is removed here.
   heavy_metal: "rugged",
 };
 
