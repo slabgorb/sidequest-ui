@@ -406,15 +406,110 @@ describe("ScrapbookGallery — chronological sort", () => {
 });
 
 describe("ScrapbookGallery — key stability (React rule #6)", () => {
-  it("uses render_id as the React key, not the array index", async () => {
-    // Source-level regression guard: CLAUDE.md lang-review rule #6 bans
-    // key={index} on lists where items can be reordered. ScrapbookGallery
-    // sorts chronologically, so index-keyed items will fragment state.
+  // CLAUDE.md lang-review rule #6 bans key={index} on lists where items can be
+  // reordered/inserted/deleted. ScrapbookGallery sorts chronologically, groups
+  // by chapter, and renders nested maps (fact chips, NPC chips, chapters,
+  // entries). Rework 2026-04-15: the previous version of this test used a
+  // regex that only checked ONE key expression contained `render_id` — it
+  // missed two separate `key={index}` compound expressions on the fact-chip
+  // and chapter-section maps, which were the exact bugs Reviewer rejected for.
+  // This rewrite enumerates EVERY key={...} occurrence and rejects any that
+  // contains a bare index identifier.
+
+  const BARE_INDEX_IDENTIFIERS = [
+    "i",
+    "idx",
+    "index",
+    "groupIdx",
+    "groupIndex",
+    "entryIdx",
+    "entryIndex",
+  ];
+
+  function extractKeyExpressions(src: string): string[] {
+    // Match `key={...}` where ... is balanced up to the first top-level `}`.
+    // Good enough for single-line JSX key props (which is what this file uses).
+    const matches: string[] = [];
+    const re = /key=\{([^}]+)\}/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src)) !== null) {
+      matches.push(m[1]);
+    }
+    return matches;
+  }
+
+  function containsBareIdentifier(expr: string, identifier: string): boolean {
+    // Word-boundary match so `idx` does not match inside `groupIdxSomething`
+    // but DOES match `${idx}` or `idx` as a standalone reference.
+    const re = new RegExp(`(?<![A-Za-z0-9_])${identifier}(?![A-Za-z0-9_])`);
+    return re.test(expr);
+  }
+
+  it("rejects every key expression that references a bare array index", async () => {
     const src = (await import("../ScrapbookGallery.tsx?raw")) as unknown as {
       default: string;
     };
-    // Accept any of the common stable-id patterns; reject bare index keys.
-    expect(src.default).not.toMatch(/key=\{i\}|key=\{idx\}|key=\{index\}/);
-    expect(src.default).toMatch(/key=\{[^}]*render_id[^}]*\}/);
+    const keyExpressions = extractKeyExpressions(src.default);
+
+    // Sanity: there must be at least one key expression to audit.
+    expect(keyExpressions.length).toBeGreaterThan(0);
+
+    const violations: { expression: string; identifier: string }[] = [];
+    for (const expr of keyExpressions) {
+      for (const ident of BARE_INDEX_IDENTIFIERS) {
+        if (containsBareIdentifier(expr, ident)) {
+          violations.push({ expression: expr, identifier: ident });
+        }
+      }
+    }
+
+    // Every violation is a rule #6 bug. Report them all at once so Dev can
+    // see the full list rather than fix-by-fix.
+    expect(violations).toEqual([]);
+  });
+
+});
+
+describe("ScrapbookGallery — compact mode detail suppression (rework 2026-04-15)", () => {
+  function sevenEnrichedEntries(): ScrapbookEntry[] {
+    return Array.from({ length: 7 }, (_, i) =>
+      enrichedEntry({
+        render_id: `r-${i + 1}`,
+        turn_number: i + 1,
+        world_facts: ["fact-a", "fact-b"],
+        npcs: [
+          { name: "Grell", role: "hostile" },
+          { name: "Aster", role: "friendly" },
+        ],
+      }),
+    );
+  }
+
+  it("hides every NPC chip in compact mode", () => {
+    const { container } = render(
+      <ScrapbookGallery images={sevenEnrichedEntries()} />,
+    );
+    const chips = container.querySelectorAll(
+      '[data-testid^="scrapbook-npc-chip-"]',
+    );
+    expect(chips).toHaveLength(0);
+  });
+
+  it("hides every world-fact chip in compact mode", () => {
+    const { container } = render(
+      <ScrapbookGallery images={sevenEnrichedEntries()} />,
+    );
+    const chips = container.querySelectorAll(
+      '[data-testid^="scrapbook-fact-chip-"]',
+    );
+    expect(chips).toHaveLength(0);
+  });
+});
+
+describe("ScrapbookGallery — absent title (rework 2026-04-15)", () => {
+  it("omits the title element entirely when both scene_name and caption are absent", () => {
+    const images: ScrapbookEntry[] = [baseEntry({ render_id: "r-1" })];
+    const { queryByTestId } = render(<ScrapbookGallery images={images} />);
+    expect(queryByTestId("scrapbook-title-r-1")).toBeNull();
   });
 });

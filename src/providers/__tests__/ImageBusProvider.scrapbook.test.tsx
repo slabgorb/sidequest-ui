@@ -105,6 +105,45 @@ describe("ImageBusProvider — scrapbook field passthrough", () => {
     expect(entry.npcs).toBeUndefined();
   });
 
+  it("treats isHandout as strict boolean — non-boolean truthy values are rejected (rework 2026-04-15)", () => {
+    // Rework driver: Reviewer flagged `isHandout: (payload.handout as boolean) ?? false`
+    // as ineffective — the cast coerces before `??`, so a string "true" or the
+    // number 1 is silently accepted as `isHandout=true`. After fix, only a
+    // literal boolean true produces isHandout=true; everything else (strings,
+    // numbers, undefined) produces false.
+    const images = renderBus([
+      imageMessage({
+        url: "https://example.invalid/a.webp",
+        render_id: "r-string-true",
+        // @ts-expect-error — deliberately malformed payload
+        handout: "true",
+      }),
+      imageMessage({
+        url: "https://example.invalid/b.webp",
+        render_id: "r-number-one",
+        // @ts-expect-error — deliberately malformed payload
+        handout: 1,
+      }),
+      imageMessage({
+        url: "https://example.invalid/c.webp",
+        render_id: "r-bool-true",
+        handout: true,
+      }),
+      imageMessage({
+        url: "https://example.invalid/d.webp",
+        render_id: "r-absent",
+      }),
+    ]);
+    // Order reversed inside provider — map by render_id for assertion clarity.
+    const byId = Object.fromEntries(
+      images.map((img) => [img.render_id, img]),
+    );
+    expect(byId["r-string-true"].isHandout).toBe(false);
+    expect(byId["r-number-one"].isHandout).toBe(false);
+    expect(byId["r-bool-true"].isHandout).toBe(true);
+    expect(byId["r-absent"].isHandout).toBe(false);
+  });
+
   it("preserves existing fields (url, render_id, timestamp, isHandout) alongside enrichment", () => {
     const images = renderBus([
       imageMessage({
