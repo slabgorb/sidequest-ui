@@ -239,6 +239,7 @@ export function ConnectScreen({
           <input
             id="player-name"
             type="text"
+            aria-label="Player name"
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
             className="w-full bg-transparent border-0 border-b border-muted-foreground/20

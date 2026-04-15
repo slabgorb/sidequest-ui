@@ -90,7 +90,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetDef> = {
   },
   gallery: {
     id: "gallery",
-    label: "Gallery",
+    label: "Scrapbook",
     hotkey: "g",
     minW: 2,
     minH: 2,

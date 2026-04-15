@@ -77,7 +77,12 @@ function latestSocket(): MockWebSocket {
   return MockWebSocket.instances[MockWebSocket.instances.length - 1];
 }
 
-/** Connect a player: fill name, select genre + world, click connect, open socket. */
+/** Connect a player through the lobby: fill name, click genre radio, click
+ *  world radio (if visible), click Begin, open socket.
+ *
+ *  The lobby was rebuilt in the #133 rework — genre and world are now
+ *  WAI-ARIA radiogroups of buttons, not `<select>` elements, so the test
+ *  clicks data-slug-addressable radios instead of calling selectOptions. */
 async function connectPlayer(
   user: ReturnType<typeof userEvent.setup>,
   playerName = "TestHero",
@@ -87,23 +92,33 @@ async function connectPlayer(
   await user.clear(nameInput);
   await user.type(nameInput, playerName);
 
-  // Select genre
-  const genreSelect = screen.queryByLabelText(/genre/i);
-  if (genreSelect) {
-    await user.selectOptions(genreSelect, genre);
-  }
-
-  // Wait for fetch to resolve and world dropdown to appear
+  // Let the genres fetch resolve so the radiogroup populates.
   await act(async () => {
     vi.advanceTimersByTime(100);
   });
 
-  // Select world (auto-selected for single-world genres like low_fantasy)
-  const worldSelect = screen.queryByLabelText(/world/i);
-  if (worldSelect && !(worldSelect as HTMLSelectElement).value) {
-    const options = (worldSelect as HTMLSelectElement).options;
-    if (options.length > 1) {
-      await user.selectOptions(worldSelect, options[1].value);
+  // Click the genre radio.
+  const genreRadio = document.querySelector<HTMLButtonElement>(
+    `[role="radio"][data-slug="${genre}"]`,
+  );
+  if (genreRadio) {
+    await user.click(genreRadio);
+  }
+
+  // Let the world list render after genre selection.
+  await act(async () => {
+    vi.advanceTimersByTime(100);
+  });
+
+  // If a world radiogroup exists and none is selected yet, click the first one.
+  const worldGroup = document.querySelector('[role="radiogroup"][aria-label="World"]');
+  if (worldGroup) {
+    const selectedWorld = worldGroup.querySelector<HTMLButtonElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    if (!selectedWorld) {
+      const firstWorld = worldGroup.querySelector<HTMLButtonElement>('[role="radio"]');
+      if (firstWorld) await user.click(firstWorld);
     }
   }
 
@@ -220,14 +235,53 @@ beforeEach(() => {
   MockWebSocket.instances = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   globalThis.WebSocket = MockWebSocket as any;
-  // Mock /api/genres so ConnectScreen can fetch worlds
-  globalThis.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      low_fantasy: { worlds: ["default"] },
-      road_warrior: { worlds: ["wasteland"] },
-      elemental_harmony: { worlds: ["burning_peace", "shattered_accord"] },
-    }),
+  // Mock `/api/genres` and `/api/sessions` — the lobby (rework #133) expects
+  // the rich GenresResponse shape (GenreMeta with worlds: WorldMeta[]) and
+  // polls /api/sessions every 15s for the CurrentSessions panel. Return
+  // fixture data for both so ConnectScreen renders without hitting the
+  // ErrorBoundary's "Something went wrong" fallback.
+  const fakeWorld = (slug: string, name: string) => ({
+    slug,
+    name,
+    description: `${name} — test fixture.`,
+    era: null,
+    setting: null,
+    inspirations: [],
+    axis_snapshot: {},
+    hero_image: null,
+  });
+  const fakeGenresResponse = {
+    low_fantasy: {
+      name: "Low Fantasy",
+      description: "Grounded sword-and-sorcery.",
+      worlds: [fakeWorld("default", "Default")],
+    },
+    road_warrior: {
+      name: "Road Warrior",
+      description: "Post-apocalyptic wasteland.",
+      worlds: [fakeWorld("wasteland", "Wasteland")],
+    },
+    elemental_harmony: {
+      name: "Elemental Harmony",
+      description: "Spirit-kingdom intrigue.",
+      worlds: [
+        fakeWorld("burning_peace", "Burning Peace"),
+        fakeWorld("shattered_accord", "Shattered Accord"),
+      ],
+    },
+  };
+  globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/sessions")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ sessions: [] }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => fakeGenresResponse,
+    } as Response);
   }) as unknown as typeof fetch;
   vi.useFakeTimers({ shouldAdvanceTime: true });
 });

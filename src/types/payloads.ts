@@ -239,6 +239,37 @@ export interface AchievementEarnedPayload {
   emoji?: string;
 }
 
+/**
+ * Scrapbook entry payload — story 33-18.
+ *
+ * Bundles per-turn metadata (turn id, location, narration excerpt, world
+ * facts, NPCs present, optional image) into one atomic message keyed by
+ * `turn_id`. Emitted by the server after `NarrationEnd` so `world_facts`
+ * and `npcs_present` are settled before delivery.
+ *
+ * `image_url`, `scene_title`, and `scene_type` arrive on an async render
+ * channel — the ImageBusProvider merges them with later IMAGE messages by
+ * `turn_id`. Same story for NpcRef fields: they match the Rust NpcRef and
+ * are always non-blank on the wire because the server builds them from
+ * `NonBlankString` fields.
+ */
+export interface ScrapbookEntryNpcRef {
+  name: string;
+  role: string;
+  disposition: string;
+}
+
+export interface ScrapbookEntryPayload {
+  turn_id: number;
+  scene_title?: string;
+  scene_type?: string;
+  location: string;
+  image_url?: string;
+  narrative_excerpt: string;
+  world_facts?: string[];
+  npcs_present?: ScrapbookEntryNpcRef[];
+}
+
 // ---------------------------------------------------------------------------
 // Dice types (story 34-2, mirroring sidequest-protocol wire types)
 // ---------------------------------------------------------------------------
@@ -431,6 +462,11 @@ export interface DiceResultMessage extends BaseMessage {
   payload: DiceResultPayload;
 }
 
+export interface ScrapbookEntryMessage extends BaseMessage {
+  type: typeof MessageType.SCRAPBOOK_ENTRY;
+  payload: ScrapbookEntryPayload;
+}
+
 export type TypedGameMessage =
   | ThinkingMessage
   | NarrationMessage
@@ -453,7 +489,8 @@ export type TypedGameMessage =
   | JournalResponseMessage
   | DiceRequestMessage
   | DiceThrowMessage
-  | DiceResultMessage;
+  | DiceResultMessage
+  | ScrapbookEntryMessage;
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -537,6 +574,10 @@ export function isDiceThrow(msg: TypedGameMessage): msg is DiceThrowMessage {
 
 export function isDiceResult(msg: TypedGameMessage): msg is DiceResultMessage {
   return msg.type === MessageType.DICE_RESULT;
+}
+
+export function isScrapbookEntry(msg: TypedGameMessage): msg is ScrapbookEntryMessage {
+  return msg.type === MessageType.SCRAPBOOK_ENTRY;
 }
 
 // ---------------------------------------------------------------------------

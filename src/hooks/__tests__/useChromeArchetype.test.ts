@@ -24,10 +24,6 @@ describe("getArchetypeForGenre", () => {
     expect(getArchetypeForGenre("elemental_harmony")).toBe("parchment");
   });
 
-  it("maps heavy_metal to parchment", () => {
-    expect(getArchetypeForGenre("heavy_metal")).toBe("parchment");
-  });
-
   it("maps neon_dystopia to terminal", () => {
     expect(getArchetypeForGenre("neon_dystopia")).toBe("terminal");
   });

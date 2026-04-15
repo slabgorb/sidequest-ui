@@ -41,6 +41,7 @@ export const MessageType = {
   DICE_REQUEST: "DICE_REQUEST",
   DICE_THROW: "DICE_THROW",
   DICE_RESULT: "DICE_RESULT",
+  SCRAPBOOK_ENTRY: "SCRAPBOOK_ENTRY",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
