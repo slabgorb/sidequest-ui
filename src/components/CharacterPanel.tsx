@@ -2,7 +2,7 @@ import { useRef } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
-import type { CharacterSummary } from "./PartyPanel";
+import type { CharacterSummary } from "@/types/party";
 import { KnowledgeJournal } from "./KnowledgeJournal";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 
@@ -165,8 +165,6 @@ export function CharacterPanel({
         <div data-testid="party-section" className="border-t border-border/30 p-2 flex flex-col gap-1">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-2 py-1">Party</h3>
           {characters.map((c) => {
-            const hpPct = Math.min(100, c.hp_max > 0 ? (c.hp / c.hp_max) * 100 : 0);
-            const hpLevel = getHpLevel(c.hp, c.hp_max);
             const isSelf = currentPlayerId !== undefined && c.player_id === currentPlayerId;
             const isActing = activePlayerId !== undefined && activePlayerId !== null && c.player_id === activePlayerId;
             const isWaiting = activePlayerId !== undefined && activePlayerId !== null && c.player_id !== activePlayerId;
@@ -208,18 +206,7 @@ export function CharacterPanel({
                       </>
                     )}
                   </span>
-                  <span className="block text-[10px] text-muted-foreground">{c.class} Lv.{c.level} — {c.hp}/{c.hp_max}</span>
-                  <div className="mt-0.5 h-1 w-full rounded-full bg-border/30 overflow-hidden">
-                    <div
-                      className={[
-                        "h-full rounded-full transition-all duration-500 ease-out",
-                        hpLevel === "healthy" ? "bg-green-500" : "",
-                        hpLevel === "warning" ? "bg-amber-500" : "",
-                        hpLevel === "critical" ? "bg-red-500 animate-pulse" : "",
-                      ].filter(Boolean).join(" ")}
-                      style={{ width: `${hpPct}%` }}
-                    />
-                  </div>
+                  <span className="block text-[10px] text-muted-foreground">{toDisplayName(c.class)} Lv.{c.level}</span>
                   {c.status_effects.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-0.5">
                       {c.status_effects.map((effect) => (
@@ -238,13 +225,6 @@ export function CharacterPanel({
 
     </div>
   );
-}
-
-function getHpLevel(hp: number, hpMax: number): "healthy" | "warning" | "critical" {
-  const pct = hpMax > 0 ? (hp / hpMax) * 100 : 0;
-  if (pct > 50) return "healthy";
-  if (pct > 25) return "warning";
-  return "critical";
 }
 
 function StatsContent({ stats }: { stats: Record<string, number> }) {

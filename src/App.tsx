@@ -20,7 +20,7 @@ import { MessageType, type GameMessage } from "@/types/protocol";
 import type { CharacterSheetData } from "@/components/CharacterSheet";
 import type { InventoryData } from "@/components/InventoryPanel";
 import type { MapState } from "@/components/MapOverlay";
-import type { CharacterSummary } from "@/components/PartyPanel";
+import type { CharacterSummary } from "@/types/party";
 import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOverlay";
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
