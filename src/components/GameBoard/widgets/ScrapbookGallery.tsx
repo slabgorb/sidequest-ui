@@ -52,10 +52,6 @@ function groupByChapter(sorted: readonly ScrapbookEntry[]): ChapterGroup[] {
   return groups;
 }
 
-function entryKey(entry: ScrapbookEntry): string {
-  return entry.render_id ?? `entry-ts-${entry.timestamp}`;
-}
-
 function entryId(entry: ScrapbookEntry): string {
   return entry.render_id ?? `ts${entry.timestamp}`;
 }
