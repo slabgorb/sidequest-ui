@@ -648,6 +648,48 @@ function AppInner() {
     };
   }, [audio.engine]);
 
+  // Scene harness: if ?scene=NAME is in the URL, POST to /dev/scene/:name
+  // to stage the save, then drive handleConnect with the returned
+  // coordinates. Dev harness only — requires the server running with
+  // DEV_SCENES=1. Blocks the normal autoReconnect path by flipping
+  // `autoReconnectAttempted` so the two don't race.
+  //
+  // Fail loud on any error: a broken scene harness load is a dev-side bug
+  // that must be visible, not silently fall back to the manual ConnectScreen.
+  const sceneHarnessAttempted = useRef(false);
+  useEffect(() => {
+    if (sceneHarnessAttempted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const sceneName = params.get("scene");
+    if (!sceneName) return;
+    sceneHarnessAttempted.current = true;
+    autoReconnectAttempted.current = true;
+    fetch(`/dev/scene/${encodeURIComponent(sceneName)}`, { method: "POST" })
+      .then((r) => {
+        if (!r.ok) {
+          return r.text().then((body) => {
+            throw new Error(`${r.status} ${body || r.statusText}`);
+          });
+        }
+        return r.json() as Promise<{
+          player_name: string;
+          genre: string;
+          world: string;
+          has_encounter: boolean;
+        }>;
+      })
+      .then(({ player_name, genre, world }) => {
+        console.info(
+          `[scene-harness] loaded ${sceneName} → ${player_name}@${genre}/${world}`,
+        );
+        handleConnect(player_name, genre, world);
+      })
+      .catch((err: Error) => {
+        console.error("[scene-harness] failed:", err);
+        window.alert(`Scene harness '${sceneName}' failed: ${err.message}`);
+      });
+  }, [handleConnect]);
+
   // Auto-reconnect on page refresh if we have a saved session.
   // This must run regardless of sessionPhase — after a server restart the
   // client's HMR state may say "game" but the WebSocket is dead and the
