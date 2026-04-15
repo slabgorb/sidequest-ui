@@ -96,7 +96,7 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
         width: payload.width as number | undefined,
         height: payload.height as number | undefined,
         timestamp: i,
-        isHandout: (payload.handout as boolean) ?? false,
+        isHandout: payload.handout === true,
         turn_number: turnNumber,
         scene_name:
           typeof payload.scene_name === "string" ? payload.scene_name : undefined,

@@ -211,11 +211,11 @@ function ScrapbookCard({
         )}
         {!compact && entry.world_facts && entry.world_facts.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
-            {entry.world_facts.map((fact, idx) => (
+            {entry.world_facts.map((fact, factIndex) => (
               <FactChip
-                key={`fact-${idx}-${fact}`}
+                key={`fact-${id}-${fact}`}
                 entryId={id}
-                index={idx}
+                index={factIndex}
                 text={fact}
               />
             ))}
@@ -289,13 +289,20 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
       </header>
 
       <div className="flex-1 overflow-y-auto px-2 py-2">
-        {groups.map((group, groupIdx) => (
+        {groups.map((group) => {
+          // Disambiguate chapters that repeat non-contiguously in the sorted
+          // order (same chapter split by another chapter between entries) by
+          // composing the key from chapter name + first entry's stable id.
+          const firstEntry = group.entries[0];
+          const groupTag =
+            firstEntry.render_id ?? `ts-${firstEntry.timestamp}`;
+          return (
           <section
-            key={`chapter-${groupIdx}-${group.chapter}`}
+            key={`chapter-${group.chapter}-${groupTag}`}
             className="mb-3"
           >
             <div
-              data-testid={`scrapbook-chapter-divider-${groupIdx}`}
+              data-testid={`scrapbook-chapter-divider-${groupTag}`}
               className="text-[10px] uppercase tracking-widest text-muted-foreground/80 border-b border-border/30 pb-1 mb-2"
             >
               {group.chapter}
@@ -318,7 +325,8 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
               ))}
             </div>
           </section>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
