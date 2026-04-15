@@ -93,25 +93,36 @@ export function CharacterPanel({
       ref={panelRef}
       className="character-panel flex flex-col bg-card/50 h-full overflow-y-auto"
     >
-      {/* Header: portrait + name */}
-      <div className="flex items-start gap-3 p-4">
-        {character.portrait_url && (
+      {/* Header: portrait · name/subtitle · level badge */}
+      <div className="flex items-center gap-3 p-4" data-testid="character-header">
+        {character.portrait_url ? (
           <img
             src={character.portrait_url}
             alt={character.name}
-            className="w-16 h-16 rounded object-cover shrink-0"
+            className="w-12 h-12 rounded-full object-cover shrink-0 border border-[var(--primary)]/30"
           />
+        ) : (
+          <div
+            aria-hidden="true"
+            data-testid="character-portrait-placeholder"
+            className="w-12 h-12 rounded-full shrink-0 flex items-center justify-center bg-[var(--surface)] border border-[var(--primary)]/30 text-[var(--primary)] text-xl font-semibold"
+          >
+            {toAvatarInitials(character.name)}
+          </div>
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-[var(--primary)] truncate">{character.name}</h2>
-          <p className="text-xs text-muted-foreground">
-            Level {character.level} {toDisplayName(character.class)}
+          {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
+          <p data-testid="character-subtitle" className="text-xs text-muted-foreground leading-tight">
+            {toDisplayName(character.class)}
+            {genreSlug ? ` · ${toDisplayName(genreSlug)}` : ""}
           </p>
-          {/* Per-character location removed: it was set once at chargen and
-              never updated as the player moved, leading to a stale "mouth"
-              display while the top header correctly showed "ANTECHAMBER".
-              Party shares location — the top-level location header is the
-              single source of truth. */}
+        </div>
+        <div
+          data-testid="character-level-badge"
+          className="shrink-0 px-2 py-0.5 rounded-md text-xs border border-[var(--primary)]/40 text-[var(--primary)] font-semibold"
+        >
+          Lv {character.level}
         </div>
       </div>
 

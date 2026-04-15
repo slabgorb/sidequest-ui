@@ -74,6 +74,22 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
     expect(screen.getByText("Kael")).toBeInTheDocument();
   });
 
+  it("renders portrait placeholder with initials when no portrait_url", () => {
+    const noPortrait = { ...CHARACTER, portrait_url: undefined };
+    render(<CharacterPanel character={noPortrait} />);
+    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    expect(placeholder).toBeInTheDocument();
+    expect(placeholder).toHaveAttribute("aria-hidden", "true");
+    expect(placeholder).toHaveTextContent("K");
+  });
+
+  it("does not render placeholder when portrait_url is present", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(
+      screen.queryByTestId("character-portrait-placeholder"),
+    ).not.toBeInTheDocument();
+  });
+
   it("does NOT display per-character location (single source of truth is the top header)", () => {
     render(<CharacterPanel character={CHARACTER} />);
     // The character.current_location field is set once at chargen and was
@@ -85,6 +101,73 @@ describe("CharacterPanel — AC-1: persistent sidebar", () => {
   it("renders level", () => {
     render(<CharacterPanel character={CHARACTER} />);
     expect(screen.getByText(/3/)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AC-1b (33-7): Enriched character header — portrait · name · subtitle · level badge
+// ---------------------------------------------------------------------------
+
+describe("CharacterPanel — 33-7: enriched header", () => {
+  it("renders a character-header row with portrait, subtitle, and level badge", () => {
+    render(<CharacterPanel character={CHARACTER} genreSlug="low_fantasy" />);
+    // Query by role/testid rather than child count — protects the semantic
+    // contract (three meaningful elements) without coupling to DOM structure.
+    expect(screen.getByTestId("character-header")).toBeInTheDocument();
+    expect(screen.getByRole("img")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Kael" })).toBeInTheDocument();
+    expect(screen.getByTestId("character-subtitle")).toBeInTheDocument();
+    expect(screen.getByTestId("character-level-badge")).toBeInTheDocument();
+  });
+
+  it("level badge shows exactly 'Lv N' as a compact chip", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    const badge = screen.getByTestId("character-level-badge");
+    expect(badge).toBeInTheDocument();
+    // Exact match: substring would let "Lv 3000" or "Lv 3 ★" pass incorrectly.
+    expect(badge).toHaveTextContent(/^Lv 3$/);
+  });
+
+  it("placeholder renders two-character initials for a two-word name", () => {
+    const twoWord = { ...CHARACTER, name: "Lyra Dawnforge", portrait_url: undefined };
+    render(<CharacterPanel character={twoWord} />);
+    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    expect(placeholder).toHaveTextContent(/^LD$/);
+  });
+
+  it("subtitle combines class and genre display names with ·", () => {
+    render(<CharacterPanel character={CHARACTER} genreSlug="mutant_wasteland" />);
+    expect(screen.getByText(/Ranger · Mutant Wasteland/)).toBeInTheDocument();
+  });
+
+  it("subtitle falls back to class-only when genreSlug is absent", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    // The subtitle should say "Ranger" but NOT contain the · separator
+    const subtitle = screen.getByText(/Ranger/);
+    expect(subtitle.textContent).not.toContain("·");
+  });
+
+  it("portrait slot is 48px (w-12 h-12) for both img and placeholder", () => {
+    const { rerender } = render(<CharacterPanel character={CHARACTER} />);
+    const img = screen.getByRole("img");
+    expect(img.className).toContain("w-12");
+    expect(img.className).toContain("h-12");
+    expect(img.className).toContain("rounded-full");
+
+    rerender(
+      <CharacterPanel character={{ ...CHARACTER, portrait_url: undefined }} />,
+    );
+    const placeholder = screen.getByTestId("character-portrait-placeholder");
+    expect(placeholder.className).toContain("w-12");
+    expect(placeholder.className).toContain("h-12");
+    expect(placeholder.className).toContain("rounded-full");
+  });
+
+  it("name uses accent color (var --primary) and truncates", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    const name = screen.getByRole("heading", { level: 2, name: "Kael" });
+    expect(name.className).toContain("text-[var(--primary)]");
+    expect(name.className).toContain("truncate");
   });
 });
 
