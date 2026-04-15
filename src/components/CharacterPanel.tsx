@@ -2,7 +2,7 @@ import { useRef } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
-import type { CharacterSummary } from "./PartyPanel";
+import type { CharacterSummary } from "@/types/party";
 import { KnowledgeJournal } from "./KnowledgeJournal";
 import type { KnowledgeEntry } from "@/providers/GameStateProvider";
 

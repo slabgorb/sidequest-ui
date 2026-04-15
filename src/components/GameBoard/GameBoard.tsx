@@ -32,7 +32,7 @@ import type { MapState } from "@/components/MapOverlay";
 import type { ConfrontationData } from "@/components/ConfrontationOverlay";
 import type { KnowledgeEntry, ItemDepletion, ResourceAlert } from "@/providers/GameStateProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
-import type { CharacterSummary } from "@/components/PartyPanel";
+import type { CharacterSummary } from "@/types/party";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
