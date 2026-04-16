@@ -24,17 +24,17 @@ export function WidgetWrapper({
   return (
     <div
       data-widget={widgetId}
-      className={`flex flex-col h-full rounded-[var(--border-radius,0.375rem)] border border-[var(--border,hsl(var(--border)))] bg-[var(--surface,hsl(var(--card)))] overflow-hidden ${className ?? ""}`}
+      className={`flex flex-col h-full rounded-[var(--border-radius,0.375rem)] border border-[var(--border,var(--border))] bg-[var(--surface,var(--card))] overflow-hidden ${className ?? ""}`}
     >
       {/* Header — drag handle */}
-      <div className="widget-drag-handle flex items-center gap-2 px-3 py-1.5 border-b border-[var(--border,hsl(var(--border)))] bg-[color-mix(in_srgb,var(--primary,hsl(var(--primary)))_10%,var(--surface,hsl(var(--card))))] cursor-grab active:cursor-grabbing select-none shrink-0">
-        <span className="text-xs font-medium text-[var(--primary,hsl(var(--foreground)))] font-[var(--font-ui,inherit)] flex-1 truncate">
+      <div className="widget-drag-handle flex items-center gap-2 px-3 py-1.5 border-b border-[var(--border,var(--border))] bg-[color-mix(in_srgb,var(--primary,var(--primary))_10%,var(--surface,var(--card)))] cursor-grab active:cursor-grabbing select-none shrink-0">
+        <span className="text-xs font-medium text-[var(--primary,var(--foreground))] font-[var(--font-ui,inherit)] flex-1 truncate">
           {title}
         </span>
         <button
           type="button"
           onClick={() => setMinimized(prev => !prev)}
-          className="p-0.5 rounded hover:bg-[var(--border,hsl(var(--border)))] text-[var(--primary,hsl(var(--muted-foreground)))] transition-colors"
+          className="p-0.5 rounded hover:bg-[var(--border,var(--border))] text-[var(--primary,var(--muted-foreground))] transition-colors"
           aria-label={minimized ? "Expand widget" : "Minimize widget"}
         >
           {minimized ? <Plus size={12} /> : <Minus size={12} />}
@@ -43,7 +43,7 @@ export function WidgetWrapper({
           <button
             type="button"
             onClick={onClose}
-            className="p-0.5 rounded hover:bg-[var(--border,hsl(var(--border)))] text-[var(--primary,hsl(var(--muted-foreground)))] transition-colors"
+            className="p-0.5 rounded hover:bg-[var(--border,var(--border))] text-[var(--primary,var(--muted-foreground))] transition-colors"
             aria-label="Close widget"
           >
             <X size={12} />

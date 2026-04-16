@@ -9,9 +9,10 @@
  * - Force-stop timeout after 5 seconds
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
+import { TextureLoader } from "three";
 import {
   Physics,
   RigidBody,
@@ -39,6 +40,7 @@ import { useDiceThrowGesture } from "./useDiceThrowGesture";
 //      from `/public/fonts/Inter-Bold.ttf` (Google Fonts, OFL).
 // Story 34-12 — physics-is-the-roll close-out.
 const FACE_LABEL_FONT = "/fonts/Inter-Bold.ttf";
+const BASTARDA_FONT = "/fonts/Bastarda-K.ttf";
 
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();
@@ -49,8 +51,8 @@ const FACE_INFO = computeFaceInfo();
 const SETTLE_THRESHOLD = 0.005;
 /** Max roll time before force-stopping (ms) */
 const MAX_ROLL_TIME = 5000;
-/** Tray dimensions (all in Rapier units; half-extents for colliders) */
-const TRAY_HALF_WIDTH = 0.5;
+/** Tray dimensions — wide enough for wall bounces, deep to use vertical panel space */
+const TRAY_HALF_WIDTH = 0.8;
 const TRAY_HALF_DEPTH = 0.8;
 /** Wall half-height — walls extend from y=0 to y=2*WALL_HALF_HEIGHT */
 const WALL_HALF_HEIGHT = 0.5;
@@ -120,34 +122,22 @@ function TrayColliders() {
 // --- Tray Visual (simple wireframe box for the spike) ---
 
 function TrayVisual() {
-  const visibleHeight = WALL_HALF_HEIGHT * 2; // walls extend from y=0 to y=1.0
   return (
     <group>
-      {/* Floor plane */}
+      {/* Shadow-catching floor — transparent material that only shows shadows,
+          so the die appears to roll on whatever surface the panel provides. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
         <planeGeometry args={[TRAY_HALF_WIDTH * 2, TRAY_HALF_DEPTH * 2]} />
-        <meshStandardMaterial color="#2a1f14" roughness={0.9} />
+        <shadowMaterial opacity={0.3} />
       </mesh>
-      {/* Wall outlines — show the inner playable volume */}
-      <lineSegments position={[0, visibleHeight / 2, 0]}>
-        <edgesGeometry
-          args={[
-            new THREE.BoxGeometry(
-              TRAY_HALF_WIDTH * 2,
-              visibleHeight,
-              TRAY_HALF_DEPTH * 2
-            ),
-          ]}
-        />
-        <lineBasicMaterial color="#5a4a3a" />
-      </lineSegments>
+      {/* No wall outlines — skeuomorphic: die rolls on the bare surface */}
     </group>
   );
 }
 
 // --- D20 Mesh with face numbers ---
 
-function FaceLabels() {
+function FaceLabels({ color = "#1a1a1a", font = FACE_LABEL_FONT }: { color?: string; font?: string }) {
   return (
     <>
       {FACE_INFO.map((face, i) => {
@@ -155,24 +145,15 @@ function FaceLabels() {
         const labelPos = face.center.clone().add(
           face.normal.clone().multiplyScalar(0.002)
         );
-        // Compute rotation: orient text so its +Z axis matches the face normal
-        // (by default Text faces +Z).
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), face.normal);
-        // If the face is nearly vertical, pick a stable "up" reference
-        const euler = new THREE.Euler().setFromQuaternion(quaternion);
-        // Suppress unused warning
-        void up;
 
         return (
           <Text
             key={i}
-            font={FACE_LABEL_FONT}
+            font={font}
             position={labelPos.toArray()}
-            rotation={[euler.x, euler.y, euler.z]}
-            fontSize={0.035}
-            color="#1a1a1a"
+            quaternion={face.quaternion}
+            fontSize={0.085}
+            color={color}
             anchorX="center"
             anchorY="middle"
             fontWeight={700}
@@ -185,19 +166,60 @@ function FaceLabels() {
   );
 }
 
-function D20Mesh() {
+/** Die appearance — driven by genre. */
+export interface DiceTheme {
+  /** Die body color */
+  dieColor: string;
+  /** Face number color */
+  labelColor: string;
+  /** Font URL for face numbers (.ttf only — troika doesn't support .woff2) */
+  labelFont?: string;
+  /** Surface roughness (0 = glossy, 1 = matte) */
+  roughness?: number;
+  /** Metalness (0 = plastic, 1 = chrome) */
+  metalness?: number;
+  /** Normal map URL for surface detail (scratches, pitting, wear) */
+  normalMap?: string;
+  /** Normal map intensity (default 1.0) */
+  normalScale?: number;
+}
+
+export const DEFAULT_DICE_THEME: DiceTheme = {
+  dieColor: "#e8e0d0",   // ivory
+  labelColor: "#1a1a1a", // near-black
+  roughness: 0.3,
+  metalness: 0.1,
+  normalMap: "/textures/dice/scratched-plastic-normal.jpg",
+  normalScale: 0.15,
+};
+
+function D20Mesh({ theme = DEFAULT_DICE_THEME }: { theme?: DiceTheme }) {
+  // Load normal map if specified. useLoader suspends until loaded.
+  const normalTex = useLoader(
+    TextureLoader,
+    theme.normalMap ?? "/textures/dice/scratched-plastic-normal.jpg",
+  );
+  normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
+
+  const normalScaleVec = useMemo(
+    () => new THREE.Vector2(theme.normalScale ?? 0.5, theme.normalScale ?? 0.5),
+    [theme.normalScale],
+  );
+
   return (
     <group name="dice">
       <mesh castShadow>
         <icosahedronGeometry args={[D20_RADIUS, 0]} />
         <meshStandardMaterial
-          color="#e8e0d0"
-          roughness={0.3}
-          metalness={0.1}
+          color={theme.dieColor}
+          roughness={theme.roughness ?? 0.3}
+          metalness={theme.metalness ?? 0.1}
+          normalMap={normalTex}
+          normalScale={normalScaleVec}
           flatShading
         />
       </mesh>
-      <FaceLabels />
+      <FaceLabels color={theme.labelColor} font={theme.labelFont ?? FACE_LABEL_FONT} />
     </group>
   );
 }
@@ -207,9 +229,11 @@ function D20Mesh() {
 function PhysicsDie({
   throwParams,
   onSettle,
+  theme,
 }: {
   throwParams: ThrowParams | null;
   onSettle: (value: number) => void;
+  theme?: DiceTheme;
 }) {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const groupRef = useRef<THREE.Group>(null);
@@ -270,38 +294,49 @@ function PhysicsDie({
     >
       <group ref={groupRef}>
         <ConvexHullCollider args={[D20_COLLIDER_VERTICES]} />
-        <D20Mesh />
+        <D20Mesh theme={theme} />
       </group>
     </RigidBody>
   );
 }
 
-// --- Pickup Die (pre-throw, draggable) ---
+// --- Pickup Die (pre-throw, idle with fidget spin) ---
 
-function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
+function PickupDie({ onThrow, theme }: { onThrow: (params: ThrowParams) => void; theme?: DiceTheme }) {
   const { onPointerDown: handlePointerDown } = useDiceThrowGesture({ onThrow });
+  const groupRef = useRef<THREE.Group>(null);
+  // Idle fidget: angular velocity with friction decay. Random kicks
+  // give it a "snap-spin on the table" feel.
+  const spinRef = useRef({
+    vx: 0, vy: 0,
+    nextKick: performance.now() + 2000 + Math.random() * 4000,
+  });
+
+  useFrame((_state, delta) => {
+    const group = groupRef.current;
+    if (!group) return;
+    const spin = spinRef.current;
+    const now = performance.now();
+
+    // Random kick — like flicking the die with a finger
+    if (now > spin.nextKick) {
+      spin.vy = (Math.random() - 0.5) * 8;
+      spin.vx = (Math.random() - 0.5) * 3;
+      spin.nextKick = now + 5000 + Math.random() * 10000;
+    }
+
+    // Friction decay
+    const friction = Math.pow(0.15, delta); // ~85% per second
+    spin.vx *= friction;
+    spin.vy *= friction;
+
+    group.rotation.y += spin.vy * delta;
+    group.rotation.x += spin.vx * delta;
+  });
 
   return (
-    <group position={[0, D20_RADIUS + 0.01, 0]}>
-      <mesh
-        castShadow
-        onPointerDown={handlePointerDown}
-        onPointerOver={() => {
-          document.body.style.cursor = "grab";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "default";
-        }}
-      >
-        <icosahedronGeometry args={[D20_RADIUS, 0]} />
-        <meshStandardMaterial
-          color="#e8e0d0"
-          roughness={0.3}
-          metalness={0.1}
-          flatShading
-        />
-      </mesh>
-      <FaceLabels />
+    <group ref={groupRef} position={[0, D20_RADIUS + 0.01, 0]}>
+      <D20Mesh theme={theme} />
     </group>
   );
 }
@@ -313,16 +348,18 @@ export function DiceScene({
   rollKey,
   onThrow,
   onSettle,
+  theme,
 }: {
   throwParams: ThrowParams | null;
   rollKey: number;
   onThrow: (params: ThrowParams) => void;
   onSettle: (value: number) => void;
+  theme?: DiceTheme;
 }) {
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[2, 4, 1]} intensity={1} castShadow />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[2, 4, 1]} intensity={1.2} castShadow />
       <Physics
         key={rollKey}
         colliders={false}
@@ -332,9 +369,9 @@ export function DiceScene({
       >
         <TrayColliders />
         {throwParams ? (
-          <PhysicsDie throwParams={throwParams} onSettle={onSettle} />
+          <PhysicsDie throwParams={throwParams} onSettle={onSettle} theme={theme} />
         ) : (
-          <PickupDie onThrow={onThrow} />
+          <PickupDie onThrow={onThrow} theme={theme} />
         )}
       </Physics>
       <TrayVisual />

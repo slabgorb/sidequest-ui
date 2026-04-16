@@ -80,7 +80,7 @@ export function buildSegments(messages: GameMessage[]): NarrativeSegment[] {
           const pendingIdx = segments.findIndex(s => s.kind === "render-pending" && s.render_id === renderId);
           if (pendingIdx >= 0) segments.splice(pendingIdx, 1);
         }
-        segments.push({ kind: "gallery-notice", text: "New image in gallery" });
+        segments.push({ kind: "gallery-notice", text: "New image in Scrapbook" });
         break;
       }
       case MessageType.SESSION_EVENT: {

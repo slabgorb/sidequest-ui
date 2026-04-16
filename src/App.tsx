@@ -5,7 +5,6 @@ import { GameBoard } from "@/components/GameBoard/GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
@@ -30,7 +29,9 @@ const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
 );
 
-const LazyDiceOverlay = lazy(() => import("@/dice/DiceOverlay"));
+// DiceOverlay overlay removed — dice now render inline in the Confrontation panel
+// via InlineDiceTray. The DiceOverlay component and DiceSpikePage are retained
+// for isolated testing.
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -155,6 +156,22 @@ function AppInner() {
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
+  // Beat ID pending a client-side dice roll — set when user picks a beat,
+  // sent with DiceThrow so the server can apply beat + narrate in one tick.
+  const pendingBeatIdRef = useRef<string | null>(null);
+
+  // Auto-dismiss dice overlay after result settles (story 34-12 fix).
+  // The overlay stays interactive until the result animation plays; then we
+  // clear both request and result so the overlay unmounts and pointer events
+  // return to the game board.
+  useEffect(() => {
+    if (!diceResult) return;
+    const timer = setTimeout(() => {
+      setDiceRequest(null);
+      setDiceResult(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [diceResult]);
 
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
@@ -523,6 +540,11 @@ function AppInner() {
     [send, executeSlashCommand, toggleWidget],
   );
 
+  const currentPlayerId = useMemo(
+    () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
+    [partyMembers, connectedPlayerName],
+  );
+
   // Structured beat dispatch via BEAT_SELECTION protocol message.
   //
   // Sends the exact beat_id from ConfrontationDef — NO text synthesis, NO
@@ -557,30 +579,29 @@ function AppInner() {
         );
         return;
       }
-      send({
-        type: MessageType.BEAT_SELECTION,
-        payload: { beat_id: beatId, actor: "player" },
-        player_id: "",
-      });
-      setCanType(false);
-      setThinking(true);
+      // Build DiceRequest locally — no server round-trip needed.
+      // The server will receive beat_id + face + seed in one DiceThrow message.
+      const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
+      const modifier = Math.floor((statVal - 10) / 2);
+      const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.metric_delta) * 2));
+      const charName = characterSheet?.name ?? character?.name ?? "Unknown";
+      const localReq: DiceRequestPayload = {
+        request_id: crypto.randomUUID(),
+        rolling_player_id: currentPlayerId ?? "",
+        character_name: charName,
+        dice: [{ sides: "d20", count: 1 }],
+        modifier,
+        stat: beat.stat_check,
+        difficulty: rawDc,
+        context: `${beat.label} — ${beat.stat_check} check`,
+      };
+      pendingBeatIdRef.current = beatId;
+      setDiceResult(null);
+      setDiceRequest(localReq);
     },
-    [confrontationData, send, thinking],
+    [confrontationData, thinking, characterSheet, character, currentPlayerId],
   );
 
-  const handleRequestJournal = useCallback(
-    (category?: string) => {
-      send({
-        type: MessageType.JOURNAL_REQUEST,
-        payload: {
-          ...(category ? { category } : {}),
-          sort_by: 'time',
-        },
-        player_id: '',
-      });
-    },
-    [send],
-  );
 
   // Dice throw — sent after local physics settles with the client-reported
   // face values (physics-is-the-roll, story 34-12). The server treats `face`
@@ -589,15 +610,23 @@ function AppInner() {
   const handleDiceThrow = useCallback(
     (params: DiceThrowParams, face: number[]) => {
       if (!diceRequest) return;
+      const beatId = pendingBeatIdRef.current;
+      pendingBeatIdRef.current = null;
       send({
         type: MessageType.DICE_THROW,
         payload: {
           request_id: diceRequest.request_id,
           throw_params: params,
           face,
+          ...(beatId ? { beat_id: beatId } : {}),
         },
         player_id: "",
       });
+      // If this was a beat roll, set thinking — narrator will run server-side
+      if (beatId) {
+        setCanType(false);
+        setThinking(true);
+      }
     },
     [diceRequest, send],
   );
@@ -647,6 +676,48 @@ function AppInner() {
       document.removeEventListener("keydown", unlock);
     };
   }, [audio.engine]);
+
+  // Scene harness: if ?scene=NAME is in the URL, POST to /dev/scene/:name
+  // to stage the save, then drive handleConnect with the returned
+  // coordinates. Dev harness only — requires the server running with
+  // DEV_SCENES=1. Blocks the normal autoReconnect path by flipping
+  // `autoReconnectAttempted` so the two don't race.
+  //
+  // Fail loud on any error: a broken scene harness load is a dev-side bug
+  // that must be visible, not silently fall back to the manual ConnectScreen.
+  const sceneHarnessAttempted = useRef(false);
+  useEffect(() => {
+    if (sceneHarnessAttempted.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const sceneName = params.get("scene");
+    if (!sceneName) return;
+    sceneHarnessAttempted.current = true;
+    autoReconnectAttempted.current = true;
+    fetch(`/dev/scene/${encodeURIComponent(sceneName)}`, { method: "POST" })
+      .then((r) => {
+        if (!r.ok) {
+          return r.text().then((body) => {
+            throw new Error(`${r.status} ${body || r.statusText}`);
+          });
+        }
+        return r.json() as Promise<{
+          player_name: string;
+          genre: string;
+          world: string;
+          has_encounter: boolean;
+        }>;
+      })
+      .then(({ player_name, genre, world }) => {
+        console.info(
+          `[scene-harness] loaded ${sceneName} → ${player_name}@${genre}/${world}`,
+        );
+        handleConnect(player_name, genre, world);
+      })
+      .catch((err: Error) => {
+        console.error("[scene-harness] failed:", err);
+        window.alert(`Scene harness '${sceneName}' failed: ${err.message}`);
+      });
+  }, [handleConnect]);
 
   // Auto-reconnect on page refresh if we have a saved session.
   // This must run regardless of sessionPhase — after a server restart the
@@ -758,10 +829,6 @@ function AppInner() {
   // In sealed-letter mode, activePlayerName stays null. Input is disabled only
   // when THIS player has already submitted (tracked via turnStatusEntries).
   const isMultiplayer = partyMembers.length > 1 || turnStatusEntries.length > 0 || activePlayerName !== null;
-  const currentPlayerId = useMemo(
-    () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
-    [partyMembers, connectedPlayerName],
-  );
   const activePlayerId = useMemo(
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
@@ -814,9 +881,11 @@ function AppInner() {
                 knowledgeEntries={gameState.knowledge}
                 depletions={gameState.depletions}
                 resourceAlerts={gameState.resourceAlerts}
-                onRequestJournal={handleRequestJournal}
                 confrontationData={confrontationData}
                 onBeatSelect={handleBeatSelect}
+                diceRequest={diceRequest}
+                diceResult={diceResult}
+                onDiceThrow={handleDiceThrow}
                 currentPlayerId={currentPlayerId ?? undefined}
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
@@ -827,21 +896,7 @@ function AppInner() {
                 layoutMode={layoutMode}
               />
             </ImageBusProvider>
-            {diceRequest && (
-              <Suspense fallback={null}>
-                {/* Key on request_id so a new DiceRequest remounts the overlay
-                    and all internal physics state resets to initial — no
-                    reset-on-prop-change useEffect needed inside the component
-                    (avoids react-hooks/set-state-in-effect for the reset path). */}
-                <LazyDiceOverlay
-                  key={diceRequest.request_id}
-                  diceRequest={diceRequest}
-                  diceResult={diceResult}
-                  playerId={currentPlayerId ?? ""}
-                  onThrow={handleDiceThrow}
-                />
-              </Suspense>
-            )}
+            {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
           </ErrorBoundary>
         )}
       </main>
@@ -871,11 +926,9 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <GameStateProvider>
-        <AppInner />
-      </GameStateProvider>
-    </ThemeProvider>
+    <GameStateProvider>
+      <AppInner />
+    </GameStateProvider>
   );
 }
 

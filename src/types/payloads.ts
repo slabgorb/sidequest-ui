@@ -328,6 +328,8 @@ export interface DiceThrowPayload {
   request_id: string;
   throw_params: DiceThrowParams;
   face: number[];
+  /** Beat ID from confrontation — when present, server applies beat + narrates in one tick. */
+  beat_id?: string;
 }
 
 /** Server -> all clients: resolved dice roll outcome. */

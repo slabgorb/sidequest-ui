@@ -194,6 +194,9 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
       if (msg.type !== MessageType.IMAGE) continue;
 
       const payload = msg.payload as Record<string, unknown>;
+      const url = payload.url as string | undefined;
+      if (!url) continue; // Skip placeholder entries with no URL
+
       const renderId = payload.render_id as string | undefined;
       if (renderId) {
         if (seenRenderIds.has(renderId)) continue;
@@ -211,7 +214,7 @@ export function ImageBusProvider({ messages, children }: ImageBusProviderProps) 
       if (entry) matchedTurnIds.add(entry.turn_id);
 
       result.push({
-        url: payload.url as string,
+        url,
         alt: (payload.alt ?? payload.description) as string | undefined,
         caption: (payload.caption ?? payload.description) as string | undefined,
         render_id: renderId,

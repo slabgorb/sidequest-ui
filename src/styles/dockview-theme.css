@@ -12,21 +12,21 @@
   position: relative;
 
   /* Dockview CSS variable mappings to SideQuest theme */
-  --dv-group-view-background-color: hsl(var(--card));
-  --dv-tabs-and-actions-container-background-color: hsl(var(--muted));
-  --dv-activegroup-visiblepanel-tab-background-color: hsl(var(--card));
-  --dv-activegroup-visiblepanel-tab-color: hsl(var(--foreground));
-  --dv-activegroup-hiddenpanel-tab-background-color: hsl(var(--muted));
-  --dv-activegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
-  --dv-inactivegroup-visiblepanel-tab-background-color: hsl(var(--card));
-  --dv-inactivegroup-visiblepanel-tab-color: hsl(var(--muted-foreground));
-  --dv-inactivegroup-hiddenpanel-tab-background-color: hsl(var(--muted));
-  --dv-inactivegroup-hiddenpanel-tab-color: hsl(var(--muted-foreground));
-  --dv-separator-border: hsl(var(--border));
-  --dv-paneview-header-border-color: hsl(var(--border));
-  --dv-tab-close-icon: hsl(var(--muted-foreground));
-  --dv-drag-over-background-color: hsl(var(--primary) / 0.2);
-  --dv-drag-over-border-color: hsl(var(--primary));
+  --dv-group-view-background-color: var(--card);
+  --dv-tabs-and-actions-container-background-color: var(--muted);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--card);
+  --dv-activegroup-visiblepanel-tab-color: var(--foreground);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--muted);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--card);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--muted-foreground);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--muted);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--muted-foreground);
+  --dv-separator-border: var(--border);
+  --dv-paneview-header-border-color: var(--border);
+  --dv-tab-close-icon: var(--muted-foreground);
+  --dv-drag-over-background-color: color-mix(in oklch, var(--primary) 20%, transparent);
+  --dv-drag-over-border-color: var(--primary);
 }
 
 .dockview-container {
@@ -52,7 +52,7 @@
   min-height: 0;
   overflow: hidden;
   overscroll-behavior: contain;
-  background-color: hsl(var(--card));
+  background-color: var(--card);
 }
 
 /* Tab styling */
@@ -64,11 +64,11 @@
 }
 
 .sidequest-dockview .dv-tab:hover {
-  background-color: hsl(var(--muted));
+  background-color: var(--muted);
 }
 
 .sidequest-dockview .dv-tab.dv-active-tab {
-  border-bottom: 2px solid hsl(var(--primary));
+  border-bottom: 2px solid var(--primary);
 }
 
 /* Hide tab close buttons — no mechanism to bring panels back */

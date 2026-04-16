@@ -75,63 +75,9 @@ export function useGenreTheme(messages: GameMessage[]): void {
     }
     styleEl.textContent = css;
 
-    // Bridge genre CSS variables to Tailwind design tokens.
-    // Genre CSS sets --text, --background, --surface, --accent, --primary, --secondary
-    // Tailwind reads --foreground, --background, --card, --accent, etc.
-    //
-    // IMPORTANT: We must NOT use getComputedStyle to read the genre values.
-    // index.css declares `.dark { --background: oklch(...) }` and `<html>`
-    // starts with class="dark". A class selector beats `:root` on
-    // specificity, so getComputedStyle(root).getPropertyValue("--background")
-    // returns the dark-mode value, not the genre's value. The luminance check
-    // would then always see a dark background and never strip the dark class
-    // — silent fallback. Parse the genre :root block directly instead.
+    // Set data-genre attribute for CSS specificity — :root[data-genre] beats .dark
     const root = document.documentElement;
-    const parseRootVar = (name: string): string => {
-      // Match the LAST occurrence so a later override in the genre CSS wins.
-      const re = new RegExp(`${name}\\s*:\\s*([^;]+);`, "g");
-      let match: RegExpExecArray | null;
-      let last = "";
-      while ((match = re.exec(css)) !== null) {
-        last = match[1].trim();
-      }
-      return last;
-    };
-
-    const text = parseRootVar("--text");
-    const bg = parseRootVar("--background");
-    const surface = parseRootVar("--surface");
-    const primary = parseRootVar("--primary");
-    const secondary = parseRootVar("--secondary");
-    const accent = parseRootVar("--accent");
-
-    // Derive border from surface (slightly lighter/darker)
-    const border = surface || bg;
-
-    const bridge: Record<string, string> = {
-      "--foreground": text,
-      "--card-foreground": text,
-      "--popover-foreground": text,
-      "--muted-foreground": text,
-      "--background": bg,
-      "--card": surface,
-      "--popover": surface,
-      "--primary": primary,
-      "--primary-foreground": text,
-      "--secondary": secondary,
-      "--secondary-foreground": text,
-      "--accent": accent,
-      "--accent-foreground": text,
-      "--border": border,
-      "--input": border,
-      "--ring": accent,
-      "--muted": surface,
-    };
-    for (const [twVar, genreVal] of Object.entries(bridge)) {
-      if (genreVal) {
-        root.style.setProperty(twVar, genreVal);
-      }
-    }
+    root.setAttribute("data-genre", "active");
 
     // Dynamic Google Font loading from genre CSS.
     // Extract font-family from the :root block or @font-face declarations.
@@ -151,16 +97,17 @@ export function useGenreTheme(messages: GameMessage[]): void {
       root.style.setProperty("font-family", `'${fontName}', var(--font-sans)`);
     }
 
-    // Check background luminance to decide dark/light mode.
-    // Only remove "dark" class if the genre background is actually light.
+    // Parse --background from genre CSS to determine dark/light mode.
+    // We parse the CSS string directly rather than using getComputedStyle
+    // because the style tag was just injected and we need the genre value,
+    // not any inherited/computed value.
+    const bgMatch = css.match(/--background\s*:\s*([^;]+);/);
+    const bg = bgMatch?.[1].trim();
     if (bg) {
       const lum = getLuminance(bg);
       const isLight = lum > 0.5;
       console.debug("[useGenreTheme] applied", {
         background: bg,
-        text,
-        primary,
-        accent,
         luminance: lum.toFixed(3),
         mode: isLight ? "light" : "dark",
       });
@@ -175,5 +122,9 @@ export function useGenreTheme(messages: GameMessage[]): void {
           "dark/light mode unchanged. Genre CSS likely missing :root vars.",
       );
     }
+
+    return () => {
+      root.removeAttribute("data-genre");
+    };
   }, [messages]);
 }

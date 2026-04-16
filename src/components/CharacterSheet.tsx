@@ -46,7 +46,7 @@ export function CharacterSheet({ data }: CharacterSheetProps) {
 
       {Object.keys(data.stats).length > 0 && (
         <div className="grid grid-cols-2 gap-2">
-          {Object.entries(data.stats).map(([stat, value]) => (
+          {Object.entries(data.stats).sort(([a], [b]) => a.localeCompare(b)).map(([stat, value]) => (
             <div key={stat} className="flex justify-between px-2 py-1 rounded bg-[var(--surface)]">
               <span className="text-[var(--primary)]">{toDisplayName(stat)}</span>
               <span className="font-mono">{value}</span>
