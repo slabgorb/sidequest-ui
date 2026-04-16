@@ -156,6 +156,19 @@ function AppInner() {
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
 
+  // Auto-dismiss dice overlay after result settles (story 34-12 fix).
+  // The overlay stays interactive until the result animation plays; then we
+  // clear both request and result so the overlay unmounts and pointer events
+  // return to the game board.
+  useEffect(() => {
+    if (!diceResult) return;
+    const timer = setTimeout(() => {
+      setDiceRequest(null);
+      setDiceResult(null);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [diceResult]);
+
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
     saveHmrState({ messages, sessionPhase, character });
