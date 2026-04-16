@@ -9,9 +9,10 @@
  * - Force-stop timeout after 5 seconds
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useLoader } from "@react-three/fiber";
+import { TextureLoader } from "three";
 import {
   Physics,
   RigidBody,
@@ -39,6 +40,7 @@ import { useDiceThrowGesture } from "./useDiceThrowGesture";
 //      from `/public/fonts/Inter-Bold.ttf` (Google Fonts, OFL).
 // Story 34-12 — physics-is-the-roll close-out.
 const FACE_LABEL_FONT = "/fonts/Inter-Bold.ttf";
+const BASTARDA_FONT = "/fonts/Bastarda-K.ttf";
 
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();
@@ -135,7 +137,7 @@ function TrayVisual() {
 
 // --- D20 Mesh with face numbers ---
 
-function FaceLabels() {
+function FaceLabels({ color = "#1a1a1a", font = FACE_LABEL_FONT }: { color?: string; font?: string }) {
   return (
     <>
       {FACE_INFO.map((face, i) => {
@@ -143,24 +145,15 @@ function FaceLabels() {
         const labelPos = face.center.clone().add(
           face.normal.clone().multiplyScalar(0.002)
         );
-        // Compute rotation: orient text so its +Z axis matches the face normal
-        // (by default Text faces +Z).
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion();
-        quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), face.normal);
-        // If the face is nearly vertical, pick a stable "up" reference
-        const euler = new THREE.Euler().setFromQuaternion(quaternion);
-        // Suppress unused warning
-        void up;
 
         return (
           <Text
             key={i}
-            font={FACE_LABEL_FONT}
+            font={font}
             position={labelPos.toArray()}
-            rotation={[euler.x, euler.y, euler.z]}
-            fontSize={0.062}
-            color="#1a1a1a"
+            quaternion={face.quaternion}
+            fontSize={0.085}
+            color={color}
             anchorX="center"
             anchorY="middle"
             fontWeight={700}
@@ -173,19 +166,60 @@ function FaceLabels() {
   );
 }
 
-function D20Mesh() {
+/** Die appearance — driven by genre. */
+export interface DiceTheme {
+  /** Die body color */
+  dieColor: string;
+  /** Face number color */
+  labelColor: string;
+  /** Font URL for face numbers (.ttf only — troika doesn't support .woff2) */
+  labelFont?: string;
+  /** Surface roughness (0 = glossy, 1 = matte) */
+  roughness?: number;
+  /** Metalness (0 = plastic, 1 = chrome) */
+  metalness?: number;
+  /** Normal map URL for surface detail (scratches, pitting, wear) */
+  normalMap?: string;
+  /** Normal map intensity (default 1.0) */
+  normalScale?: number;
+}
+
+export const DEFAULT_DICE_THEME: DiceTheme = {
+  dieColor: "#e8e0d0",   // ivory
+  labelColor: "#1a1a1a", // near-black
+  roughness: 0.3,
+  metalness: 0.1,
+  normalMap: "/textures/dice/scratched-plastic-normal.jpg",
+  normalScale: 0.15,
+};
+
+function D20Mesh({ theme = DEFAULT_DICE_THEME }: { theme?: DiceTheme }) {
+  // Load normal map if specified. useLoader suspends until loaded.
+  const normalTex = useLoader(
+    TextureLoader,
+    theme.normalMap ?? "/textures/dice/scratched-plastic-normal.jpg",
+  );
+  normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
+
+  const normalScaleVec = useMemo(
+    () => new THREE.Vector2(theme.normalScale ?? 0.5, theme.normalScale ?? 0.5),
+    [theme.normalScale],
+  );
+
   return (
     <group name="dice">
       <mesh castShadow>
         <icosahedronGeometry args={[D20_RADIUS, 0]} />
         <meshStandardMaterial
-          color="#e8e0d0"
-          roughness={0.3}
-          metalness={0.1}
+          color={theme.dieColor}
+          roughness={theme.roughness ?? 0.3}
+          metalness={theme.metalness ?? 0.1}
+          normalMap={normalTex}
+          normalScale={normalScaleVec}
           flatShading
         />
       </mesh>
-      <FaceLabels />
+      <FaceLabels color={theme.labelColor} font={theme.labelFont ?? FACE_LABEL_FONT} />
     </group>
   );
 }
@@ -195,9 +229,11 @@ function D20Mesh() {
 function PhysicsDie({
   throwParams,
   onSettle,
+  theme,
 }: {
   throwParams: ThrowParams | null;
   onSettle: (value: number) => void;
+  theme?: DiceTheme;
 }) {
   const rigidBodyRef = useRef<RapierRigidBody>(null);
   const groupRef = useRef<THREE.Group>(null);
@@ -258,7 +294,7 @@ function PhysicsDie({
     >
       <group ref={groupRef}>
         <ConvexHullCollider args={[D20_COLLIDER_VERTICES]} />
-        <D20Mesh />
+        <D20Mesh theme={theme} />
       </group>
     </RigidBody>
   );
@@ -266,7 +302,7 @@ function PhysicsDie({
 
 // --- Pickup Die (pre-throw, idle with fidget spin) ---
 
-function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
+function PickupDie({ onThrow, theme }: { onThrow: (params: ThrowParams) => void; theme?: DiceTheme }) {
   const { onPointerDown: handlePointerDown } = useDiceThrowGesture({ onThrow });
   const groupRef = useRef<THREE.Group>(null);
   // Idle fidget: angular velocity with friction decay. Random kicks
@@ -300,25 +336,7 @@ function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
 
   return (
     <group ref={groupRef} position={[0, D20_RADIUS + 0.01, 0]}>
-      <mesh
-        castShadow
-        onPointerDown={handlePointerDown}
-        onPointerOver={() => {
-          document.body.style.cursor = "grab";
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = "default";
-        }}
-      >
-        <icosahedronGeometry args={[D20_RADIUS, 0]} />
-        <meshStandardMaterial
-          color="#e8e0d0"
-          roughness={0.3}
-          metalness={0.1}
-          flatShading
-        />
-      </mesh>
-      <FaceLabels />
+      <D20Mesh theme={theme} />
     </group>
   );
 }
@@ -330,11 +348,13 @@ export function DiceScene({
   rollKey,
   onThrow,
   onSettle,
+  theme,
 }: {
   throwParams: ThrowParams | null;
   rollKey: number;
   onThrow: (params: ThrowParams) => void;
   onSettle: (value: number) => void;
+  theme?: DiceTheme;
 }) {
   return (
     <>
@@ -349,9 +369,9 @@ export function DiceScene({
       >
         <TrayColliders />
         {throwParams ? (
-          <PhysicsDie throwParams={throwParams} onSettle={onSettle} />
+          <PhysicsDie throwParams={throwParams} onSettle={onSettle} theme={theme} />
         ) : (
-          <PickupDie onThrow={onThrow} />
+          <PickupDie onThrow={onThrow} theme={theme} />
         )}
       </Physics>
       <TrayVisual />

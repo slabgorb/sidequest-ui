@@ -51,46 +51,70 @@ const FACE_INDICES: [number, number, number][] = [
 const FACE_NUMBERS = [20, 2, 8, 14, 12, 18, 4, 16, 6, 10, 1, 19, 13, 7, 9, 11, 17, 5, 15, 3];
 
 /**
- * Face information: number, center position, and outward normal.
- * The normal is used to orient text meshes so numbers face outward.
+ * Face information: number, center position, outward normal, and a
+ * quaternion that orients text to read upright when the face is on top.
  */
 export interface FaceInfo {
   number: number;
   center: THREE.Vector3;
   normal: THREE.Vector3;
+  /** Quaternion that orients a +Z-facing text mesh onto this face,
+   *  with the text reading upright when the face points toward +Y. */
+  quaternion: THREE.Quaternion;
 }
 
+/** Icosahedron vertices at die radius, computed once. */
+const RAW_VERTS = [
+  new THREE.Vector3(-1, PHI, 0),
+  new THREE.Vector3(1, PHI, 0),
+  new THREE.Vector3(-1, -PHI, 0),
+  new THREE.Vector3(1, -PHI, 0),
+  new THREE.Vector3(0, -1, PHI),
+  new THREE.Vector3(0, 1, PHI),
+  new THREE.Vector3(0, -1, -PHI),
+  new THREE.Vector3(0, 1, -PHI),
+  new THREE.Vector3(PHI, 0, -1),
+  new THREE.Vector3(PHI, 0, 1),
+  new THREE.Vector3(-PHI, 0, -1),
+  new THREE.Vector3(-PHI, 0, 1),
+].map(v => v.normalize().multiplyScalar(D20_RADIUS));
+
 /**
- * Compute face center + normal for all 20 faces in local space.
+ * Compute face center, normal, and text orientation for all 20 faces.
+ *
+ * Text orientation: on a real d20, each number reads upright when its face
+ * is the "top" face (normal pointing up). We build a lookAt matrix from
+ * the face center outward along the normal, with "up" derived from the
+ * vertex layout of each triangle — specifically, the edge from vertex A
+ * to the midpoint of B-C gives a consistent "up" direction within the
+ * face plane. This avoids the arbitrary twist that setFromUnitVectors produces.
  */
 export function computeFaceInfo(): FaceInfo[] {
-  // Icosahedron vertices at unit scale
-  const rawVerts = [
-    new THREE.Vector3(-1, PHI, 0),
-    new THREE.Vector3(1, PHI, 0),
-    new THREE.Vector3(-1, -PHI, 0),
-    new THREE.Vector3(1, -PHI, 0),
-    new THREE.Vector3(0, -1, PHI),
-    new THREE.Vector3(0, 1, PHI),
-    new THREE.Vector3(0, -1, -PHI),
-    new THREE.Vector3(0, 1, -PHI),
-    new THREE.Vector3(PHI, 0, -1),
-    new THREE.Vector3(PHI, 0, 1),
-    new THREE.Vector3(-PHI, 0, -1),
-    new THREE.Vector3(-PHI, 0, 1),
-  ].map(v => v.normalize().multiplyScalar(D20_RADIUS));
-
   return FACE_INDICES.map((indices, i) => {
     const [a, b, c] = indices;
     const center = new THREE.Vector3()
-      .add(rawVerts[a])
-      .add(rawVerts[b])
-      .add(rawVerts[c])
+      .add(RAW_VERTS[a])
+      .add(RAW_VERTS[b])
+      .add(RAW_VERTS[c])
       .divideScalar(3);
-    // For a regular icosahedron centered at origin, the outward normal
-    // of each face is the normalized center position.
+
     const normal = center.clone().normalize();
-    return { number: FACE_NUMBERS[i], center, normal };
+
+    // Build a rotation matrix that faces the normal with stable "up".
+    // The "up" hint is the direction from vertex A toward the midpoint of
+    // edge B-C — this lies in the face plane and gives a repeatable
+    // orientation for every triangle.
+    const edgeMid = RAW_VERTS[b].clone().add(RAW_VERTS[c]).multiplyScalar(0.5);
+    const faceUp = edgeMid.clone().sub(RAW_VERTS[a]).normalize();
+
+    // lookAt: point FROM outside the face back TO center, so the text
+    // (which faces +Z by default) ends up facing outward, not mirrored.
+    const outside = center.clone().add(normal);
+    const mat = new THREE.Matrix4();
+    mat.lookAt(outside, center, faceUp);
+    const quaternion = new THREE.Quaternion().setFromRotationMatrix(mat);
+
+    return { number: FACE_NUMBERS[i], center, normal, quaternion };
   });
 }
 

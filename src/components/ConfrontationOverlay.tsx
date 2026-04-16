@@ -258,6 +258,7 @@ export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, 
           diceResult={diceResult ?? null}
           playerId={playerId}
           onThrow={onDiceThrow}
+          genreSlug={data.genre_slug}
         />
       )}
 

@@ -10,17 +10,130 @@
  * when a DiceRequest is active.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { DiceScene, type ThrowParams } from "./DiceScene";
+import { DiceScene, type ThrowParams, type DiceTheme, DEFAULT_DICE_THEME } from "./DiceScene";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { replayThrowParams } from "./replayThrowParams";
+
+// Archetype → dice label font (matches useChromeArchetype UI fonts)
+const PARCHMENT_FONT = "/fonts/EBGaramond.ttf";
+const TERMINAL_FONT = "/fonts/Orbitron.ttf";
+const RUGGED_FONT = "/fonts/Oswald.ttf";
+
+/** Per-genre dice themes. Genres not listed here fall back to DEFAULT_DICE_THEME. */
+const GENRE_DICE_THEMES: Record<string, DiceTheme> = {
+  // --- parchment archetype ---
+  caverns_and_claudes: {
+    dieColor: "#e8e0d0",    // classic ivory
+    labelColor: "#8b0000",  // dark red ink
+    roughness: 0.4,
+    metalness: 0.05,
+    normalMap: "/textures/dice/scratched-plastic-normal.jpg",
+    normalScale: 0.15,
+    labelFont: PARCHMENT_FONT,
+  },
+  elemental_harmony: {
+    dieColor: "#f5f0e8",    // parchment white
+    labelColor: "#2d5a27",  // forest green
+    roughness: 0.5,
+    metalness: 0.0,
+    normalMap: "/textures/dice/worn-stone-normal.jpg",
+    normalScale: 0.15,
+    labelFont: PARCHMENT_FONT,
+  },
+  low_fantasy: {
+    dieColor: "#6b4226",    // worn leather
+    labelColor: "#d4a574",  // aged gold
+    roughness: 0.8,
+    metalness: 0.1,
+    normalMap: "/textures/dice/worn-stone-normal.jpg",
+    normalScale: 0.25,
+    labelFont: PARCHMENT_FONT,
+  },
+  victoria: {
+    dieColor: "#4a1a3a",    // deep plum
+    labelColor: "#d4af37",  // polished brass
+    roughness: 0.25,
+    metalness: 0.5,
+    normalMap: "/textures/dice/scratched-metal-normal.jpg",
+    normalScale: 0.15,
+    labelFont: PARCHMENT_FONT,
+  },
+  // --- terminal archetype ---
+  neon_dystopia: {
+    dieColor: "#1a1a2e",    // dark chrome
+    labelColor: "#ff00ff",  // hot magenta
+    roughness: 0.1,
+    metalness: 0.8,
+    normalMap: "/textures/dice/brushed-metal-normal.jpg",
+    normalScale: 0.2,
+    labelFont: TERMINAL_FONT,
+  },
+  space_opera: {
+    dieColor: "#1a1a3a",    // deep space blue
+    labelColor: "#00ccff",  // hologram cyan
+    roughness: 0.15,
+    metalness: 0.7,
+    normalMap: "/textures/dice/brushed-metal-normal.jpg",
+    normalScale: 0.15,
+    labelFont: TERMINAL_FONT,
+  },
+  // --- rugged archetype ---
+  mutant_wasteland: {
+    dieColor: "#7fff00",    // lime green
+    labelColor: "#1a3a0a",  // dark green
+    roughness: 0.5,
+    metalness: 0.1,
+    normalMap: "/textures/dice/worn-stone-normal.jpg",
+    normalScale: 0.3,
+    labelFont: "/fonts/AmericanTypewriter.ttf",
+  },
+  road_warrior: {
+    dieColor: "#2a2a2a",    // matte black
+    labelColor: "#ff4400",  // hot rod orange
+    roughness: 0.6,
+    metalness: 0.3,
+    normalMap: "/textures/dice/scratched-metal-normal.jpg",
+    normalScale: 0.2,
+    labelFont: RUGGED_FONT,
+  },
+  spaghetti_western: {
+    dieColor: "#c4956a",    // dusty sandstone
+    labelColor: "#3a1a0a",  // burnt leather
+    roughness: 0.9,
+    metalness: 0.0,
+    normalMap: "/textures/dice/worn-stone-normal.jpg",
+    normalScale: 0.25,
+    labelFont: RUGGED_FONT,
+  },
+  pulp_noir: {
+    dieColor: "#1a1a1a",    // noir black
+    labelColor: "#c8b060",  // smoky gold
+    roughness: 0.2,
+    metalness: 0.4,
+    normalMap: "/textures/dice/brushed-metal-normal.jpg",
+    normalScale: 0.15,
+    labelFont: RUGGED_FONT,
+  },
+  heavy_metal: {
+    dieColor: "#0a0a0a",    // black iron
+    labelColor: "#cc0000",  // blood red
+    roughness: 0.35,
+    metalness: 0.6,
+    normalMap: "/textures/dice/scratched-metal-normal.jpg",
+    normalScale: 0.2,
+    labelFont: "/fonts/Bastarda-K.ttf",
+  },
+};
 
 export interface InlineDiceTrayProps {
   diceRequest: DiceRequestPayload | null;
   diceResult: DiceResultPayload | null;
   playerId: string;
   onThrow: (params: DiceThrowParams, face: number[]) => void;
+  /** Genre slug for theming the die. */
+  genreSlug?: string;
 }
 
 /** Generate random throw params — replaces the drag gesture. */
@@ -61,7 +174,11 @@ function buildAnnouncement(result: DiceResultPayload): string {
   return `${result.character_name} rolled ${result.total} (${faces} ${formatModifier(result.modifier)}) vs DC ${result.difficulty} — ${result.outcome}`;
 }
 
-export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow }: InlineDiceTrayProps) {
+export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, genreSlug }: InlineDiceTrayProps) {
+  const diceTheme = useMemo(
+    () => (genreSlug && GENRE_DICE_THEMES[genreSlug]) || DEFAULT_DICE_THEME,
+    [genreSlug],
+  );
   const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
   const [rollKey, setRollKey] = useState(0);
   const [pendingLocalParams, setPendingLocalParams] = useState<ThrowParams | null>(null);
@@ -158,6 +275,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow }: I
             rollKey={rollKey}
             onThrow={noopThrow}
             onSettle={handleSettle}
+            theme={diceTheme}
           />
         </Canvas>
 
