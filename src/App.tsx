@@ -29,7 +29,9 @@ const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
 );
 
-const LazyDiceOverlay = lazy(() => import("@/dice/DiceOverlay"));
+// DiceOverlay overlay removed — dice now render inline in the Confrontation panel
+// via InlineDiceTray. The DiceOverlay component and DiceSpikePage are retained
+// for isolated testing.
 
 type SessionPhase = "connect" | "creation" | "game";
 
@@ -881,6 +883,9 @@ function AppInner() {
                 resourceAlerts={gameState.resourceAlerts}
                 confrontationData={confrontationData}
                 onBeatSelect={handleBeatSelect}
+                diceRequest={diceRequest}
+                diceResult={diceResult}
+                onDiceThrow={handleDiceThrow}
                 currentPlayerId={currentPlayerId ?? undefined}
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
@@ -891,19 +896,7 @@ function AppInner() {
                 layoutMode={layoutMode}
               />
             </ImageBusProvider>
-            {diceRequest && (
-              <Suspense fallback={null}>
-                {/* NO key={request_id} here — remounting the Canvas destroys
-                    the WebGL context. DiceOverlay uses rollKey internally to
-                    reset physics state without remounting the R3F Canvas. */}
-                <LazyDiceOverlay
-                  diceRequest={diceRequest}
-                  diceResult={diceResult}
-                  playerId={currentPlayerId ?? ""}
-                  onThrow={handleDiceThrow}
-                />
-              </Suspense>
-            )}
+            {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
           </ErrorBoundary>
         )}
       </main>

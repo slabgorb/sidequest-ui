@@ -1,0 +1,254 @@
+/**
+ * InlineDiceTray — Compact dice tray embedded in the Confrontation panel.
+ *
+ * No gestures, no drag-to-throw. The die sits idle in the tray. When a beat
+ * button is clicked (which creates a DiceRequest), the die auto-rolls with
+ * random physics params. Settle → face reported → result shown inline.
+ *
+ * The Canvas stays mounted as long as the confrontation is active, avoiding
+ * WebGL context creation/destruction churn. The die only appears and rolls
+ * when a DiceRequest is active.
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { DiceScene, type ThrowParams } from "./DiceScene";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import { replayThrowParams } from "./replayThrowParams";
+
+export interface InlineDiceTrayProps {
+  diceRequest: DiceRequestPayload | null;
+  diceResult: DiceResultPayload | null;
+  playerId: string;
+  onThrow: (params: DiceThrowParams, face: number[]) => void;
+}
+
+/** Generate random throw params — replaces the drag gesture. */
+function randomThrowParams(): ThrowParams {
+  // Random position near center of tray
+  const px = (Math.random() - 0.5) * 0.3;
+  const pz = (Math.random() - 0.5) * 0.4;
+
+  // Hard horizontal throw — bounces off walls, good energy
+  const vx = (Math.random() - 0.5) * 8;
+  const vy = -(Math.random() * 2 + 1.5); // moderate downward
+  const vz = (Math.random() - 0.5) * 6;
+
+  // Good spin — tumbles convincingly
+  const ax = (Math.random() - 0.5) * 30;
+  const ay = (Math.random() - 0.5) * 30;
+  const az = (Math.random() - 0.5) * 30;
+
+  // Random initial rotation
+  const rx = Math.random() * Math.PI * 2;
+  const ry = Math.random() * Math.PI * 2;
+  const rz = Math.random() * Math.PI * 2;
+
+  return {
+    position: [px, 0.5, pz],
+    linearVelocity: [vx, vy, vz],
+    angularVelocity: [ax, ay, az],
+    rotation: [rx, ry, rz],
+  };
+}
+
+function formatModifier(mod: number): string {
+  return mod >= 0 ? `+${mod}` : `${mod}`;
+}
+
+function buildAnnouncement(result: DiceResultPayload): string {
+  const faces = result.rolls.flatMap((r) => r.faces).join(", ");
+  return `${result.character_name} rolled ${result.total} (${faces} ${formatModifier(result.modifier)}) vs DC ${result.difficulty} — ${result.outcome}`;
+}
+
+export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow }: InlineDiceTrayProps) {
+  const [throwParams, setThrowParams] = useState<ThrowParams | null>(null);
+  const [rollKey, setRollKey] = useState(0);
+  const [pendingLocalParams, setPendingLocalParams] = useState<ThrowParams | null>(null);
+  const lastRequestIdRef = useRef<string | null>(null);
+
+  const isRollingPlayer = diceRequest !== null && playerId === diceRequest.rolling_player_id;
+
+  // Auto-roll when a new DiceRequest arrives for the rolling player.
+  // No gesture needed — the beat button click is the intent signal.
+  useEffect(() => {
+    if (!diceRequest) return;
+    if (diceRequest.request_id === lastRequestIdRef.current) return;
+    lastRequestIdRef.current = diceRequest.request_id;
+
+    if (isRollingPlayer) {
+      const params = randomThrowParams();
+      setThrowParams(params);
+      setPendingLocalParams(params);
+      setRollKey((k) => k + 1);
+    }
+  }, [diceRequest, isRollingPlayer]);
+
+  // Spectator replay — when DiceResult arrives for non-rolling players
+  useEffect(() => {
+    if (!diceResult) return;
+    if (isRollingPlayer) return;
+    const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    setThrowParams(sceneParams);
+    setRollKey((k) => k + 1);
+  }, [diceResult, isRollingPlayer]);
+
+  // Physics settle → report face to server
+  const handleSettle = useCallback(
+    (value: number) => {
+      if (!isRollingPlayer || !diceRequest || !pendingLocalParams) return;
+      const params = pendingLocalParams;
+      setPendingLocalParams(null);
+      onThrow(
+        {
+          velocity: params.linearVelocity,
+          angular: params.angularVelocity,
+          position: [
+            params.position[0] + 0.5,
+            (params.position[2] + 0.8) / 1.6,
+          ],
+        },
+        [value],
+      );
+    },
+    [isRollingPlayer, diceRequest, pendingLocalParams, onThrow],
+  );
+
+  // DiceScene still requires an onThrow prop (for PickupDie). Since we
+  // auto-roll, PickupDie never renders — but we need a no-op to satisfy types.
+  const noopThrow = useCallback(() => {}, []);
+
+  const needed = diceRequest ? diceRequest.difficulty - diceRequest.modifier : 0;
+
+  return (
+    <div data-testid="inline-dice-tray" className="mt-3 flex flex-col" style={{ flex: 1 }}>
+      {/* Compact info line — only when a request is active */}
+      {diceRequest && (
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1 px-1">
+          <span>
+            DC {diceRequest.difficulty} · {diceRequest.stat} {formatModifier(diceRequest.modifier)} · need {needed}
+          </span>
+        </div>
+      )}
+
+      {/* 3D dice canvas — transparent background, die rolls on the panel surface */}
+      <div
+        style={{
+          position: "relative",
+          flex: 1,
+          minHeight: 200,
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <Canvas
+          shadows
+          camera={{
+            position: [0, 1.4, 0.8],
+            fov: 50,
+            near: 0.01,
+            far: 50,
+          }}
+          gl={{ antialias: true, alpha: true }}
+          dpr={Math.min(window.devicePixelRatio, 2)}
+          style={{ pointerEvents: "none", background: "transparent" }}
+        >
+          <DiceScene
+            throwParams={throwParams}
+            rollKey={rollKey}
+            onThrow={noopThrow}
+            onSettle={handleSettle}
+          />
+        </Canvas>
+
+        {/* Result readout — overlaid at bottom of canvas */}
+        {diceResult && (
+          <div
+            data-testid="dice-result"
+            data-outcome={diceResult.outcome}
+            style={{
+              position: "absolute",
+              bottom: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              pointerEvents: "none",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 14,
+                color: "var(--foreground, #e8e0d0)",
+                background: "var(--muted, rgba(255,255,255,0.1))",
+                borderRadius: 4,
+                padding: "2px 6px",
+                fontFamily: "serif",
+              }}
+            >
+              {diceResult.rolls.flatMap((r) => r.faces).join(", ")}
+            </span>
+            <span
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                color:
+                  diceResult.outcome === "CritSuccess"
+                    ? "#22c55e"
+                    : diceResult.outcome === "CritFail"
+                      ? "#ef4444"
+                      : diceResult.outcome === "Success"
+                        ? "#e8e0d0"
+                        : "#9ca3af",
+                textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+                fontFamily: "serif",
+              }}
+            >
+              {diceResult.total}
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color:
+                  diceResult.outcome === "CritSuccess"
+                    ? "#22c55e"
+                    : diceResult.outcome === "CritFail"
+                      ? "#ef4444"
+                      : "var(--muted-foreground, #8a7a6a)",
+                fontFamily: "serif",
+              }}
+            >
+              {diceResult.outcome === "CritSuccess"
+                ? "Critical!"
+                : diceResult.outcome === "CritFail"
+                  ? "Critical Fail!"
+                  : diceResult.outcome === "Success"
+                    ? "Success"
+                    : "Fail"}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Screen reader announcement */}
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          clip: "rect(0,0,0,0)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {diceResult && diceRequest ? buildAnnouncement(diceResult) : ""}
+      </div>
+    </div>
+  );
+}
+
+export default InlineDiceTray;

@@ -36,6 +36,7 @@ import type { CharacterSummary } from "@/types/party";
 import type { useAudio } from "@/hooks/useAudio";
 import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
 
 import { WIDGET_REGISTRY, type WidgetId } from "./widgetRegistry";
@@ -128,6 +129,9 @@ export interface GameBoardProps {
   knowledgeEntries?: KnowledgeEntry[];
   confrontationData?: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
+  diceRequest?: DiceRequestPayload | null;
+  diceResult?: DiceResultPayload | null;
+  onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
   currentPlayerId?: string;
   activePlayerId?: string | null;
   activePlayerName?: string | null;
@@ -155,6 +159,9 @@ export function GameBoard({
   knowledgeEntries,
   confrontationData,
   onBeatSelect,
+  diceRequest,
+  diceResult,
+  onDiceThrow,
   currentPlayerId,
   activePlayerId,
   activePlayerName,
@@ -318,7 +325,14 @@ export function GameBoard({
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
         return confrontationData ? (
-          <ConfrontationWidget data={confrontationData} onBeatSelect={onBeatSelect} />
+          <ConfrontationWidget
+            data={confrontationData}
+            onBeatSelect={onBeatSelect}
+            diceRequest={diceRequest}
+            diceResult={diceResult}
+            playerId={currentPlayerId}
+            onDiceThrow={onDiceThrow}
+          />
         ) : null;
       case "audio":
         return (
@@ -336,7 +350,8 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      knowledgeEntries, confrontationData, onBeatSelect, nowPlaying, volumes, muted,
+      knowledgeEntries, confrontationData, onBeatSelect, diceRequest, diceResult,
+      onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId]);

@@ -30,10 +30,10 @@ export const D20_COLLIDER_VERTICES = new Float32Array([
    PHI, 0,  1,
   -PHI, 0, -1,
   -PHI, 0,  1,
-].map(v => v * 0.08));
+].map(v => v * 0.14));
 
 /** Die radius for the visual mesh */
-export const D20_RADIUS = 0.135;
+export const D20_RADIUS = 0.24;
 
 /**
  * Standard d20 face-to-number mapping.

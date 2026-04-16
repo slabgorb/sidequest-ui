@@ -49,8 +49,8 @@ const FACE_INFO = computeFaceInfo();
 const SETTLE_THRESHOLD = 0.005;
 /** Max roll time before force-stopping (ms) */
 const MAX_ROLL_TIME = 5000;
-/** Tray dimensions (all in Rapier units; half-extents for colliders) */
-const TRAY_HALF_WIDTH = 0.5;
+/** Tray dimensions — wide enough for wall bounces, deep to use vertical panel space */
+const TRAY_HALF_WIDTH = 0.8;
 const TRAY_HALF_DEPTH = 0.8;
 /** Wall half-height — walls extend from y=0 to y=2*WALL_HALF_HEIGHT */
 const WALL_HALF_HEIGHT = 0.5;
@@ -120,27 +120,15 @@ function TrayColliders() {
 // --- Tray Visual (simple wireframe box for the spike) ---
 
 function TrayVisual() {
-  const visibleHeight = WALL_HALF_HEIGHT * 2; // walls extend from y=0 to y=1.0
   return (
     <group>
-      {/* Floor plane */}
+      {/* Shadow-catching floor — transparent material that only shows shadows,
+          so the die appears to roll on whatever surface the panel provides. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
         <planeGeometry args={[TRAY_HALF_WIDTH * 2, TRAY_HALF_DEPTH * 2]} />
-        <meshStandardMaterial color="#2a1f14" roughness={0.9} />
+        <shadowMaterial opacity={0.3} />
       </mesh>
-      {/* Wall outlines — show the inner playable volume */}
-      <lineSegments position={[0, visibleHeight / 2, 0]}>
-        <edgesGeometry
-          args={[
-            new THREE.BoxGeometry(
-              TRAY_HALF_WIDTH * 2,
-              visibleHeight,
-              TRAY_HALF_DEPTH * 2
-            ),
-          ]}
-        />
-        <lineBasicMaterial color="#5a4a3a" />
-      </lineSegments>
+      {/* No wall outlines — skeuomorphic: die rolls on the bare surface */}
     </group>
   );
 }
@@ -171,7 +159,7 @@ function FaceLabels() {
             font={FACE_LABEL_FONT}
             position={labelPos.toArray()}
             rotation={[euler.x, euler.y, euler.z]}
-            fontSize={0.035}
+            fontSize={0.062}
             color="#1a1a1a"
             anchorX="center"
             anchorY="middle"
@@ -276,13 +264,42 @@ function PhysicsDie({
   );
 }
 
-// --- Pickup Die (pre-throw, draggable) ---
+// --- Pickup Die (pre-throw, idle with fidget spin) ---
 
 function PickupDie({ onThrow }: { onThrow: (params: ThrowParams) => void }) {
   const { onPointerDown: handlePointerDown } = useDiceThrowGesture({ onThrow });
+  const groupRef = useRef<THREE.Group>(null);
+  // Idle fidget: angular velocity with friction decay. Random kicks
+  // give it a "snap-spin on the table" feel.
+  const spinRef = useRef({
+    vx: 0, vy: 0,
+    nextKick: performance.now() + 2000 + Math.random() * 4000,
+  });
+
+  useFrame((_state, delta) => {
+    const group = groupRef.current;
+    if (!group) return;
+    const spin = spinRef.current;
+    const now = performance.now();
+
+    // Random kick — like flicking the die with a finger
+    if (now > spin.nextKick) {
+      spin.vy = (Math.random() - 0.5) * 8;
+      spin.vx = (Math.random() - 0.5) * 3;
+      spin.nextKick = now + 5000 + Math.random() * 10000;
+    }
+
+    // Friction decay
+    const friction = Math.pow(0.15, delta); // ~85% per second
+    spin.vx *= friction;
+    spin.vy *= friction;
+
+    group.rotation.y += spin.vy * delta;
+    group.rotation.x += spin.vx * delta;
+  });
 
   return (
-    <group position={[0, D20_RADIUS + 0.01, 0]}>
+    <group ref={groupRef} position={[0, D20_RADIUS + 0.01, 0]}>
       <mesh
         castShadow
         onPointerDown={handlePointerDown}
@@ -321,8 +338,8 @@ export function DiceScene({
 }) {
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[2, 4, 1]} intensity={1} castShadow />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[2, 4, 1]} intensity={1.2} castShadow />
       <Physics
         key={rollKey}
         colliders={false}
