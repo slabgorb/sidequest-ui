@@ -5,7 +5,6 @@ import { GameBoard } from "@/components/GameBoard/GameBoard";
 import { ImageBusProvider } from "@/providers/ImageBusProvider";
 import type { ResourcePool } from "@/components/CharacterPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ThemeProvider } from "@/providers/ThemeProvider";
 import { GameStateProvider, useGameState } from "@/providers/GameStateProvider";
 import { useGameSocket } from "@/hooks/useGameSocket";
 import { useGenreTheme } from "@/hooks/useGenreTheme";
@@ -934,11 +933,9 @@ function App() {
   }
 
   return (
-    <ThemeProvider>
-      <GameStateProvider>
-        <AppInner />
-      </GameStateProvider>
-    </ThemeProvider>
+    <GameStateProvider>
+      <AppInner />
+    </GameStateProvider>
   );
 }
 
