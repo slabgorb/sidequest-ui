@@ -155,6 +155,9 @@ function AppInner() {
   // Dice overlay state from DICE_REQUEST / DICE_RESULT messages (story 34-5)
   const [diceRequest, setDiceRequest] = useState<DiceRequestPayload | null>(null);
   const [diceResult, setDiceResult] = useState<DiceResultPayload | null>(null);
+  // Beat ID pending a client-side dice roll — set when user picks a beat,
+  // sent with DiceThrow so the server can apply beat + narrate in one tick.
+  const pendingBeatIdRef = useRef<string | null>(null);
 
   // Auto-dismiss dice overlay after result settles (story 34-12 fix).
   // The overlay stays interactive until the result animation plays; then we
@@ -570,15 +573,27 @@ function AppInner() {
         );
         return;
       }
-      send({
-        type: MessageType.BEAT_SELECTION,
-        payload: { beat_id: beatId, actor: "player" },
-        player_id: "",
-      });
-      setCanType(false);
-      setThinking(true);
+      // Build DiceRequest locally — no server round-trip needed.
+      // The server will receive beat_id + face + seed in one DiceThrow message.
+      const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
+      const modifier = Math.floor((statVal - 10) / 2);
+      const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.metric_delta) * 2));
+      const charName = characterSheet?.name ?? character?.name ?? "Unknown";
+      const localReq: DiceRequestPayload = {
+        request_id: crypto.randomUUID(),
+        rolling_player_id: currentPlayerId ?? "",
+        character_name: charName,
+        dice: [{ sides: "d20", count: 1 }],
+        modifier,
+        stat: beat.stat_check,
+        difficulty: rawDc,
+        context: `${beat.label} — ${beat.stat_check} check`,
+      };
+      pendingBeatIdRef.current = beatId;
+      setDiceResult(null);
+      setDiceRequest(localReq);
     },
-    [confrontationData, send, thinking],
+    [confrontationData, thinking, characterSheet, character, currentPlayerId],
   );
 
   const handleRequestJournal = useCallback(
@@ -602,15 +617,23 @@ function AppInner() {
   const handleDiceThrow = useCallback(
     (params: DiceThrowParams, face: number[]) => {
       if (!diceRequest) return;
+      const beatId = pendingBeatIdRef.current;
+      pendingBeatIdRef.current = null;
       send({
         type: MessageType.DICE_THROW,
         payload: {
           request_id: diceRequest.request_id,
           throw_params: params,
           face,
+          ...(beatId ? { beat_id: beatId } : {}),
         },
         player_id: "",
       });
+      // If this was a beat roll, set thinking — narrator will run server-side
+      if (beatId) {
+        setCanType(false);
+        setThinking(true);
+      }
     },
     [diceRequest, send],
   );
