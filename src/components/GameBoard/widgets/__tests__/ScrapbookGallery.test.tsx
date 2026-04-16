@@ -113,17 +113,17 @@ describe("ScrapbookGallery — legend bar", () => {
     ).toBe("Drips echo somewhere below.");
   });
 
-  it("falls back to caption field as title when scene_name is absent", () => {
+  it("omits title when scene_name is absent even if caption exists", () => {
     const images: ScrapbookEntry[] = [
       baseEntry({
         render_id: "r-1",
         caption: "A crumbling doorway",
       }),
     ];
-    const { getByTestId } = render(<ScrapbookGallery images={images} />);
-    expect(getByTestId("scrapbook-title-r-1").textContent).toBe(
-      "A crumbling doorway",
-    );
+    const { queryByTestId } = render(<ScrapbookGallery images={images} />);
+    // caption no longer promoted to title — prevents duplicate text when
+    // caption and narrative_beat contain the same narrative_excerpt
+    expect(queryByTestId("scrapbook-title-r-1")).toBeNull();
   });
 
   it("hides the caption line entirely when narrative_beat is absent and no caption fallback exists", () => {

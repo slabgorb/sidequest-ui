@@ -72,7 +72,7 @@ describe("NarrativeView", () => {
     );
     // Images no longer render inline — they go to the ImageGalleryWidget
     expect(screen.queryByAltText("A dark chamber")).not.toBeInTheDocument();
-    expect(screen.getByText("New image in gallery")).toBeInTheDocument();
+    expect(screen.getByText("New image in Scrapbook")).toBeInTheDocument();
   });
 
   // -- auto-scroll -----------------------------------------------------------

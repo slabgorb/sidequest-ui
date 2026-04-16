@@ -10,7 +10,7 @@
  * no placeholders, no "Untitled" fallbacks (see CLAUDE.md "no silent
  * fallbacks"). This lets 33-17 ship before 33-18 enriches the server payload.
  */
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { GalleryImage, NpcRole, ScrapbookNpc } from "@/providers/ImageBusProvider";
 
 export type ScrapbookEntry = GalleryImage;
@@ -57,7 +57,7 @@ function entryId(entry: ScrapbookEntry): string {
 }
 
 function titleFor(entry: ScrapbookEntry): string | undefined {
-  return entry.scene_name ?? entry.caption;
+  return entry.scene_name;
 }
 
 function ScrapbookEmpty() {
@@ -154,12 +154,70 @@ function TurnBadge({
   );
 }
 
+function Lightbox({
+  entry,
+  onClose,
+}: {
+  entry: ScrapbookEntry;
+  onClose: () => void;
+}) {
+  const title = titleFor(entry);
+  const caption = entry.narrative_beat;
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      data-testid="scrapbook-lightbox"
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-[90vw] max-h-[90vh] flex flex-col items-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={entry.url}
+          alt={entry.alt ?? title ?? "Scrapbook scene"}
+          className="max-w-full max-h-[80vh] object-contain rounded"
+        />
+        {(title || caption) && (
+          <div className="mt-2 text-center max-w-lg">
+            {title && (
+              <div className="text-sm font-semibold text-white/90">{title}</div>
+            )}
+            {caption && (
+              <div className="text-xs text-white/60 italic mt-1">{caption}</div>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          aria-label="Close lightbox"
+          onClick={onClose}
+          className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-black/70 text-white/80 hover:text-white flex items-center justify-center text-lg"
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ScrapbookCard({
   entry,
   compact,
+  onSelect,
 }: {
   entry: ScrapbookEntry;
   compact: boolean;
+  onSelect: (entry: ScrapbookEntry) => void;
 }) {
   const id = entryId(entry);
   const title = titleFor(entry);
@@ -171,7 +229,14 @@ function ScrapbookCard({
       data-testid={`scrapbook-entry-${id}`}
       className="flex flex-col gap-1 bg-surface/40 rounded overflow-hidden border border-border/40"
     >
-      <div className="relative aspect-[4/3] bg-muted/30">
+      <div
+        className="relative aspect-[4/3] bg-muted/30 cursor-pointer"
+        onClick={() => onSelect(entry)}
+        role="button"
+        tabIndex={0}
+        aria-label={`Enlarge: ${title ?? "Scrapbook scene"}`}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(entry); } }}
+      >
         <img
           src={entry.url}
           alt={entry.alt ?? title ?? "Scrapbook scene"}
@@ -235,6 +300,9 @@ function ScrapbookCard({
 
 export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
   const [view, setView] = useState<ViewMode>("grid");
+  const [lightboxEntry, setLightboxEntry] = useState<ScrapbookEntry | null>(null);
+  const handleSelect = useCallback((entry: ScrapbookEntry) => setLightboxEntry(entry), []);
+  const handleClose = useCallback(() => setLightboxEntry(null), []);
 
   if (images.length === 0) {
     return <ScrapbookEmpty />;
@@ -321,6 +389,7 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
                   key={entry.render_id ?? `entry-ts-${entry.timestamp}`}
                   entry={entry}
                   compact={compact}
+                  onSelect={handleSelect}
                 />
               ))}
             </div>
@@ -328,6 +397,9 @@ export function ScrapbookGallery({ images }: ScrapbookGalleryProps) {
           );
         })}
       </div>
+      {lightboxEntry && (
+        <Lightbox entry={lightboxEntry} onClose={handleClose} />
+      )}
     </div>
   );
 }
