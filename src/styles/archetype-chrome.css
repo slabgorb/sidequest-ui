@@ -13,8 +13,8 @@
   background:
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
-      color-mix(in srgb, var(--surface, hsl(var(--background))) 95%, transparent)
+      color-mix(in srgb, var(--surface, var(--card)) 80%, transparent),
+      color-mix(in srgb, var(--surface, var(--background)) 95%, transparent)
     );
 }
 
@@ -133,8 +133,8 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
+      color-mix(in srgb, var(--surface, var(--card)) 80%, transparent),
+      color-mix(in srgb, var(--surface, var(--card)) 95%, transparent)
     );
 }
 
@@ -255,8 +255,8 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
+      color-mix(in srgb, var(--surface, var(--card)) 80%, transparent),
+      color-mix(in srgb, var(--surface, var(--card)) 95%, transparent)
     );
   background-size: 40px 40px, 40px 40px, 40px 40px, 100% 100%;
 }
@@ -388,7 +388,7 @@
     ),
     radial-gradient(
       ellipse at 50% 50%,
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 80%, transparent),
-      color-mix(in srgb, var(--surface, hsl(var(--card))) 95%, transparent)
+      color-mix(in srgb, var(--surface, var(--card)) 80%, transparent),
+      color-mix(in srgb, var(--surface, var(--card)) 95%, transparent)
     );
 }

@@ -123,7 +123,7 @@ export function MobileTabView({
             onClick={() => handleTabClick(tab.id)}
             className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
               activeTab === tab.id
-                ? "text-[var(--primary,hsl(var(--primary)))]"
+                ? "text-[var(--primary,var(--primary))]"
                 : "text-muted-foreground"
             }`}
           >
@@ -134,7 +134,7 @@ export function MobileTabView({
                 <span
                   data-testid={`tab-badge-${tab.id}`}
                   aria-label={`new ${tab.label}`}
-                  className="inline-block w-[5px] h-[5px] rounded-full bg-[var(--primary,hsl(var(--primary)))]"
+                  className="inline-block w-[5px] h-[5px] rounded-full bg-[var(--primary,var(--primary))]"
                 />
               )}
             </span>
