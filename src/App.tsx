@@ -539,6 +539,11 @@ function AppInner() {
     [send, executeSlashCommand, toggleWidget],
   );
 
+  const currentPlayerId = useMemo(
+    () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
+    [partyMembers, connectedPlayerName],
+  );
+
   // Structured beat dispatch via BEAT_SELECTION protocol message.
   //
   // Sends the exact beat_id from ConfrontationDef — NO text synthesis, NO
@@ -823,10 +828,6 @@ function AppInner() {
   // In sealed-letter mode, activePlayerName stays null. Input is disabled only
   // when THIS player has already submitted (tracked via turnStatusEntries).
   const isMultiplayer = partyMembers.length > 1 || turnStatusEntries.length > 0 || activePlayerName !== null;
-  const currentPlayerId = useMemo(
-    () => partyMembers.find((m) => m.name === connectedPlayerName)?.player_id ?? null,
-    [partyMembers, connectedPlayerName],
-  );
   const activePlayerId = useMemo(
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
@@ -893,12 +894,10 @@ function AppInner() {
             </ImageBusProvider>
             {diceRequest && (
               <Suspense fallback={null}>
-                {/* Key on request_id so a new DiceRequest remounts the overlay
-                    and all internal physics state resets to initial — no
-                    reset-on-prop-change useEffect needed inside the component
-                    (avoids react-hooks/set-state-in-effect for the reset path). */}
+                {/* NO key={request_id} here — remounting the Canvas destroys
+                    the WebGL context. DiceOverlay uses rollKey internally to
+                    reset physics state without remounting the R3F Canvas. */}
                 <LazyDiceOverlay
-                  key={diceRequest.request_id}
                   diceRequest={diceRequest}
                   diceResult={diceResult}
                   playerId={currentPlayerId ?? ""}
