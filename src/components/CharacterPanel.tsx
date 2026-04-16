@@ -228,7 +228,7 @@ export function CharacterPanel({
 }
 
 function StatsContent({ stats }: { stats: Record<string, number> }) {
-  const entries = Object.entries(stats);
+  const entries = Object.entries(stats).sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) {
     return <p className="text-sm text-muted-foreground/60">No stats available.</p>;
   }
