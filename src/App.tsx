@@ -596,19 +596,6 @@ function AppInner() {
     [confrontationData, thinking, characterSheet, character, currentPlayerId],
   );
 
-  const handleRequestJournal = useCallback(
-    (category?: string) => {
-      send({
-        type: MessageType.JOURNAL_REQUEST,
-        payload: {
-          ...(category ? { category } : {}),
-          sort_by: 'time',
-        },
-        player_id: '',
-      });
-    },
-    [send],
-  );
 
   // Dice throw — sent after local physics settles with the client-reported
   // face values (physics-is-the-roll, story 34-12). The server treats `face`
@@ -892,7 +879,6 @@ function AppInner() {
                 knowledgeEntries={gameState.knowledge}
                 depletions={gameState.depletions}
                 resourceAlerts={gameState.resourceAlerts}
-                onRequestJournal={handleRequestJournal}
                 confrontationData={confrontationData}
                 onBeatSelect={handleBeatSelect}
                 currentPlayerId={currentPlayerId ?? undefined}

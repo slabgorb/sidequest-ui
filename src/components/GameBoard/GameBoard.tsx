@@ -138,7 +138,6 @@ export interface GameBoardProps {
   worldSlug?: string;
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
-  onRequestJournal?: (category?: string) => void;
 }
 
 export function GameBoard({
@@ -166,7 +165,6 @@ export function GameBoard({
   worldSlug,
   depletions,
   resourceAlerts,
-  onRequestJournal,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -306,8 +304,6 @@ export function GameBoard({
             character={characterSheet}
             resources={resources}
             genreSlug={genreSlug}
-            knowledgeEntries={knowledgeEntries}
-            onRequestJournal={onRequestJournal}
             onResourceThresholdCrossed={handleResourceThresholdCrossed}
             characters={characters}
             currentPlayerId={currentPlayerId}
@@ -342,7 +338,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       knowledgeEntries, confrontationData, onBeatSelect, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug,
-      onRequestJournal, handleResourceThresholdCrossed, characters, currentPlayerId,
+      handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
