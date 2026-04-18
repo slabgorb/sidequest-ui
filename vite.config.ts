@@ -24,6 +24,7 @@ export default defineConfig({
     proxy: {
       '/ws': { target: 'ws://localhost:8765', ws: true },
       '/api': { target: 'http://localhost:8765' },
+      '/dev': { target: 'http://localhost:8765' },
       '/genre': { target: 'http://localhost:8765' },
       '/renders': { target: 'http://localhost:8765' },
     },

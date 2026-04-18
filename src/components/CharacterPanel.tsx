@@ -3,10 +3,7 @@ import type { CharacterSheetData } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "@/types/party";
-import { KnowledgeJournal } from "./KnowledgeJournal";
-import type { KnowledgeEntry } from "@/providers/GameStateProvider";
-
-type TabId = "stats" | "abilities" | "status" | "journal";
+type TabId = "stats" | "abilities" | "status";
 
 export interface ResourcePool {
   value: number;
@@ -31,8 +28,6 @@ export interface CharacterPanelProps {
     resource: string;
     threshold: ResourceThreshold;
   }) => void;
-  knowledgeEntries?: KnowledgeEntry[];
-  onRequestJournal?: (category?: string) => void;
   characters?: CharacterSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
@@ -57,8 +52,6 @@ export function CharacterPanel({
   character,
   resources,
   genreSlug,
-  knowledgeEntries,
-  onRequestJournal,
   onResourceThresholdCrossed,
   characters = [],
   currentPlayerId,
@@ -77,7 +70,6 @@ export function CharacterPanel({
     { id: "stats", label: "Stats" },
     { id: "abilities", label: "Abilities" },
     ...(hasResources ? [{ id: "status" as TabId, label: "Status" }] : []),
-    ...(knowledgeEntries && knowledgeEntries.length > 0 ? [{ id: "journal" as TabId, label: "Journal" }] : []),
   ];
 
   // Inventory has its own top-level panel — drop the redundant subtab.
@@ -155,9 +147,6 @@ export function CharacterPanel({
             onThresholdCrossed={onResourceThresholdCrossed}
           />
         )}
-        {activeTab === "journal" && knowledgeEntries && (
-          <KnowledgeJournal entries={knowledgeEntries} onRequestJournal={onRequestJournal} />
-        )}
       </div>
 
       {/* Party members section */}
@@ -228,7 +217,7 @@ export function CharacterPanel({
 }
 
 function StatsContent({ stats }: { stats: Record<string, number> }) {
-  const entries = Object.entries(stats);
+  const entries = Object.entries(stats).sort(([a], [b]) => a.localeCompare(b));
   if (entries.length === 0) {
     return <p className="text-sm text-muted-foreground/60">No stats available.</p>;
   }

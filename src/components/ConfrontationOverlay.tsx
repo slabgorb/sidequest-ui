@@ -1,3 +1,6 @@
+import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
+import { InlineDiceTray } from "@/dice/InlineDiceTray";
+
 // ═══════════════════════════════════════════════════════════
 // Types — exported for tests and consumers
 // ═══════════════════════════════════════════════════════════
@@ -59,6 +62,11 @@ interface ConfrontationOverlayProps {
   onBeatSelect?: (beatId: string) => void;
   /** When true, renders inline (no fixed positioning) for use inside a widget. */
   inline?: boolean;
+  /** Dice state — rendered inline below beats when active. */
+  diceRequest?: DiceRequestPayload | null;
+  diceResult?: DiceResultPayload | null;
+  playerId?: string;
+  onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -203,7 +211,7 @@ function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
 // Main component
 // ═══════════════════════════════════════════════════════════
 
-export function ConfrontationOverlay({ data, onBeatSelect, inline }: ConfrontationOverlayProps) {
+export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, diceResult, playerId, onDiceThrow }: ConfrontationOverlayProps) {
   if (!data) return null;
 
   const isStandoff = data.type === 'standoff';
@@ -242,6 +250,17 @@ export function ConfrontationOverlay({ data, onBeatSelect, inline }: Confrontati
 
       {/* Beat action buttons */}
       <BeatActions beats={data.beats} onBeatSelect={onBeatSelect} />
+
+      {/* Inline dice tray — rolls right here when a beat is selected */}
+      {onDiceThrow && playerId && (
+        <InlineDiceTray
+          diceRequest={diceRequest ?? null}
+          diceResult={diceResult ?? null}
+          playerId={playerId}
+          onThrow={onDiceThrow}
+          genreSlug={data.genre_slug}
+        />
+      )}
 
       {/* Secondary stats (chase rigs, etc.) */}
       {data.secondary_stats && (

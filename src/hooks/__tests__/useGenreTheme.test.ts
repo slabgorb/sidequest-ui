@@ -33,6 +33,7 @@ describe("useGenreTheme", () => {
 
   afterEach(() => {
     document.getElementById("genre-theme-css")?.remove();
+    document.documentElement.removeAttribute("data-genre");
   });
 
   it("does nothing when messages array is empty", () => {
@@ -69,6 +70,20 @@ describe("useGenreTheme", () => {
     const noCSS = makeSessionEvent("theme_css");
     renderHook(() => useGenreTheme([noCSS]));
     expect(document.getElementById("genre-theme-css")).toBeNull();
+  });
+
+  it("sets data-genre attribute on documentElement when theme_css is applied", () => {
+    const msg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
+    renderHook(() => useGenreTheme([msg]));
+    expect(document.documentElement.getAttribute("data-genre")).toBe("active");
+  });
+
+  it("removes data-genre attribute on cleanup", () => {
+    const msg = makeSessionEvent("theme_css", { css: SAMPLE_CSS });
+    const { unmount } = renderHook(() => useGenreTheme([msg]));
+    expect(document.documentElement.getAttribute("data-genre")).toBe("active");
+    unmount();
+    expect(document.documentElement.getAttribute("data-genre")).toBeNull();
   });
 
   it("updates CSS when a new theme_css event arrives", () => {
