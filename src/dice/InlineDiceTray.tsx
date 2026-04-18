@@ -188,17 +188,25 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
 
   // Auto-roll when a new DiceRequest arrives for the rolling player.
   // No gesture needed — the beat button click is the intent signal.
+  //
+  // Short pre-roll pause (story 37-25): let the "need X" readout register
+  // with the player before the physics fires. Without it the die starts
+  // tumbling on the same frame the target appears and the number blurs
+  // past unread — players lose the tension beat of knowing what they need.
   useEffect(() => {
     if (!diceRequest) return;
     if (diceRequest.request_id === lastRequestIdRef.current) return;
     lastRequestIdRef.current = diceRequest.request_id;
 
-    if (isRollingPlayer) {
+    if (!isRollingPlayer) return;
+
+    const timer = setTimeout(() => {
       const params = randomThrowParams();
       setThrowParams(params);
       setPendingLocalParams(params);
       setRollKey((k) => k + 1);
-    }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [diceRequest, isRollingPlayer]);
 
   // Spectator replay — when DiceResult arrives for non-rolling players

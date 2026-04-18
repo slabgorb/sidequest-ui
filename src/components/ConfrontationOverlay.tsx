@@ -146,6 +146,16 @@ function ActorPortrait({
 // Beat action buttons
 // ═══════════════════════════════════════════════════════════
 
+// Risk color — maps |metric_delta| to a green→red hue. DC scales with
+// |metric_delta| (see App.tsx handleBeatSelect), so this gives players a
+// qualitative sense of how risky a beat is without revealing the exact DC.
+// Range: |delta| 0 → 10 maps to hue 120 (green) → 0 (red).
+function riskColor(metricDelta: number): string {
+  const risk = Math.min(1, Math.abs(metricDelta) / 10);
+  const hue = 120 * (1 - risk);
+  return `hsl(${hue.toFixed(0)}, 60%, 50%)`;
+}
+
 function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelect?: (beatId: string) => void }) {
   return (
     <div className="flex flex-wrap gap-2 mt-3">
@@ -158,6 +168,7 @@ function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelec
         const tooltip = beat.risk
           ? `${beat.label} (${beat.stat_check}) — ${beat.risk}`
           : `${beat.label} (${beat.stat_check})`;
+        const color = riskColor(beat.metric_delta);
         return (
           <button
             key={beat.id}
@@ -165,12 +176,12 @@ function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelec
             title={tooltip}
             aria-label={tooltip}
             data-resolution={beat.resolution ? 'true' : undefined}
+            data-risk={Math.min(1, Math.abs(beat.metric_delta) / 10).toFixed(2)}
             onClick={() => onBeatSelect?.(beat.id)}
+            style={{ borderColor: color, color }}
             className={[
-              'px-3 py-1.5 rounded text-xs border transition-colors',
-              beat.resolution
-                ? 'border-destructive text-destructive hover:bg-destructive/10 font-bold'
-                : 'border-border hover:bg-muted',
+              'px-3 py-1.5 rounded text-xs border transition-colors hover:bg-muted',
+              beat.resolution ? 'font-bold' : '',
             ].join(' ')}
           >
             <span>{beat.label}</span>
