@@ -10,7 +10,7 @@
  * when a DiceRequest is active.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { DiceScene, type ThrowParams, type DiceTheme, DEFAULT_DICE_THEME } from "./DiceScene";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
@@ -210,10 +210,11 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
   }, [diceRequest, isRollingPlayer]);
 
   // Spectator replay — when DiceResult arrives for non-rolling players
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!diceResult) return;
     if (isRollingPlayer) return;
     const sceneParams = replayThrowParams(diceResult.throw_params, diceResult.seed);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThrowParams(sceneParams);
     setRollKey((k) => k + 1);
   }, [diceResult, isRollingPlayer]);
