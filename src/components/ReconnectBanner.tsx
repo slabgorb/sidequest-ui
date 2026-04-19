@@ -1,19 +1,9 @@
-import { useEffect, useRef } from "react";
-
 interface ReconnectBannerProps {
-  readyState: number;
+  visible: boolean;
 }
 
-export function ReconnectBanner({ readyState }: ReconnectBannerProps) {
-  // Only show after we've seen a successful OPEN. First-load CONNECTING/CLOSED
-  // is not "reconnecting" — it's "connecting for the first time," and the
-  // ConnectScreen already owns that UX.
-  const wasOpenRef = useRef(false);
-  useEffect(() => {
-    if (readyState === WebSocket.OPEN) wasOpenRef.current = true;
-  }, [readyState]);
-
-  if (!wasOpenRef.current || readyState === WebSocket.OPEN) return null;
+export function ReconnectBanner({ visible }: ReconnectBannerProps) {
+  if (!visible) return null;
   return (
     <div
       role="status"

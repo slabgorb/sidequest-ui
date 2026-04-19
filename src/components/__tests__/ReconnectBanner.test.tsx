@@ -2,65 +2,36 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { ReconnectBanner } from "../ReconnectBanner";
 
-// Story 37-26 — ReconnectBanner behavior.
-// AC-4: "Reconnecting..." banner visible when readyState !== OPEN,
-// but only AFTER a first successful OPEN (B1 fix: no banner on initial load).
+// Story 37-26 — ReconnectBanner is a pure presentational component.
+// The "are we actually reconnecting?" logic lives in useWebSocket and is
+// threaded through useGameSocket as `isReconnecting`. This suite tests the
+// render contract only; the semantics (first-load silence, intentional-close
+// silence) are tested in useWebSocket-isReconnecting.test.ts.
 
 describe("ReconnectBanner (37-26)", () => {
-  it("renders nothing on initial mount with readyState CLOSED (no prior OPEN)", () => {
-    const { container } = render(<ReconnectBanner readyState={WebSocket.CLOSED} />);
+  it("renders nothing when visible is false", () => {
+    const { container } = render(<ReconnectBanner visible={false} />);
+    expect(screen.queryByRole("status")).toBeNull();
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders nothing on initial mount with readyState CONNECTING (no prior OPEN)", () => {
-    const { container } = render(<ReconnectBanner readyState={WebSocket.CONNECTING} />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("renders nothing when readyState is OPEN", () => {
-    const { container } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("stays hidden through first-time connect flow (CLOSED → CONNECTING → OPEN)", () => {
-    const { container, rerender } = render(<ReconnectBanner readyState={WebSocket.CLOSED} />);
-    expect(container.firstChild).toBeNull();
-    rerender(<ReconnectBanner readyState={WebSocket.CONNECTING} />);
-    expect(container.firstChild).toBeNull();
-    rerender(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("shows banner after OPEN → CLOSED (true reconnect)", () => {
-    const { rerender } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    rerender(<ReconnectBanner readyState={WebSocket.CLOSED} />);
+  it('renders "Reconnecting..." when visible is true', () => {
+    render(<ReconnectBanner visible={true} />);
     expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
-  });
-
-  it("shows banner after OPEN → CONNECTING (reconnect in progress)", () => {
-    const { rerender } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    rerender(<ReconnectBanner readyState={WebSocket.CONNECTING} />);
-    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
-  });
-
-  it("shows banner after OPEN → CLOSING", () => {
-    const { rerender } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    rerender(<ReconnectBanner readyState={WebSocket.CLOSING} />);
-    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
-  });
-
-  it("hides banner again once readyState returns to OPEN", () => {
-    const { container, rerender } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    rerender(<ReconnectBanner readyState={WebSocket.CLOSED} />);
-    expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
-    rerender(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    expect(container.firstChild).toBeNull();
   });
 
   it("exposes role=status / live region for a11y", () => {
-    const { rerender } = render(<ReconnectBanner readyState={WebSocket.OPEN} />);
-    rerender(<ReconnectBanner readyState={WebSocket.CLOSED} />);
+    render(<ReconnectBanner visible={true} />);
     const el = screen.getByRole("status");
     expect(el).toHaveTextContent(/reconnecting/i);
+  });
+
+  it("toggles cleanly on prop flip", () => {
+    const { rerender } = render(<ReconnectBanner visible={false} />);
+    expect(screen.queryByRole("status")).toBeNull();
+    rerender(<ReconnectBanner visible={true} />);
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    rerender(<ReconnectBanner visible={false} />);
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

@@ -464,7 +464,7 @@ function AppInner() {
 
   const sendRef = useRef<typeof send | null>(null);
 
-  const { connect, disconnect, send, readyState, error } = useGameSocket({
+  const { connect, disconnect, send, readyState, isReconnecting, error } = useGameSocket({
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
     onMessage: handleMessage,
   });
@@ -836,7 +836,7 @@ function AppInner() {
   );
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
-      <ReconnectBanner readyState={readyState} />
+      <ReconnectBanner visible={isReconnecting} />
       <main className="flex flex-col flex-1 min-h-0">
         {sessionPhase === "connect" && (
           <ErrorBoundary name="Connect">

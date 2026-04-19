@@ -4,32 +4,19 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import InputBar from "@/components/InputBar";
 
-// Integration RED test for story 37-26.
+// Integration test for story 37-26 — drives a MockWebSocket through the real
+// useWebSocket hook and asserts the prop contract between hook and banner:
 //
-// Renders a minimal host that mirrors App's wiring:
-//   - useWebSocket → readyState
-//   - <ReconnectBanner readyState={readyState} />
-//   - <InputBar disabled={readyState !== WebSocket.OPEN} ... />
-//
-// Drives a MockWebSocket through OPEN → CLOSE and asserts:
-//   AC-1/AC-4: banner appears when socket closes
-//   AC-3: input disabled during disconnect, re-enabled on reopen
+//   - isReconnecting stays false on initial load (B1)
+//   - isReconnecting flips true on unintentional drop (AC-1/AC-4)
+//   - isReconnecting stays false on intentional disconnect (B2)
+//   - InputBar disabled tracks readyState !== OPEN (AC-3)
+//   - reconnect flips isReconnecting back to false
 
 // ---------------------------------------------------------------------------
-// MockWebSocket — mirrors useWebSocket-teardown.test.ts shape
+// MockWebSocket
 // ---------------------------------------------------------------------------
-type MockInstance = {
-  url: string;
-  readyState: number;
-  onopen: ((ev: Event) => void) | null;
-  onclose: ((ev: CloseEvent) => void) | null;
-  onerror: ((ev: Event) => void) | null;
-  onmessage: ((ev: MessageEvent) => void) | null;
-  send: (_: unknown) => void;
-  close: (code?: number) => void;
-};
-
-const instances: MockInstance[] = [];
+const instances: MockWebSocket[] = [];
 
 class MockWebSocket {
   static CONNECTING = 0;
@@ -45,29 +32,7 @@ class MockWebSocket {
 
   constructor(url: string) {
     this.url = url;
-    const inst: MockInstance = {
-      url,
-      readyState: MockWebSocket.CONNECTING,
-      onopen: null,
-      onclose: null,
-      onerror: null,
-      onmessage: null,
-      send: () => {},
-      close: (code = 1006) => {
-        this.readyState = MockWebSocket.CLOSED;
-        inst.readyState = MockWebSocket.CLOSED;
-        this.onclose?.({ code } as CloseEvent);
-      },
-    };
-    Object.defineProperty(inst, "onopen", {
-      get: () => this.onopen,
-      set: (v) => (this.onopen = v),
-    });
-    Object.defineProperty(inst, "onclose", {
-      get: () => this.onclose,
-      set: (v) => (this.onclose = v),
-    });
-    instances.push(inst);
+    instances.push(this);
   }
 
   send() {}
@@ -77,14 +42,16 @@ class MockWebSocket {
   }
 }
 
+function latest() {
+  return instances[instances.length - 1];
+}
 function openLatest() {
-  const ws = instances[instances.length - 1] as unknown as MockWebSocket;
+  const ws = latest();
   ws.readyState = MockWebSocket.OPEN;
   ws.onopen?.(new Event("open"));
 }
-
 function closeLatest(code = 1006) {
-  const ws = instances[instances.length - 1] as unknown as MockWebSocket;
+  const ws = latest();
   ws.readyState = MockWebSocket.CLOSED;
   ws.onclose?.({ code } as CloseEvent);
 }
@@ -102,14 +69,15 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // Host — minimal mirror of App's wiring
 // ---------------------------------------------------------------------------
-function Host() {
-  const { readyState } = useWebSocket<unknown>({
+function Host({ onReady }: { onReady?: (disconnect: () => void) => void } = {}) {
+  const { readyState, isReconnecting, disconnect } = useWebSocket<unknown>({
     url: "ws://test/socket",
     onMessage: () => {},
   });
+  if (onReady) onReady(disconnect);
   return (
     <>
-      <ReconnectBanner readyState={readyState} />
+      <ReconnectBanner visible={isReconnecting} />
       <InputBar
         onSend={() => {}}
         disabled={readyState !== WebSocket.OPEN}
@@ -121,8 +89,13 @@ function Host() {
 describe("Reconnect wiring integration (37-26)", () => {
   it("does NOT show banner on initial page load (B1 regression)", () => {
     render(<Host />);
-    // Before the first OPEN, readyState is CLOSED/CONNECTING. Banner must
-    // stay hidden or we'll lie to first-load users.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("does NOT show banner through first-time connect (CLOSED → CONNECTING → OPEN)", () => {
+    render(<Host />);
+    expect(screen.queryByRole("status")).toBeNull();
+    act(() => openLatest());
     expect(screen.queryByRole("status")).toBeNull();
   });
 
@@ -134,7 +107,7 @@ describe("Reconnect wiring integration (37-26)", () => {
     expect(input.disabled).toBe(false);
   });
 
-  it("shows banner and disables input when socket drops after first open", () => {
+  it("shows banner and disables input when socket drops unintentionally", () => {
     render(<Host />);
     act(() => openLatest());
     act(() => closeLatest(1006));
@@ -143,14 +116,25 @@ describe("Reconnect wiring integration (37-26)", () => {
     expect(input.disabled).toBe(true);
   });
 
+  it("does NOT show banner on intentional disconnect (B2 regression)", () => {
+    let disconnectFn: (() => void) | null = null;
+    render(<Host onReady={(d) => (disconnectFn = d)} />);
+    act(() => openLatest());
+    expect(disconnectFn).not.toBeNull();
+    act(() => disconnectFn!());
+    // Intentional close: readyState will eventually be CLOSED, but banner
+    // must stay hidden because the caller asked for it.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("re-enables input and hides banner on reconnect", () => {
     render(<Host />);
     act(() => openLatest());
     act(() => closeLatest(1006));
-    // useWebSocket schedules a reconnect timer (initial backoff = 1000ms).
-    // Fast-forward fake timers, then open the new mock socket.
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    // Drain any pending reconnect timer regardless of backoff delay.
     act(() => {
-      vi.advanceTimersByTime(1100);
+      vi.runAllTimers();
     });
     act(() => openLatest());
     expect(screen.queryByRole("status")).toBeNull();
