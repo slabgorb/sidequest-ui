@@ -24,6 +24,7 @@ import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOv
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { GenresResponse } from "@/types/genres";
+import { ReconnectBanner } from "@/components/ReconnectBanner";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
@@ -835,6 +836,7 @@ function AppInner() {
   );
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
+      <ReconnectBanner readyState={readyState} />
       <main className="flex flex-col flex-1 min-h-0">
         {sessionPhase === "connect" && (
           <ErrorBoundary name="Connect">
