@@ -272,31 +272,45 @@ export function ConnectScreen({
           <div className="flex flex-col md:flex-row gap-8 w-full">
             {/* Left column — genre + world radio lists */}
             <div className="flex flex-col gap-6 md:w-64 shrink-0">
-              <section>
+              <section className="flex flex-col min-h-0">
                 <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
                   Genre
+                  <span className="not-italic text-muted-foreground/40 ml-1">
+                    ({genreItems.length})
+                  </span>
                 </h2>
-                <OptionList
-                  ariaLabel="Genre"
-                  items={genreItems}
-                  selected={genreSlug}
-                  onSelect={setGenreSlug}
-                  disabled={isConnecting}
-                />
+                {/* Cap height so the list scrolls inside its frame instead
+                    of pushing the page below the fold; ensures Sebastien-
+                    type players see all packs without needing to discover
+                    that the page itself scrolls. */}
+                <div className="max-h-[40vh] flex flex-col min-h-0">
+                  <OptionList
+                    ariaLabel="Genre"
+                    items={genreItems}
+                    selected={genreSlug}
+                    onSelect={setGenreSlug}
+                    disabled={isConnecting}
+                  />
+                </div>
               </section>
 
               {currentPack && worldItems.length > 0 && (
-                <section>
+                <section className="flex flex-col min-h-0">
                   <h2 className="text-xs uppercase tracking-widest text-muted-foreground/50 mb-2">
                     World
+                    <span className="not-italic text-muted-foreground/40 ml-1">
+                      ({worldItems.length})
+                    </span>
                   </h2>
-                  <OptionList
-                    ariaLabel="World"
-                    items={worldItems}
-                    selected={worldSlug}
-                    onSelect={setWorldSlug}
-                    disabled={isConnecting}
-                  />
+                  <div className="max-h-[40vh] flex flex-col min-h-0">
+                    <OptionList
+                      ariaLabel="World"
+                      items={worldItems}
+                      selected={worldSlug}
+                      onSelect={setWorldSlug}
+                      disabled={isConnecting}
+                    />
+                  </div>
                 </section>
               )}
             </div>

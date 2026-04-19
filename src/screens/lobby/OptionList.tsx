@@ -86,7 +86,8 @@ export function OptionList({
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
-      className="flex flex-col w-full"
+      className="flex flex-col w-full overflow-y-auto min-h-0
+                 [scrollbar-gutter:stable] [scrollbar-width:thin]"
     >
       {items.map((item) => {
         const isSelected = item.slug === selected;
@@ -109,7 +110,7 @@ export function OptionList({
               focus-visible:outline-none focus-visible:bg-muted/20
               ${
                 isSelected
-                  ? "border-l-foreground/60 text-foreground"
+                  ? "border-l-accent bg-accent/10 text-foreground font-semibold"
                   : "border-l-transparent text-foreground/60 hover:border-l-muted-foreground/40 hover:text-foreground/85"
               }
             `}
