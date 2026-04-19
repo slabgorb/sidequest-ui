@@ -1,5 +1,5 @@
 import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import InputBar from "@/components/InputBar";
@@ -92,6 +92,11 @@ function closeLatest(code = 1006) {
 beforeEach(() => {
   instances.length = 0;
   vi.stubGlobal("WebSocket", MockWebSocket);
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // ---------------------------------------------------------------------------
@@ -114,6 +119,13 @@ function Host() {
 }
 
 describe("Reconnect wiring integration (37-26)", () => {
+  it("does NOT show banner on initial page load (B1 regression)", () => {
+    render(<Host />);
+    // Before the first OPEN, readyState is CLOSED/CONNECTING. Banner must
+    // stay hidden or we'll lie to first-load users.
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("hides banner and enables input when connected", () => {
     render(<Host />);
     act(() => openLatest());
@@ -122,7 +134,7 @@ describe("Reconnect wiring integration (37-26)", () => {
     expect(input.disabled).toBe(false);
   });
 
-  it("shows banner and disables input when socket drops", () => {
+  it("shows banner and disables input when socket drops after first open", () => {
     render(<Host />);
     act(() => openLatest());
     act(() => closeLatest(1006));
@@ -135,16 +147,14 @@ describe("Reconnect wiring integration (37-26)", () => {
     render(<Host />);
     act(() => openLatest());
     act(() => closeLatest(1006));
-    // useWebSocket schedules a reconnect timer; it will create a new
-    // MockWebSocket. Fast-forward through backoff.
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        act(() => openLatest());
-        expect(screen.queryByRole("status")).toBeNull();
-        const input = screen.getByRole("textbox") as HTMLInputElement;
-        expect(input.disabled).toBe(false);
-        resolve();
-      }, 1100);
+    // useWebSocket schedules a reconnect timer (initial backoff = 1000ms).
+    // Fast-forward fake timers, then open the new mock socket.
+    act(() => {
+      vi.advanceTimersByTime(1100);
     });
+    act(() => openLatest());
+    expect(screen.queryByRole("status")).toBeNull();
+    const input = screen.getByRole("textbox") as HTMLInputElement;
+    expect(input.disabled).toBe(false);
   });
 });
