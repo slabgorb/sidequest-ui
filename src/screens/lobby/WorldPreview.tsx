@@ -23,44 +23,72 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
   // render" pattern (preferred over useEffect for prop-derived resets,
   // see https://react.dev/learn/you-might-not-need-an-effect#adjusting-state-when-a-prop-changes)
   // so eslint-plugin-react-hooks/set-state-in-effect doesn't fire.
-  const [imageFailed, setImageFailed] = useState(false);
+  // Image state machine: 'idle' (no image to load), 'loading' (fetching),
+  // 'loaded' (visible), 'failed' (network/decode error). Reset on world swap.
+  type ImageStatus = "idle" | "loading" | "loaded" | "failed";
+  const initialStatus: ImageStatus = world?.hero_image ? "loading" : "idle";
+  const [imageStatus, setImageStatus] = useState<ImageStatus>(initialStatus);
   const [trackedSlug, setTrackedSlug] = useState<string | null>(world?.slug ?? null);
   if ((world?.slug ?? null) !== trackedSlug) {
     setTrackedSlug(world?.slug ?? null);
-    setImageFailed(false);
+    setImageStatus(initialStatus);
   }
 
   if (!pack || !world) {
+    const prompt = !pack
+      ? "Choose a genre to see what awaits."
+      : "Choose a world.";
     return (
       <div className="flex-1 flex items-center justify-center text-center px-6 min-h-[18rem]">
-        <p className="text-base italic text-muted-foreground/50">
-          Choose a genre to see what awaits.
-        </p>
+        <p className="text-base italic text-muted-foreground/50">{prompt}</p>
       </div>
     );
   }
 
   const toneChips = getToneChips(world.axis_snapshot);
-  const showImage = world.hero_image && !imageFailed;
+  const hasImage = Boolean(world.hero_image);
+
+  // Pick the placeholder copy for the *non-loaded* states. Three explicit
+  // copies so a player (and Sebastien with a debugger open) can tell at a
+  // glance whether the image is loading, missing, or failed to fetch.
+  const placeholderCopy =
+    imageStatus === "loading"
+      ? "loading the page…"
+      : imageStatus === "failed"
+      ? "the page tore in transit"
+      : "the page is faded…";
 
   return (
     <div className="flex-1 flex flex-col gap-4 px-6">
       {/* Hero image frame — fixed aspect ratio so layout doesn't jump. */}
       <div className="relative w-full aspect-video overflow-hidden rounded border border-muted-foreground/20 bg-muted/10">
-        {showImage ? (
+        {hasImage && imageStatus !== "failed" && (
           <img
             src={world.hero_image!}
             alt={`${world.name} — ${world.setting ?? pack.name}`}
             className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
             onLoad={(e) => {
               (e.currentTarget as HTMLImageElement).style.opacity = "1";
+              setImageStatus("loaded");
             }}
-            onError={() => setImageFailed(true)}
+            onError={() => setImageStatus("failed")}
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
+        )}
+        {imageStatus !== "loaded" && (
+          <div
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2"
+            role={imageStatus === "loading" ? "status" : undefined}
+            aria-live={imageStatus === "failed" ? "polite" : undefined}
+          >
+            {imageStatus === "loading" && (
+              <span
+                className="block w-5 h-5 rounded-full border-2 border-muted-foreground/30
+                           border-t-foreground/60 animate-spin"
+                aria-hidden="true"
+              />
+            )}
             <p className="text-sm italic text-muted-foreground/40 tracking-wide">
-              the page is faded…
+              {placeholderCopy}
             </p>
           </div>
         )}
