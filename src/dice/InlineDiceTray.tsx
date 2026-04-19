@@ -189,10 +189,11 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
   // Auto-roll when a new DiceRequest arrives for the rolling player.
   // No gesture needed — the beat button click is the intent signal.
   //
-  // Short pre-roll pause (story 37-25): let the "need X" readout register
-  // with the player before the physics fires. Without it the die starts
-  // tumbling on the same frame the target appears and the number blurs
-  // past unread — players lose the tension beat of knowing what they need.
+  // Pre-roll pause: give the table 1500ms to read the target before the
+  // physics fires. Alex needs time to parse "need 12"; Sebastien wants to
+  // see the mechanical target before the outcome. Too short and the number
+  // blurs past unread; too long and it feels laggy. 1.5s is the tabletop
+  // "DM calls the target, then picks up the die" beat.
   useEffect(() => {
     if (!diceRequest) return;
     if (diceRequest.request_id === lastRequestIdRef.current) return;
@@ -205,7 +206,7 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
       setThrowParams(params);
       setPendingLocalParams(params);
       setRollKey((k) => k + 1);
-    }, 100);
+    }, 1500);
     return () => clearTimeout(timer);
   }, [diceRequest, isRollingPlayer]);
 
@@ -248,11 +249,23 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
 
   return (
     <div data-testid="inline-dice-tray" className="mt-3 flex flex-col" style={{ flex: 1 }}>
-      {/* Compact info line — only when a request is active */}
+      {/* Target banner — prominent so the table can read it before the roll.
+          Shows DC (the number the total beats) as the big target; modifier
+          is secondary context. Stays visible through the roll and result,
+          replaced when the next beat builds a new DiceRequest. */}
       {diceRequest && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1 px-1">
-          <span>
-            DC {diceRequest.difficulty} · {diceRequest.stat} {formatModifier(diceRequest.modifier)} · need {needed}
+        <div
+          data-testid="dice-target-banner"
+          className="flex items-center justify-center gap-2 mb-2 px-3 py-2 rounded border border-border bg-muted/40"
+        >
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Target
+          </span>
+          <span className="text-2xl font-bold text-foreground leading-none">
+            {diceRequest.difficulty}
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            ({diceRequest.stat} {formatModifier(diceRequest.modifier)} · need {needed} on d20)
           </span>
         </div>
       )}
@@ -288,7 +301,11 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
           />
         </Canvas>
 
-        {/* Result readout — overlaid at bottom of canvas */}
+        {/* Result readout — "Rolled N vs Target M — Outcome".
+            Persists alongside the target banner above until the next beat
+            issues a new DiceRequest (App.tsx clears on new request / on
+            confrontation end). Tabletop parity: the DM never erases the
+            target number mid-resolution. */}
         {diceResult && (
           <div
             data-testid="dice-result"
@@ -299,26 +316,21 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
               left: "50%",
               transform: "translateX(-50%)",
               display: "flex",
-              alignItems: "center",
-              gap: 12,
+              alignItems: "baseline",
+              gap: 10,
+              padding: "6px 12px",
+              background: "rgba(0, 0, 0, 0.55)",
+              borderRadius: 6,
               pointerEvents: "none",
+              whiteSpace: "nowrap",
+              fontFamily: "serif",
+              textShadow: "0 2px 8px rgba(0,0,0,0.8)",
             }}
           >
+            <span style={{ fontSize: 12, color: "#a8a29e" }}>Rolled</span>
             <span
               style={{
-                fontSize: 14,
-                color: "var(--foreground, #e8e0d0)",
-                background: "var(--muted, rgba(255,255,255,0.1))",
-                borderRadius: 4,
-                padding: "2px 6px",
-                fontFamily: "serif",
-              }}
-            >
-              {diceResult.rolls.flatMap((r) => r.faces).join(", ")}
-            </span>
-            <span
-              style={{
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: 700,
                 color:
                   diceResult.outcome === "CritSuccess"
@@ -327,24 +339,28 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
                       ? "#ef4444"
                       : diceResult.outcome === "Success"
                         ? "#e8e0d0"
-                        : "#9ca3af",
-                textShadow: "0 2px 8px rgba(0,0,0,0.6)",
-                fontFamily: "serif",
+                        : "#fca5a5",
+                lineHeight: 1,
               }}
             >
               {diceResult.total}
             </span>
+            <span style={{ fontSize: 12, color: "#a8a29e" }}>
+              vs {diceResult.difficulty}
+            </span>
             <span
               style={{
-                fontSize: 12,
-                fontWeight: 600,
+                fontSize: 14,
+                fontWeight: 700,
+                marginLeft: 4,
                 color:
                   diceResult.outcome === "CritSuccess"
                     ? "#22c55e"
                     : diceResult.outcome === "CritFail"
                       ? "#ef4444"
-                      : "var(--muted-foreground, #8a7a6a)",
-                fontFamily: "serif",
+                      : diceResult.outcome === "Success"
+                        ? "#e8e0d0"
+                        : "#fca5a5",
               }}
             >
               {diceResult.outcome === "CritSuccess"

@@ -161,18 +161,16 @@ function AppInner() {
   // sent with DiceThrow so the server can apply beat + narrate in one tick.
   const pendingBeatIdRef = useRef<string | null>(null);
 
-  // Auto-dismiss dice overlay after result settles (story 34-12 fix).
-  // The overlay stays interactive until the result animation plays; then we
-  // clear both request and result so the overlay unmounts and pointer events
-  // return to the game board.
+  // Dice overlay persists after result so the table can see "rolled N vs
+  // target M → outcome" until the next beat begins. Cleared by: (a) a new
+  // DiceRequest arriving (DICE_REQUEST handler below), (b) a local beat
+  // click (handleBeatSelect sets a fresh request), (c) the confrontation
+  // ending — handled by the effect below.
   useEffect(() => {
-    if (!diceResult) return;
-    const timer = setTimeout(() => {
-      setDiceRequest(null);
-      setDiceResult(null);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [diceResult]);
+    if (confrontationData) return;
+    setDiceRequest(null);
+    setDiceResult(null);
+  }, [confrontationData]);
 
   // Bug 2: Persist critical state to sessionStorage for HMR survival
   useEffect(() => {
