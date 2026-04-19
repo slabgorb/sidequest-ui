@@ -35,6 +35,13 @@ export interface UseWebSocketReturn {
   connected: boolean;
   /** Raw WebSocket readyState value. */
   readyState: number;
+  /**
+   * True when the socket has previously been OPEN, was not closed intentionally
+   * by the caller, and is currently not OPEN — i.e. a user-visible reconnect
+   * is in progress. Distinct from `!connected`, which is also true during
+   * first-time connect and after intentional disconnect.
+   */
+  isReconnecting: boolean;
   /** Open a connection (no-op if already connected). */
   connect: () => void;
   /** Close the connection intentionally (suppresses reconnect). */
@@ -73,10 +80,17 @@ export function useWebSocket<T>({
 }: UseWebSocketOptions<T>): UseWebSocketReturn {
   const [readyState, setReadyState] = useState<number>(WebSocket.CLOSED);
   const [error, setError] = useState<Event | null>(null);
+  // Reactive "have we ever successfully opened?" flag. Must be state (not a
+  // ref) so downstream `isReconnecting` recomputes when it flips.
+  const [hasEverOpened, setHasEverOpened] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Reactive mirror of intentionalClose so `isReconnecting` updates when the
+  // caller invokes disconnect(). The ref is kept for the event-handler
+  // synchronous read path inside onclose.
   const intentionalCloseRef = useRef(false);
+  const [intentionalClose, setIntentionalClose] = useState(false);
   const retryDelayRef = useRef(INITIAL_BACKOFF_MS);
 
   // Callback refs — prevent stale closures without re-running effects
@@ -133,6 +147,7 @@ export function useWebSocket<T>({
     ws.onopen = () => {
       setReadyState(WebSocket.OPEN);
       setError(null);
+      setHasEverOpened(true);
       retryDelayRef.current = INITIAL_BACKOFF_MS; // reset on success
     };
 
@@ -174,6 +189,7 @@ export function useWebSocket<T>({
   const connect = useCallback(() => {
     clearReconnectTimer();
     intentionalCloseRef.current = false;
+    setIntentionalClose(false);
     retryDelayRef.current = INITIAL_BACKOFF_MS;
     createSocket();
   }, [createSocket, clearReconnectTimer]);
@@ -181,6 +197,7 @@ export function useWebSocket<T>({
   const disconnect = useCallback(() => {
     clearReconnectTimer();
     intentionalCloseRef.current = true;
+    setIntentionalClose(true);
     wsRef.current?.close();
   }, [clearReconnectTimer]);
 
@@ -216,11 +233,15 @@ export function useWebSocket<T>({
   useEffect(() => {
     if (autoConnect) {
       intentionalCloseRef.current = false;
+      setIntentionalClose(false);
       createSocket();
     }
 
     return () => {
       intentionalCloseRef.current = true;
+      // Do NOT mirror to setIntentionalClose here — this fires during
+      // StrictMode effect cleanup, and flagging the unmount as an intentional
+      // close would misreport isReconnecting for the remounted component.
       clearReconnectTimer();
       const ws = wsRef.current;
       if (ws) {
@@ -231,6 +252,11 @@ export function useWebSocket<T>({
   }, [url, autoConnect, createSocket, clearReconnectTimer]);
 
   const connected = readyState === WebSocket.OPEN;
+  // Only "reconnecting" when we've had a successful connection, the caller
+  // hasn't intentionally closed, and we're not currently OPEN. This is the
+  // signal ReconnectBanner renders on — first-time connect and intentional
+  // disconnect both resolve to false.
+  const isReconnecting = hasEverOpened && !intentionalClose && !connected;
 
-  return { connected, readyState, connect, disconnect, send, error };
+  return { connected, readyState, isReconnecting, connect, disconnect, send, error };
 }

@@ -10,6 +10,7 @@ export interface UseGameSocketOptions {
 
 export interface UseGameSocketReturn {
   readyState: number;
+  isReconnecting: boolean;
   connect: () => void;
   disconnect: () => void;
   send: (message: GameMessage) => void;
@@ -41,6 +42,7 @@ export function useGameSocket({
 
   return {
     readyState: ws.readyState,
+    isReconnecting: ws.isReconnecting,
     connect: ws.connect,
     disconnect: ws.disconnect,
     send: ws.send as (message: GameMessage) => void,
