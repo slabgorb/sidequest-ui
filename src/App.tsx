@@ -735,9 +735,15 @@ function AppInner() {
   // saved in SQLite).
   useEffect(() => {
     if (autoReconnectAttempted.current) return;
+    // Latch unconditionally on first run. Previously we only set this when
+    // `loadSession()` returned truthy, which meant a subsequent handleConnect
+    // identity change (e.g. from `send` re-memoizing) could re-enter this
+    // effect *after* the Begin click had written a saved session. That
+    // fired handleConnect a second time and caused the server to run the
+    // opening-hook resolution twice per Begin (playtest 2026-04-22).
+    autoReconnectAttempted.current = true;
     const saved = loadSession();
     if (!saved) return;
-    autoReconnectAttempted.current = true;
     handleConnect(saved.playerName, saved.genre, saved.world);
   }, [handleConnect]);
 
