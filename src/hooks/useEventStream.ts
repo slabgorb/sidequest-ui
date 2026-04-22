@@ -5,6 +5,7 @@ type Args = { wsUrl: string; slug: string; playerId: string; onMessage?: (m: any
 
 export function useEventStream({ wsUrl, slug, playerId, onMessage }: Args) {
   const [events, setEvents] = useState<PeerEvent[]>([]);
+  const [offline, setOffline] = useState(false);
   const storeRef = useRef<PeerEventStore | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
@@ -24,12 +25,15 @@ export function useEventStream({ wsUrl, slug, playerId, onMessage }: Args) {
 
       ws = new WebSocket(wsUrl);
       ws.onopen = () => {
+        setOffline(false);
         ws!.send(JSON.stringify({
           type: 'SESSION_EVENT',
           player_id: playerId,
           payload: { event: 'connect', game_slug: slug, last_seen_seq: lastSeen },
         }));
       };
+      ws.onerror = () => { setOffline(true); };
+      ws.onclose = () => { setOffline(true); };
       ws.onmessage = async (ev) => {
         const m = JSON.parse(ev.data);
         onMessageRef.current?.(m);
@@ -44,5 +48,5 @@ export function useEventStream({ wsUrl, slug, playerId, onMessage }: Args) {
     return () => { cancelled = true; ws?.close(); };
   }, [wsUrl, slug, playerId]);
 
-  return { events };
+  return { events, offline };
 }

@@ -21,7 +21,7 @@ export function GameScreen({ mode }: { mode: 'solo' | 'multiplayer' }) {
     }
   }, []);
 
-  const { events } = useEventStream({
+  const { events, offline } = useEventStream({
     wsUrl: `ws://${location.host}/ws`,
     slug,
     playerId: name ?? '',
@@ -36,6 +36,11 @@ export function GameScreen({ mode }: { mode: 'solo' | 'multiplayer' }) {
         <NamePrompt setName={setName} />
       ) : (
         <>
+          {offline && (
+            <div data-testid="offline-banner">
+              Narrator unreachable — showing cached state (read-only)
+            </div>
+          )}
           <PausedBanner paused={paused} waitingFor={waitingFor} />
           <ol data-testid="narration-log">
             {narrations.map((e) => (
