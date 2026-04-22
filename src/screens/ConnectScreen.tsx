@@ -187,15 +187,35 @@ export function ConnectScreen({
   const canSubmit =
     playerName.trim() !== "" && genreSlug !== null && worldSlug !== null;
 
-  // New routing flow: POST /api/games → navigate to /solo/:slug or /play/:slug.
-  // Does not require a player name — identity is handled after routing.
-  const canStart = genreSlug !== null && worldSlug !== null;
+  // Start button: currently delegates to the legacy onConnect flow because
+  // the new /solo/:slug and /play/:slug routes render a half-wired GameScreen
+  // with no chargen, no input, no game board (scaffold only). Until the
+  // session view is feature-complete, Start must take players into the
+  // working AppInner tree. The `mode` + POST /api/games routing will be
+  // re-enabled once GameScreen mounts the full game UI.
+  const canStart = canSubmit;
 
   const handleStart = async () => {
     if (!canStart || !genreSlug || !worldSlug) return;
-    const url = await start({ genreSlug, worldSlug, mode });
-    navigate(url);
+    const trimmedName = playerName.trim();
+    try {
+      localStorage.setItem("sq:display-name", trimmedName);
+    } catch {
+      // non-critical
+    }
+    // Still create the server-side game record so /api/sessions reflects the
+    // session immediately (drives lobby's CurrentSessions panel for others).
+    try {
+      await start({ genreSlug, worldSlug, mode });
+    } catch {
+      // non-blocking — legacy connect flow recreates session state via WS
+    }
+    saveState(trimmedName, genreSlug, worldSlug);
+    appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
+    onConnect(trimmedName, genreSlug, worldSlug);
   };
+  // Keep navigate in scope in case we re-enable route navigation later.
+  void navigate;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,14 +410,16 @@ export function ConnectScreen({
           >
             ── ◇ ──
           </span>
-          {/* Start: new routing flow — POST /api/games → navigate. No player name required. */}
+          {/* Start: currently delegates to the legacy onConnect flow — the
+              /solo/:slug and /play/:slug routes render a stub GameScreen, so
+              we route through AppInner until it's feature-complete. */}
           <button
             type="button"
             onClick={handleStart}
             disabled={!canStart || isConnecting}
             title={
               !canStart
-                ? "Choose a genre and world to start"
+                ? "Enter your name and choose a genre and world"
                 : undefined
             }
             className="text-base italic text-foreground/70 hover:text-foreground
