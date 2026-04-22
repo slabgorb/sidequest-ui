@@ -25,6 +25,19 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
+// jsdom may not properly initialize localStorage. Add a polyfill if needed.
+if (!globalThis.localStorage || typeof localStorage.clear !== 'function') {
+  const storage: Record<string, string> = {};
+  globalThis.localStorage = {
+    getItem: (key: string) => storage[key] ?? null,
+    setItem: (key: string, value: string) => { storage[key] = value; },
+    removeItem: (key: string) => { delete storage[key]; },
+    clear: () => { Object.keys(storage).forEach(k => delete storage[k]); },
+    key: (index: number) => Object.keys(storage)[index] ?? null,
+    length: Object.keys(storage).length,
+  } as Storage;
+}
+
 // App.tsx persists an HMR snapshot to sessionStorage so hot-reloads don't
 // lose game state. Tests that render <App /> in a loop leak that snapshot
 // across tests — the second test sees a fully-hydrated App skipping the

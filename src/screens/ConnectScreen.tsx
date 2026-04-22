@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AudioEngine } from "@/audio/AudioEngine";
 import type { GenresResponse, GenreMeta, WorldMeta } from "@/types/genres";
 import { OptionList, type OptionItem } from "./lobby/OptionList";
@@ -7,6 +8,8 @@ import { CurrentSessions } from "./lobby/CurrentSessions";
 import { useSessions } from "./lobby/useSessions";
 import { JourneyHistory } from "./lobby/JourneyHistory";
 import { appendHistory, type JourneyEntry } from "./lobby/historyStore";
+import { ModePicker, type GameMode } from "./lobby/ModePicker";
+import { useStartGame } from "./lobby/useStartGame";
 
 export interface ConnectScreenProps {
   onConnect: (playerName: string, genre: string, world: string) => void;
@@ -74,6 +77,9 @@ export function ConnectScreen({
   const [worldSlug, setWorldSlug] = useState<string | null>(
     saved.world ?? null,
   );
+  const [mode, setMode] = useState<GameMode>("solo");
+  const { start } = useStartGame();
+  const navigate = useNavigate();
 
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
@@ -140,6 +146,16 @@ export function ConnectScreen({
     return currentPack.worlds.find((w) => w.slug === worldSlug) ?? null;
   }, [currentPack, worldSlug]);
 
+  // When genres load, auto-select if there is exactly one genre and no genre
+  // is yet selected. Mirrors the world auto-select logic below.
+  useEffect(() => {
+    const slugs = Object.keys(genres);
+    if (slugs.length === 1 && genreSlug === null) {
+      setGenreSlug(slugs[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genres]);
+
   // When the genre changes, pick a sensible default world:
   //   1. Respect the saved world if it's valid in this genre (initial mount only).
   //   2. Otherwise, if there's exactly one world, auto-select it.
@@ -170,6 +186,16 @@ export function ConnectScreen({
 
   const canSubmit =
     playerName.trim() !== "" && genreSlug !== null && worldSlug !== null;
+
+  // New routing flow: POST /api/games → navigate to /solo/:slug or /play/:slug.
+  // Does not require a player name — identity is handled after routing.
+  const canStart = genreSlug !== null && worldSlug !== null;
+
+  const handleStart = async () => {
+    if (!canStart || !genreSlug || !worldSlug) return;
+    const url = await start({ genreSlug, worldSlug, mode });
+    navigate(url);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,8 +341,15 @@ export function ConnectScreen({
               )}
             </div>
 
-            {/* Right column — world preview */}
-            <WorldPreview pack={currentPack} world={currentWorld} />
+            {/* Right column — world preview + mode picker */}
+            <div className="flex-1 flex flex-col gap-4">
+              <WorldPreview pack={currentPack} world={currentWorld} />
+              {worldSlug && (
+                <div className="px-6">
+                  <ModePicker value={mode} onChange={setMode} />
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -357,12 +390,14 @@ export function ConnectScreen({
           >
             ── ◇ ──
           </span>
+          {/* Start: new routing flow — POST /api/games → navigate. No player name required. */}
           <button
-            type="submit"
-            disabled={!canSubmit || isConnecting}
+            type="button"
+            onClick={handleStart}
+            disabled={!canStart || isConnecting}
             title={
-              !canSubmit
-                ? "Enter your name and choose a genre and world"
+              !canStart
+                ? "Choose a genre and world to start"
                 : undefined
             }
             className="text-base italic text-foreground/70 hover:text-foreground
@@ -372,7 +407,24 @@ export function ConnectScreen({
                        focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
                        rounded px-8 py-2.5 cursor-pointer tracking-wide"
           >
-            Begin
+            Start
+          </button>
+          {/* Begin: legacy WebSocket flow — requires player name. */}
+          <button
+            type="submit"
+            disabled={!canSubmit || isConnecting}
+            title={
+              !canSubmit
+                ? "Enter your name and choose a genre and world"
+                : undefined
+            }
+            className="text-sm italic text-foreground/50 hover:text-foreground/70
+                       disabled:text-muted-foreground/20 disabled:cursor-default
+                       transition-all bg-transparent border-0
+                       focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
+                       rounded px-4 py-1 cursor-pointer tracking-wide"
+          >
+            Begin (legacy)
           </button>
         </div>
       </form>

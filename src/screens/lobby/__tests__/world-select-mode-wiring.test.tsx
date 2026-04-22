@@ -1,0 +1,82 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { installWebAudioMock, installLocalStorageMock } from '@/audio/__tests__/web-audio-mock';
+import { AudioEngine } from '@/audio/AudioEngine';
+import App from '../../../App';
+
+const GENRES_RESPONSE = {
+  low_fantasy: {
+    name: 'Low Fantasy',
+    description: '',
+    worlds: [
+      {
+        slug: 'moldharrow-keep',
+        name: 'Moldharrow Keep',
+        description: '',
+        era: null,
+        setting: null,
+        axis_snapshot: {},
+        inspirations: [],
+        hero_image: null,
+      },
+    ],
+  },
+};
+
+const GAME_RESPONSE = {
+  slug: '2026-04-22-moldharrow-keep',
+  mode: 'multiplayer',
+  genre_slug: 'low_fantasy',
+  world_slug: 'moldharrow-keep',
+  resumed: false,
+};
+
+describe('world-select mode wiring', () => {
+  beforeEach(() => {
+    AudioEngine.resetInstance();
+    installWebAudioMock();
+    installLocalStorageMock();
+  });
+
+  afterEach(() => {
+    AudioEngine.resetInstance();
+    vi.unstubAllGlobals();
+  });
+
+  it('sends mode + world to POST /api/games and navigates to the returned URL', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      // Sessions polling — always return empty list
+      if (typeof url === 'string' && url.startsWith('/api/sessions')) {
+        return Promise.resolve({ ok: true, json: async () => ({ sessions: [] }) });
+      }
+      // Genres fetch
+      if (typeof url === 'string' && url === '/api/genres') {
+        return Promise.resolve({ ok: true, json: async () => GENRES_RESPONSE });
+      }
+      // Start game POST
+      if (typeof url === 'string' && url === '/api/games' && opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, status: 201, json: async () => GAME_RESPONSE });
+      }
+      return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>);
+
+    await waitFor(() => screen.getByRole('radio', { name: /Moldharrow Keep/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /Moldharrow Keep/i }));
+    fireEvent.click(screen.getByRole('radio', { name: /multiplayer/i }));
+    fireEvent.click(screen.getByRole('button', { name: /start/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/games', expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"mode":"multiplayer"'),
+      }));
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('game-screen')).toHaveAttribute('data-mode', 'multiplayer');
+    });
+  });
+});
