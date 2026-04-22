@@ -104,14 +104,14 @@ export function OptionList({
             className={`
               flex items-baseline justify-between
               w-full text-left px-3 py-1.5
-              bg-transparent border-0 border-l-2
+              bg-transparent border-0 border-l-4
               transition-colors cursor-pointer
               disabled:cursor-default disabled:opacity-40
               focus-visible:outline-none focus-visible:bg-muted/20
               ${
                 isSelected
-                  ? "border-l-accent bg-accent/10 text-foreground font-semibold"
-                  : "border-l-transparent text-foreground/60 hover:border-l-muted-foreground/40 hover:text-foreground/85"
+                  ? "border-l-accent bg-accent/25 text-foreground font-semibold ring-1 ring-accent/30"
+                  : "border-l-transparent text-foreground/60 hover:border-l-muted-foreground/40 hover:bg-muted/20 hover:text-foreground/85"
               }
             `}
           >

@@ -286,13 +286,14 @@ export function ConnectScreen({
             id="player-name"
             type="text"
             aria-label="Player name"
+            autoFocus
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
-            className="w-full bg-transparent border-0 border-b border-muted-foreground/20
+            className="w-full bg-transparent border-0 border-b border-muted-foreground/40
                        text-center text-lg text-foreground/90
-                       focus:outline-none focus:border-muted-foreground/50
-                       placeholder:text-muted-foreground/20"
-            placeholder="…"
+                       focus:outline-none focus:border-muted-foreground
+                       placeholder:text-muted-foreground/60"
+            placeholder="Enter your name…"
             disabled={isConnecting}
           />
         </div>
@@ -361,14 +362,17 @@ export function ConnectScreen({
               )}
             </div>
 
-            {/* Right column — world preview + mode picker */}
+            {/* Right column — mode picker + world preview. Mode sits above
+                the preview so it doesn't feel like a footnote buried beneath
+                the world description — Sebastien-tier readers need mode to
+                read as a real decision. */}
             <div className="flex-1 flex flex-col gap-4">
-              <WorldPreview pack={currentPack} world={currentWorld} />
               {worldSlug && (
                 <div className="px-6">
                   <ModePicker value={mode} onChange={setMode} />
                 </div>
               )}
+              <WorldPreview pack={currentPack} world={currentWorld} />
             </div>
           </div>
         )}
@@ -430,23 +434,6 @@ export function ConnectScreen({
                        rounded px-8 py-2.5 cursor-pointer tracking-wide"
           >
             Start
-          </button>
-          {/* Begin: legacy WebSocket flow — requires player name. */}
-          <button
-            type="submit"
-            disabled={!canSubmit || isConnecting}
-            title={
-              !canSubmit
-                ? "Enter your name and choose a genre and world"
-                : undefined
-            }
-            className="text-sm italic text-foreground/50 hover:text-foreground/70
-                       disabled:text-muted-foreground/20 disabled:cursor-default
-                       transition-all bg-transparent border-0
-                       focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
-                       rounded px-4 py-1 cursor-pointer tracking-wide"
-          >
-            Begin (legacy)
           </button>
         </div>
       </form>
