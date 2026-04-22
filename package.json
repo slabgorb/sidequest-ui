@@ -50,6 +50,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.4.0",
     "idb": "^8.0.3",
+    "jest-websocket-mock": "^2.5.0",
     "jsdom": "^29.0.1",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
