@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDisplayName } from '../hooks/useDisplayName';
+import { useEventStream } from '../hooks/useEventStream';
 import { PausedBanner } from '../components/PausedBanner';
 
 export function GameScreen({ mode }: { mode: 'solo' | 'multiplayer' }) {
@@ -9,30 +10,25 @@ export function GameScreen({ mode }: { mode: 'solo' | 'multiplayer' }) {
   const [paused, setPaused] = useState(false);
   const [waitingFor, setWaitingFor] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (!name || !slug) return;
-    const ws = new WebSocket(`ws://${location.host}/ws`);
-    ws.onopen = () =>
-      ws.send(
-        JSON.stringify({
-          type: 'SESSION_EVENT',
-          player_id: name,
-          payload: { event: 'connect', game_slug: slug },
-        }),
-      );
-    ws.onmessage = (ev) => {
-      const m = JSON.parse(ev.data as string) as { type: string; payload: { waiting_for: string[] } };
-      if (m.type === 'GAME_PAUSED') {
-        setPaused(true);
-        setWaitingFor(m.payload.waiting_for);
-      }
-      if (m.type === 'GAME_RESUMED') {
-        setPaused(false);
-        setWaitingFor([]);
-      }
-    };
-    return () => ws.close();
-  }, [name, slug]);
+  const handleMessage = useCallback((m: { type: string; payload?: { waiting_for?: string[] } }) => {
+    if (m.type === 'GAME_PAUSED') {
+      setPaused(true);
+      setWaitingFor(m.payload?.waiting_for ?? []);
+    }
+    if (m.type === 'GAME_RESUMED') {
+      setPaused(false);
+      setWaitingFor([]);
+    }
+  }, []);
+
+  const { events } = useEventStream({
+    wsUrl: `ws://${location.host}/ws`,
+    slug,
+    playerId: name ?? '',
+    onMessage: handleMessage,
+  });
+
+  const narrations = events.filter((e) => e.kind === 'NARRATION');
 
   return (
     <div data-testid="game-screen" data-mode={mode} data-slug={slug}>
@@ -41,7 +37,11 @@ export function GameScreen({ mode }: { mode: 'solo' | 'multiplayer' }) {
       ) : (
         <>
           <PausedBanner paused={paused} waitingFor={waitingFor} />
-          {/* rest of game UI */}
+          <ol data-testid="narration-log">
+            {narrations.map((e) => (
+              <li key={e.seq}>{(e.payload as any).text}</li>
+            ))}
+          </ol>
         </>
       )}
     </div>

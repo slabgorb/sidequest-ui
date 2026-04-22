@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { PeerEventStore, type PeerEvent } from '../lib/peerEventStore';
 
-type Args = { wsUrl: string; slug: string; playerId: string };
+type Args = { wsUrl: string; slug: string; playerId: string; onMessage?: (m: any) => void };
 
-export function useEventStream({ wsUrl, slug, playerId }: Args) {
+export function useEventStream({ wsUrl, slug, playerId, onMessage }: Args) {
   const [events, setEvents] = useState<PeerEvent[]>([]);
   const storeRef = useRef<PeerEventStore | null>(null);
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
 
   useEffect(() => {
+    if (!slug || !playerId) return;
     let cancelled = false;
     let ws: WebSocket | null = null;
 
@@ -29,6 +32,7 @@ export function useEventStream({ wsUrl, slug, playerId }: Args) {
       };
       ws.onmessage = async (ev) => {
         const m = JSON.parse(ev.data);
+        onMessageRef.current?.(m);
         if (m.payload && typeof m.payload.seq === 'number') {
           const peerEv: PeerEvent = { seq: m.payload.seq, kind: m.type, payload: m.payload };
           await store.append(peerEv);
