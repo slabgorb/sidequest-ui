@@ -124,6 +124,12 @@ function AppInner() {
   const [canType, setCanType] = useState(true);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
+  // Set by handleConnect to signal "the initial SESSION_EVENT{connect} is
+  // already in flight". Consumed by the mid-session reconnect effect below
+  // to suppress a duplicate connect on the very first WS OPEN transition.
+  // Without this the server runs opening-hook resolution twice per Begin
+  // (playtest 2026-04-22).
+  const justConnectedRef = useRef(false);
 
   // Overlay data from server messages
   const [characterSheet, setCharacterSheet] = useState<CharacterSheetData | null>(null);
@@ -476,6 +482,7 @@ function AppInner() {
       saveSession(playerName, genre, world);
       setCurrentGenre(genre);
       setConnectedPlayerName(playerName);
+      justConnectedRef.current = true;
       connect();
       setConnected(true);
       setTimeout(() => {
@@ -776,6 +783,13 @@ function AppInner() {
     const wasDisconnected = prevReadyState.current !== WebSocket.OPEN;
     prevReadyState.current = readyState;
     if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
+      // Suppress the duplicate connect on the initial handshake: handleConnect
+      // already scheduled a SESSION_EVENT{connect} and sending another one here
+      // makes the server resolve the opening hook twice.
+      if (justConnectedRef.current) {
+        justConnectedRef.current = false;
+        return;
+      }
       const saved = loadSession();
       if (saved) {
         send({
