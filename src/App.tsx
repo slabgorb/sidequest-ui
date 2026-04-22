@@ -1,4 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Route, Routes } from "react-router-dom";
+import { GameScreen } from "@/screens/GameScreen";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
@@ -904,7 +906,7 @@ function AppInner() {
   );
 }
 
-function App() {
+function LobbyRoot() {
   const [isDashboard, setIsDashboard] = useState(
     () => window.location.hash === "#/dashboard",
   );
@@ -926,10 +928,25 @@ function App() {
   }
 
   return (
-    <GameStateProvider>
-      <AppInner />
-    </GameStateProvider>
+    <div data-testid="lobby-root">
+      <GameStateProvider>
+        <AppInner />
+      </GameStateProvider>
+    </div>
   );
 }
 
-export default App;
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<LobbyRoot />} />
+      <Route path="/solo/:slug" element={<GameScreen mode="solo" />} />
+      <Route path="/play/:slug" element={<GameScreen mode="multiplayer" />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  // In tests we wrap with MemoryRouter; in production the entry point (main.tsx) provides BrowserRouter.
+  return <AppRoutes />;
+}
