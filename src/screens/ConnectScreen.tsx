@@ -185,7 +185,8 @@ export function ConnectScreen({
   }, [currentPack, saved.world]);
 
   // Start requires only a world selection — player name is collected by
-  // GameScreen's NamePrompt after navigation.
+  // AppInner's NamePrompt when mounting at the slug route (if not already
+  // stored in localStorage under "sq:display-name").
   const canStart = genreSlug !== null && worldSlug !== null;
 
   const handleStart = async () => {

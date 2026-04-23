@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Route, Routes } from "react-router-dom";
-import { GameScreen } from "@/screens/GameScreen";
+import { Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import { CharacterCreation, type CreationScene } from "@/components/CharacterCreation/CharacterCreation";
 import { GameBoard } from "@/components/GameBoard/GameBoard";
@@ -40,10 +39,10 @@ type SessionPhase = "connect" | "creation" | "game";
 
 const SESSION_KEY = "sidequest-session";
 
+// SavedSession stores only the game_slug (MP-01 migration). The old
+// playerName+genre+world shape is gone — use game_slug for all reconnect paths.
 interface SavedSession {
-  playerName: string;
-  genre: string;
-  world: string;
+  gameSlug: string;
 }
 
 function loadSession(): SavedSession | null {
@@ -51,16 +50,16 @@ function loadSession(): SavedSession | null {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as SavedSession;
-    if (data.playerName && data.genre && data.world) return data;
+    if (data.gameSlug) return data;
     return null;
   } catch {
     return null;
   }
 }
 
-function saveSession(playerName: string, genre: string, world: string) {
+function saveSession(gameSlug: string) {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ playerName, genre, world }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ gameSlug }));
   } catch {
     // non-critical
   }
@@ -106,29 +105,98 @@ function saveHmrState(state: HmrState): void {
   }
 }
 
+// NamePrompt — shown in slug-mode when sq:display-name is not yet set.
+// Extracted as a standalone component so AppInner's slug-arrival branch
+// can render it without duplicating the ConnectScreen name field.
+// Decision: we do NOT reuse ConnectScreen here because ConnectScreen
+// requires genres data and the full lobby UI; at the slug-arrival point
+// we only need a name. Keep it minimal.
+function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const [v, setV] = useState("");
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 min-h-screen gap-8">
+      <div aria-hidden="true" className="text-muted-foreground/30 text-sm tracking-[0.5em]">
+        ── ◇ ──
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (v.trim()) onSubmit(v.trim());
+        }}
+        className="flex flex-col items-center gap-4 w-full max-w-sm"
+      >
+        <label className="flex flex-col gap-2 w-full text-center">
+          <span className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
+            What name shall be yours?
+          </span>
+          <input
+            value={v}
+            onChange={(e) => setV(e.target.value)}
+            autoFocus
+            aria-label="Player name"
+            className="w-full rounded border border-border bg-background px-4 py-2 text-center text-lg focus:outline-none focus:ring-2 focus:ring-primary/60"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={!v.trim()}
+          className="rounded bg-primary px-6 py-2 text-primary-foreground text-sm tracking-wide uppercase disabled:opacity-40"
+        >
+          Begin
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function AppInner() {
+  // Slug-mode: when mounted at /solo/:slug or /play/:slug, `slug` is present.
+  // AppInner skips ConnectScreen and drives the session-phase state machine
+  // directly from the slug-based connect SESSION_EVENT.
+  const { slug } = useParams<{ slug?: string }>();
+
+  // Display name — read from localStorage (sq:display-name).
+  // Set by ConnectScreen handleStart, or by NamePrompt in slug-mode.
+  const [displayName, setDisplayName] = useState<string | null>(
+    () => localStorage.getItem("sq:display-name"),
+  );
+
+  const handleNameSubmit = useCallback((name: string) => {
+    try {
+      localStorage.setItem("sq:display-name", name);
+    } catch {
+      // non-critical
+    }
+    setDisplayName(name);
+  }, []);
+
   // Bug 2: Hydrate from sessionStorage on mount (HMR recovery)
   const hmrState = loadHmrState();
+  // In slug-mode: don't restore "connect" phase from HMR — we drive phase
+  // transitions from the server response to our slug-based connect.
+  const initialPhase: SessionPhase = (() => {
+    if (hmrState?.sessionPhase) return hmrState.sessionPhase;
+    // In slug-mode we start at "connect" but skip the ConnectScreen — the
+    // slug-connect effect below fires immediately on mount.
+    return "connect";
+  })();
   const [messages, setMessages] = useState<GameMessage[]>(hmrState?.messages ?? []);
   const [connected, setConnected] = useState(false);
-  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(hmrState?.sessionPhase ?? "connect");
+  const [sessionPhase, setSessionPhase] = useState<SessionPhase>(initialPhase);
   const [creationScene, setCreationScene] = useState<CreationScene | null>(null);
   const [creationLoading, setCreationLoading] = useState(false);
   const [character, setCharacter] = useState<Record<string, unknown> | null>(hmrState?.character ?? null);
   const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
-  const [currentGenre, setCurrentGenre] = useState<string | null>(hmrState ? loadSession()?.genre ?? null : null);
+  const [currentGenre, setCurrentGenre] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   // Unified input lock: false after submit, true when narration arrives.
   // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
   const [canType, setCanType] = useState(true);
   const sessionPhaseRef = useRef<SessionPhase>("connect");
   const autoReconnectAttempted = useRef(false);
-  // Set by handleConnect to signal "the initial SESSION_EVENT{connect} is
-  // already in flight". Consumed by the mid-session reconnect effect below
-  // to suppress a duplicate connect on the very first WS OPEN transition.
-  // Without this the server runs opening-hook resolution twice per Begin
-  // (playtest 2026-04-22).
+  // Latched when slug-connect fires so the mid-session reconnect effect
+  // doesn't double-send SESSION_EVENT on the same WS OPEN transition.
   const justConnectedRef = useRef(false);
 
   // Overlay data from server messages
@@ -150,9 +218,7 @@ function AppInner() {
   const [partyResources, setPartyResources] = useState<Record<string, ResourcePool>>({});
 
   // Multiplayer identity — who this tab is and whose turn it is
-  const [connectedPlayerName, setConnectedPlayerName] = useState<string>(
-    () => loadSession()?.playerName ?? "",
-  );
+  const [connectedPlayerName, setConnectedPlayerName] = useState<string>("");
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
 
@@ -186,6 +252,8 @@ function AppInner() {
   }, [messages, sessionPhase, character]);
 
   // Fetch available genres from the server — never hardcode.
+  // Only needed in connect phase (for the lobby). In slug-mode we skip
+  // ConnectScreen so the genres fetch is still run but not blocking.
   // Response shape is `GenresResponse` (rich metadata per genre + world);
   // see `sidequest-server::list_genres` and `@/types/genres`.
   const fetchGenres = useCallback(() => {
@@ -458,7 +526,7 @@ function AppInner() {
       if (saved && sendRef.current) {
         sendRef.current({
           type: MessageType.SESSION_EVENT,
-          payload: { event: "connect", player_name: saved.playerName, genre: saved.genre, world: saved.world },
+          payload: { event: "connect", game_slug: saved.gameSlug },
           player_id: "",
         });
       }
@@ -476,25 +544,6 @@ function AppInner() {
   });
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
-
-  const handleConnect = useCallback(
-    (playerName: string, genre: string, world: string) => {
-      saveSession(playerName, genre, world);
-      setCurrentGenre(genre);
-      setConnectedPlayerName(playerName);
-      justConnectedRef.current = true;
-      connect();
-      setConnected(true);
-      setTimeout(() => {
-        send({
-          type: MessageType.SESSION_EVENT,
-          payload: { event: "connect", player_name: playerName, genre, world },
-          player_id: "",
-        });
-      }, 300);
-    },
-    [connect, send],
-  );
 
   const handleCreationRespond = useCallback(
     (payload: Record<string, unknown>) => {
@@ -685,11 +734,14 @@ function AppInner() {
     };
   }, [audio.engine]);
 
+  const navigate = useNavigate();
+
   // Scene harness: if ?scene=NAME is in the URL, POST to /dev/scene/:name
-  // to stage the save, then drive handleConnect with the returned
-  // coordinates. Dev harness only — requires the server running with
-  // DEV_SCENES=1. Blocks the normal autoReconnect path by flipping
-  // `autoReconnectAttempted` so the two don't race.
+  // to stage the save. Server returns { slug } (game_slug). Dev harness only —
+  // requires the server running with DEV_SCENES=1. Navigates to /solo/:slug
+  // so AppInner owns the WebSocket session via the slug-based flow.
+  // Blocks the normal autoReconnect path by flipping `autoReconnectAttempted`
+  // so the two don't race.
   //
   // Fail loud on any error: a broken scene harness load is a dev-side bug
   // that must be visible, not silently fall back to the manual ConnectScreen.
@@ -708,44 +760,62 @@ function AppInner() {
             throw new Error(`${r.status} ${body || r.statusText}`);
           });
         }
-        return r.json() as Promise<{
-          player_name: string;
-          genre: string;
-          world: string;
-          has_encounter: boolean;
-        }>;
+        return r.json() as Promise<{ slug: string }>;
       })
-      .then(({ player_name, genre, world }) => {
-        console.info(
-          `[scene-harness] loaded ${sceneName} → ${player_name}@${genre}/${world}`,
-        );
-        handleConnect(player_name, genre, world);
+      .then(({ slug: sceneSlug }) => {
+        console.info(`[scene-harness] loaded ${sceneName} → /solo/${sceneSlug}`);
+        navigate(`/solo/${sceneSlug}`);
       })
       .catch((err: Error) => {
         console.error("[scene-harness] failed:", err);
         window.alert(`Scene harness '${sceneName}' failed: ${err.message}`);
       });
-  }, [handleConnect]);
+  }, [navigate]);
 
-  // Auto-reconnect on page refresh if we have a saved session.
-  // This must run regardless of sessionPhase — after a server restart the
-  // client's HMR state may say "game" but the WebSocket is dead and the
-  // server has no session.  Re-sending the connect handshake lets the server
-  // restore the session (or route to character creation if there's nothing
-  // saved in SQLite).
+  // Auto-reconnect on page refresh if we have a saved session with a game_slug.
+  // Navigates to /solo/:slug — AppInner owns the WebSocket session.
+  // No fallback to the legacy genre+world+player path: if there is no slug,
+  // the session is stale (pre-MP-01) and must not be reconnected silently.
   useEffect(() => {
     if (autoReconnectAttempted.current) return;
-    // Latch unconditionally on first run. Previously we only set this when
-    // `loadSession()` returned truthy, which meant a subsequent handleConnect
-    // identity change (e.g. from `send` re-memoizing) could re-enter this
-    // effect *after* the Begin click had written a saved session. That
-    // fired handleConnect a second time and caused the server to run the
-    // opening-hook resolution twice per Begin (playtest 2026-04-22).
     autoReconnectAttempted.current = true;
     const saved = loadSession();
     if (!saved) return;
-    handleConnect(saved.playerName, saved.genre, saved.world);
-  }, [handleConnect]);
+    navigate(`/solo/${saved.gameSlug}`);
+  }, [navigate]);
+
+  // Slug-mode connect: when AppInner mounts at /solo/:slug or /play/:slug,
+  // fire SESSION_EVENT{connect, game_slug} immediately (or after name is set).
+  // The existing sessionPhase state machine takes over from the server response:
+  //   connected + !has_character → "creation"
+  //   ready                      → "game"
+  //
+  // This effect is the single connect entry point for the slug-based flow.
+  // Dependency on `displayName` means it re-fires after NamePrompt confirms —
+  // which is the intended behavior (we need a name before connecting).
+  const slugConnectFired = useRef(false);
+  useEffect(() => {
+    if (!slug) return;
+    if (!displayName) return; // Wait for NamePrompt
+    if (slugConnectFired.current) return;
+    slugConnectFired.current = true;
+    saveSession(slug);
+    setCurrentGenre(null); // Will be populated from PARTY_STATUS or theme events
+    setConnectedPlayerName(displayName);
+    justConnectedRef.current = true;
+    connect();
+    setConnected(true);
+    // Allow the WebSocket to open before sending the connect payload.
+    // 300ms gives the socket one event-loop tick to transition to OPEN
+    // before the SESSION_EVENT connect is sent.
+    setTimeout(() => {
+      sendRef.current?.({
+        type: MessageType.SESSION_EVENT,
+        payload: { event: "connect", game_slug: slug },
+        player_id: displayName,
+      });
+    }, 300);
+  }, [slug, displayName, connect]);
 
   // WebSocket OPEN transitions — two separate concerns, split into two effects
   // so the cleanup path doesn't depend on App-level `connected` state.
@@ -754,10 +824,10 @@ function AppInner() {
   // `readyState === OPEN && wasDisconnected && connected`. The `&& connected`
   // guard is a foot-gun on the initial page-reload path: when the WebSocket
   // first transitions to OPEN, App's `connected` state is still `false`
-  // (handleConnect hasn't completed yet). The effect's guard fails. By the
-  // time `connected` flips to true, `prevReadyState.current` has already been
-  // set to OPEN, so `wasDisconnected` is now false and the effect fails the
-  // guard a second time. Net result: on a server-restart + page-reload cycle,
+  // (the slug-connect effect hasn't completed yet). The effect's guard fails.
+  // By the time `connected` flips to true, `prevReadyState.current` has already
+  // been set to OPEN, so `wasDisconnected` is now false and the effect fails
+  // the guard a second time. Net result: on a server-restart + page-reload cycle,
   // the cleanup never runs, and any state that gets stuck during restoration
   // (canType=false, thinking=true) stays stuck until the user leaves the
   // session. See ping-pong playtest 2026-04-11 "InputBar stuck disabled".
@@ -781,17 +851,16 @@ function AppInner() {
   // (2) Re-handshake on reconnect — keeps the original conservative gate.
   // Only re-sends the SESSION_EVENT "connect" payload when the app was
   // previously `connected` (i.e. this is a genuine mid-session reconnect,
-  // not the first page-load handshake, which is already handled by
-  // `handleConnect` via the autoReconnect effect above). The ref-flip has
-  // to happen in this effect — effect (1) only reads `prevReadyState.current`
-  // and leaves it untouched so effect (2) can still observe the transition.
+  // not the first page-load handshake which is handled by the slug-connect
+  // effect above). Uses game_slug — no legacy genre+world+player fallback.
   useEffect(() => {
     const wasDisconnected = prevReadyState.current !== WebSocket.OPEN;
     prevReadyState.current = readyState;
     if (readyState === WebSocket.OPEN && wasDisconnected && connected) {
-      // Suppress the duplicate connect on the initial handshake: handleConnect
-      // already scheduled a SESSION_EVENT{connect} and sending another one here
-      // makes the server resolve the opening hook twice.
+      // Suppress the duplicate connect on the initial handshake: the
+      // slug-connect effect already scheduled a SESSION_EVENT{connect}
+      // and sending another one here makes the server resolve the opening
+      // hook twice.
       if (justConnectedRef.current) {
         justConnectedRef.current = false;
         return;
@@ -800,7 +869,7 @@ function AppInner() {
       if (saved) {
         send({
           type: MessageType.SESSION_EVENT,
-          payload: { event: "connect", player_name: saved.playerName, genre: saved.genre, world: saved.world },
+          payload: { event: "connect", game_slug: saved.gameSlug },
           player_id: "",
         });
       }
@@ -854,11 +923,18 @@ function AppInner() {
     () => activePlayerName ? (partyMembers.find((m) => m.name === activePlayerName)?.player_id ?? null) : null,
     [partyMembers, activePlayerName],
   );
+
+  // In slug-mode, if no display name yet, show the name prompt before
+  // connecting. Do not show ConnectScreen — the session already exists.
+  if (slug && !displayName) {
+    return <NamePrompt onSubmit={handleNameSubmit} />;
+  }
+
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <ReconnectBanner visible={isReconnecting} />
       <main className="flex flex-col flex-1 min-h-0">
-        {sessionPhase === "connect" && (
+        {sessionPhase === "connect" && !slug && (
           <ErrorBoundary name="Connect">
             <ConnectScreen
               genres={genres}
@@ -920,6 +996,25 @@ function AppInner() {
             {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
           </ErrorBoundary>
         )}
+        {/* In slug-mode while sessionPhase is still "connect" (waiting for server
+            response after sending the slug-based SESSION_EVENT), show a connecting
+            indicator rather than the ConnectScreen (which requires genre selection). */}
+        {sessionPhase === "connect" && slug && (
+          <div className="flex flex-col items-center justify-center flex-1 min-h-screen gap-4">
+            <span
+              aria-hidden="true"
+              className="text-muted-foreground/30 text-sm tracking-[0.5em]"
+            >
+              ── ◇ ──
+            </span>
+            <p
+              role="status"
+              className="text-sm italic text-muted-foreground/50 animate-pulse"
+            >
+              The pages are turning…
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -959,8 +1054,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LobbyRoot />} />
-      <Route path="/solo/:slug" element={<GameScreen mode="solo" />} />
-      <Route path="/play/:slug" element={<GameScreen mode="multiplayer" />} />
+      <Route path="/solo/:slug" element={<LobbyRoot />} />
+      <Route path="/play/:slug" element={<LobbyRoot />} />
     </Routes>
   );
 }

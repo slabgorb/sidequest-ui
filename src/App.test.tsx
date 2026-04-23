@@ -95,8 +95,7 @@ describe("Wiring: App.tsx WebSocket OPEN-transition cleanup (playtest 2026-04-11
   it("keeps the reconnect handshake gated on `connected && wasDisconnected`", async () => {
     const src = await readAppSrc();
     // Effect (2): must still guard the re-handshake on `connected` so the
-    // first-mount path (which has its own handshake via handleConnect) doesn't
-    // double-fire.
+    // first-mount path (handled by the slug-connect effect) doesn't double-fire.
     expect(src).toMatch(
       /readyState\s*===\s*WebSocket\.OPEN\s*&&\s*wasDisconnected\s*&&\s*connected/,
     );
