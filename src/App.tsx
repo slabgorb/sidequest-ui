@@ -861,7 +861,6 @@ function AppInner() {
         {sessionPhase === "connect" && (
           <ErrorBoundary name="Connect">
             <ConnectScreen
-              onConnect={handleConnect}
               genres={genres}
               isConnecting={isConnecting}
               error={socketError}

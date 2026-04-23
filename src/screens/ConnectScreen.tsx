@@ -12,7 +12,6 @@ import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 
 export interface ConnectScreenProps {
-  onConnect: (playerName: string, genre: string, world: string) => void;
   /**
    * Full genres response from `/api/genres`. Keyed by genre slug, each
    * value carries the pack's display name, description, and full world
@@ -61,7 +60,6 @@ function prettify(slug: string): string {
 }
 
 export function ConnectScreen({
-  onConnect,
   genres,
   isConnecting = false,
   error,
@@ -80,6 +78,8 @@ export function ConnectScreen({
   const [mode, setMode] = useState<GameMode>("solo");
   const { start } = useStartGame();
   const navigate = useNavigate();
+  const [startError, setStartError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
@@ -184,42 +184,15 @@ export function ConnectScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPack, saved.world]);
 
-  const canSubmit =
-    playerName.trim() !== "" && genreSlug !== null && worldSlug !== null;
-
-  // Start button: currently delegates to the legacy onConnect flow because
-  // the new /solo/:slug and /play/:slug routes render a half-wired GameScreen
-  // with no chargen, no input, no game board (scaffold only). Until the
-  // session view is feature-complete, Start must take players into the
-  // working AppInner tree. The `mode` + POST /api/games routing will be
-  // re-enabled once GameScreen mounts the full game UI.
-  const canStart = canSubmit;
+  // Start requires only a world selection — player name is collected by
+  // GameScreen's NamePrompt after navigation.
+  const canStart = genreSlug !== null && worldSlug !== null;
 
   const handleStart = async () => {
     if (!canStart || !genreSlug || !worldSlug) return;
-    const trimmedName = playerName.trim();
-    try {
-      localStorage.setItem("sq:display-name", trimmedName);
-    } catch {
-      // non-critical
-    }
-    // Still create the server-side game record so /api/sessions reflects the
-    // session immediately (drives lobby's CurrentSessions panel for others).
-    try {
-      await start({ genreSlug, worldSlug, mode });
-    } catch {
-      // non-blocking — legacy connect flow recreates session state via WS
-    }
-    saveState(trimmedName, genreSlug, worldSlug);
-    appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
-    onConnect(trimmedName, genreSlug, worldSlug);
-  };
-  // Keep navigate in scope in case we re-enable route navigation later.
-  void navigate;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit || !genreSlug || !worldSlug) return;
+    if (isStarting) return;
+    setStartError(null);
+    setIsStarting(true);
 
     // Unlock AudioContext on this user gesture — browsers require a
     // click/tap before audio can play.
@@ -229,9 +202,34 @@ export function ConnectScreen({
       // Audio unlock is best-effort; never block game entry.
     }
 
-    saveState(playerName, genreSlug, worldSlug);
-    appendHistory({ player_name: playerName, genre: genreSlug, world: worldSlug });
-    onConnect(playerName, genreSlug, worldSlug);
+    let url: string;
+    try {
+      url = await start({ genreSlug, worldSlug, mode });
+    } catch (err) {
+      setStartError(
+        err instanceof Error ? err.message : "Failed to start game. Please try again.",
+      );
+      setIsStarting(false);
+      return;
+    } finally {
+      // Belt-and-suspenders: ensure isStarting is cleared even on
+      // unexpected throws above (setIsStarting(false) is idempotent).
+      setIsStarting(false);
+    }
+
+    // Only write side-effects after start() succeeds — avoid phantom
+    // "Past journeys" entries for sessions that were never created.
+    const trimmedName = playerName.trim();
+    if (trimmedName) {
+      try {
+        localStorage.setItem("sq:display-name", trimmedName);
+      } catch {
+        // non-critical
+      }
+      saveState(trimmedName, genreSlug, worldSlug);
+      appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
+    }
+    navigate(url);
   };
 
   // Click handler for "Past journeys" rows. Prefills all three fields
@@ -271,7 +269,7 @@ export function ConnectScreen({
       </span>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => { e.preventDefault(); void handleStart(); }}
         className="flex flex-col items-center gap-8 w-full max-w-4xl"
       >
         {/* Name prompt */}
@@ -389,10 +387,11 @@ export function ConnectScreen({
           />
         )}
 
-        {/* Error */}
-        {error && (
+        {/* Error — covers both the prop-passed connection error and start() failures.
+            Both sources are joined so neither silently masks the other. */}
+        {[error, startError].filter(Boolean).join(" — ") && (
           <p role="alert" className="text-sm italic text-destructive/70">
-            {error}
+            {[error, startError].filter(Boolean).join(" — ")}
           </p>
         )}
 
@@ -414,16 +413,13 @@ export function ConnectScreen({
           >
             ── ◇ ──
           </span>
-          {/* Start: currently delegates to the legacy onConnect flow — the
-              /solo/:slug and /play/:slug routes render a stub GameScreen, so
-              we route through AppInner until it's feature-complete. */}
           <button
             type="button"
             onClick={handleStart}
-            disabled={!canStart || isConnecting}
+            disabled={!canStart || isConnecting || isStarting}
             title={
               !canStart
-                ? "Enter your name and choose a genre and world"
+                ? "Choose a genre and world to begin"
                 : undefined
             }
             className="text-base italic text-foreground/70 hover:text-foreground
@@ -433,7 +429,7 @@ export function ConnectScreen({
                        focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
                        rounded px-8 py-2.5 cursor-pointer tracking-wide"
           >
-            Start
+            {isStarting ? "Starting..." : "Start"}
           </button>
         </div>
       </form>
