@@ -78,6 +78,7 @@ export function ConnectScreen({
   const [mode, setMode] = useState<GameMode>("solo");
   const { start } = useStartGame();
   const navigate = useNavigate();
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
@@ -188,6 +189,7 @@ export function ConnectScreen({
 
   const handleStart = async () => {
     if (!canStart || !genreSlug || !worldSlug) return;
+    setStartError(null);
 
     // Unlock AudioContext on this user gesture — browsers require a
     // click/tap before audio can play.
@@ -197,6 +199,18 @@ export function ConnectScreen({
       // Audio unlock is best-effort; never block game entry.
     }
 
+    let url: string;
+    try {
+      url = await start({ genreSlug, worldSlug, mode });
+    } catch (err) {
+      setStartError(
+        err instanceof Error ? err.message : "Failed to start game. Please try again.",
+      );
+      return;
+    }
+
+    // Only write side-effects after start() succeeds — avoid phantom
+    // "Past journeys" entries for sessions that were never created.
     const trimmedName = playerName.trim();
     if (trimmedName) {
       try {
@@ -207,7 +221,6 @@ export function ConnectScreen({
       saveState(trimmedName, genreSlug, worldSlug);
       appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
     }
-    const url = await start({ genreSlug, worldSlug, mode });
     navigate(url);
   };
 
@@ -366,10 +379,10 @@ export function ConnectScreen({
           />
         )}
 
-        {/* Error */}
-        {error && (
+        {/* Error — covers both the prop-passed connection error and start() failures */}
+        {(error || startError) && (
           <p role="alert" className="text-sm italic text-destructive/70">
-            {error}
+            {error ?? startError}
           </p>
         )}
 

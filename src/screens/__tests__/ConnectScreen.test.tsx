@@ -81,7 +81,7 @@ describe("ConnectScreen", () => {
       if (typeof url === "string" && url.startsWith("/api/sessions")) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [] }) });
       }
-      if (typeof url === "string" && url === "/api/games" && (opts as RequestInit | undefined)?.method === "POST") {
+      if (typeof url === "string" && url === "/api/games" && opts?.method === "POST") {
         return Promise.resolve({
           ok: true,
           status: 201,
@@ -271,6 +271,57 @@ describe("ConnectScreen", () => {
       expect(
         screen.getByLabelText(/what name shall be yours/i),
       ).toHaveValue("");
+    });
+  });
+
+  // -- start() failure path ---------------------------------------------------
+  describe("start() failure handling", () => {
+    it("shows an error and does not write localStorage when start() fails", async () => {
+      // Override the default fetch mock: /api/games returns 500.
+      globalThis.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (typeof url === "string" && url.startsWith("/api/sessions")) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [] }) });
+        }
+        if (typeof url === "string" && url === "/api/games" && opts?.method === "POST") {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: () => Promise.resolve({}),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }) as unknown as typeof fetch;
+
+      // Pre-load a valid saved state so genre + world are auto-selected and
+      // the Start button is enabled on first render.
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          playerName: "Rincewind",
+          genre: "low_fantasy",
+          world: "greyhawk",
+        }),
+      );
+
+      const user = userEvent.setup();
+      renderConnect({ genres: GENRES });
+
+      await user.click(screen.getByRole("button", { name: /start/i }));
+
+      // Error alert must be visible.
+      const alert = await screen.findByRole("alert");
+      expect(alert).toBeInTheDocument();
+      expect(alert.textContent).toMatch(/start game failed/i);
+
+      // sidequest-connect must not have been updated by this failed attempt —
+      // the pre-loaded value is still present but no new write happened during
+      // the failed handleStart. Since the pre-loaded value was written before
+      // render (not by handleStart), it's present; what matters is that the
+      // journey history (sidequest-history) was NOT written.
+      expect(localStorage.getItem("sidequest-history")).toBeNull();
+
+      // The sq:display-name key must also not have been written.
+      expect(localStorage.getItem("sq:display-name")).toBeNull();
     });
   });
 });
