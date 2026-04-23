@@ -274,6 +274,143 @@ describe("ConnectScreen", () => {
     });
   });
 
+  // -- in-flight spinner + double-click guard ---------------------------------
+  describe("isStarting guard", () => {
+    /**
+     * Helper: set up localStorage so genre + world are pre-selected, then
+     * return a deferred fetch that the caller can resolve/reject manually.
+     */
+    function setupDeferredStart() {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          playerName: "Rincewind",
+          genre: "low_fantasy",
+          world: "greyhawk",
+        }),
+      );
+
+      let resolveStart!: (r: Response) => void;
+      const deferred = new Promise<Response>((resolve) => {
+        resolveStart = resolve;
+      });
+
+      globalThis.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (typeof url === "string" && url.startsWith("/api/sessions")) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [] }) });
+        }
+        if (typeof url === "string" && url === "/api/games" && opts?.method === "POST") {
+          return deferred;
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }) as unknown as typeof fetch;
+
+      return { resolveStart };
+    }
+
+    it("disables Start button while POST /api/games is in flight", async () => {
+      const user = userEvent.setup();
+      const { resolveStart } = setupDeferredStart();
+
+      renderConnect({ genres: GENRES });
+
+      const btn = screen.getByRole("button", { name: /start/i });
+      await user.click(btn);
+
+      // While the fetch is in-flight the button should be disabled and
+      // show "Starting..." to give the user feedback.
+      expect(screen.getByRole("button", { name: /starting\.\.\./i })).toBeDisabled();
+
+      // Resolve the deferred fetch so the component settles.
+      resolveStart(
+        new Response(JSON.stringify({ slug: "test-slug", mode: "solo" }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      // After resolution the button is gone (navigation happened) — just
+      // verify no error appeared.
+      await screen.findByRole("button", { name: /start/i }).then(
+        () => {},
+        () => {}, // navigation unmounts the button — that's fine
+      );
+    });
+
+    it("ignores repeated Start clicks while in flight", async () => {
+      const user = userEvent.setup();
+      const { resolveStart } = setupDeferredStart();
+
+      renderConnect({ genres: GENRES });
+
+      const btn = screen.getByRole("button", { name: /start/i });
+
+      // First click starts the POST.
+      await user.click(btn);
+
+      // Synchronously clicking the now-disabled button should not fire a
+      // second fetch call. userEvent respects the disabled attribute, so
+      // click is a no-op here — which is exactly what we want to verify.
+      await user.click(btn);
+
+      // Only one call to /api/games should have been made.
+      const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+      const gameCalls = fetchMock.mock.calls.filter(
+        ([url, opts]: [string, RequestInit]) =>
+          url === "/api/games" && opts?.method === "POST",
+      );
+      expect(gameCalls).toHaveLength(1);
+
+      resolveStart(
+        new Response(JSON.stringify({ slug: "test-slug", mode: "solo" }), {
+          status: 201,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+  });
+
+  // -- combined error display --------------------------------------------------
+  describe("combined error display", () => {
+    it("shows both external error and startError together", async () => {
+      // Make /api/games return 500 so start() sets startError.
+      globalThis.fetch = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (typeof url === "string" && url.startsWith("/api/sessions")) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [] }) });
+        }
+        if (typeof url === "string" && url === "/api/games" && opts?.method === "POST") {
+          return Promise.resolve({
+            ok: false,
+            status: 500,
+            json: () => Promise.resolve({}),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      }) as unknown as typeof fetch;
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          playerName: "Rincewind",
+          genre: "low_fantasy",
+          world: "greyhawk",
+        }),
+      );
+
+      const user = userEvent.setup();
+      // Pass an external connection error via the prop.
+      renderConnect({ genres: GENRES, error: "Lost connection" });
+
+      await user.click(screen.getByRole("button", { name: /start/i }));
+
+      // The single alert region should contain BOTH messages.
+      const alert = await screen.findByRole("alert");
+      expect(alert.textContent).toContain("Lost connection");
+      expect(alert.textContent).toContain("start game failed");
+      expect(alert.textContent).toContain(" — ");
+    });
+  });
+
   // -- start() failure path ---------------------------------------------------
   describe("start() failure handling", () => {
     it("shows an error and does not write localStorage when start() fails", async () => {

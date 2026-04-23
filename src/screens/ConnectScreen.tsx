@@ -79,6 +79,7 @@ export function ConnectScreen({
   const { start } = useStartGame();
   const navigate = useNavigate();
   const [startError, setStartError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Live multiplayer presence — drives both the per-world "X here"
   // annotations on the world list and the CurrentSessions panel below
@@ -189,7 +190,9 @@ export function ConnectScreen({
 
   const handleStart = async () => {
     if (!canStart || !genreSlug || !worldSlug) return;
+    if (isStarting) return;
     setStartError(null);
+    setIsStarting(true);
 
     // Unlock AudioContext on this user gesture — browsers require a
     // click/tap before audio can play.
@@ -206,7 +209,12 @@ export function ConnectScreen({
       setStartError(
         err instanceof Error ? err.message : "Failed to start game. Please try again.",
       );
+      setIsStarting(false);
       return;
+    } finally {
+      // Belt-and-suspenders: ensure isStarting is cleared even on
+      // unexpected throws above (setIsStarting(false) is idempotent).
+      setIsStarting(false);
     }
 
     // Only write side-effects after start() succeeds — avoid phantom
@@ -379,10 +387,11 @@ export function ConnectScreen({
           />
         )}
 
-        {/* Error — covers both the prop-passed connection error and start() failures */}
-        {(error || startError) && (
+        {/* Error — covers both the prop-passed connection error and start() failures.
+            Both sources are joined so neither silently masks the other. */}
+        {[error, startError].filter(Boolean).join(" — ") && (
           <p role="alert" className="text-sm italic text-destructive/70">
-            {error ?? startError}
+            {[error, startError].filter(Boolean).join(" — ")}
           </p>
         )}
 
@@ -407,7 +416,7 @@ export function ConnectScreen({
           <button
             type="button"
             onClick={handleStart}
-            disabled={!canStart || isConnecting}
+            disabled={!canStart || isConnecting || isStarting}
             title={
               !canStart
                 ? "Choose a genre and world to begin"
@@ -420,7 +429,7 @@ export function ConnectScreen({
                        focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
                        rounded px-8 py-2.5 cursor-pointer tracking-wide"
           >
-            Start
+            {isStarting ? "Starting..." : "Start"}
           </button>
         </div>
       </form>
