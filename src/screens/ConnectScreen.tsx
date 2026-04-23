@@ -12,7 +12,6 @@ import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 
 export interface ConnectScreenProps {
-  onConnect: (playerName: string, genre: string, world: string) => void;
   /**
    * Full genres response from `/api/genres`. Keyed by genre slug, each
    * value carries the pack's display name, description, and full world
@@ -61,7 +60,6 @@ function prettify(slug: string): string {
 }
 
 export function ConnectScreen({
-  onConnect,
   genres,
   isConnecting = false,
   error,
@@ -184,15 +182,21 @@ export function ConnectScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPack, saved.world]);
 
-  const canSubmit =
-    playerName.trim() !== "" && genreSlug !== null && worldSlug !== null;
-
   // Start requires only a world selection — player name is collected by
   // GameScreen's NamePrompt after navigation.
   const canStart = genreSlug !== null && worldSlug !== null;
 
   const handleStart = async () => {
     if (!canStart || !genreSlug || !worldSlug) return;
+
+    // Unlock AudioContext on this user gesture — browsers require a
+    // click/tap before audio can play.
+    try {
+      await AudioEngine.getInstance().ensureResumed();
+    } catch {
+      // Audio unlock is best-effort; never block game entry.
+    }
+
     const trimmedName = playerName.trim();
     if (trimmedName) {
       try {
@@ -205,23 +209,6 @@ export function ConnectScreen({
     }
     const url = await start({ genreSlug, worldSlug, mode });
     navigate(url);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit || !genreSlug || !worldSlug) return;
-
-    // Unlock AudioContext on this user gesture — browsers require a
-    // click/tap before audio can play.
-    try {
-      await AudioEngine.getInstance().ensureResumed();
-    } catch {
-      // Audio unlock is best-effort; never block game entry.
-    }
-
-    saveState(playerName, genreSlug, worldSlug);
-    appendHistory({ player_name: playerName, genre: genreSlug, world: worldSlug });
-    onConnect(playerName, genreSlug, worldSlug);
   };
 
   // Click handler for "Past journeys" rows. Prefills all three fields
@@ -261,7 +248,7 @@ export function ConnectScreen({
       </span>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => { e.preventDefault(); void handleStart(); }}
         className="flex flex-col items-center gap-8 w-full max-w-4xl"
       >
         {/* Name prompt */}
