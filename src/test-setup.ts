@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest'
+// MP-03: PeerEventStore uses IndexedDB, and usePeerEventCache is mounted
+// inside AppInner. Any test that renders <App /> needs indexedDB in the
+// environment; jsdom doesn't ship it. Installing the polyfill globally
+// keeps individual test files from having to remember the import.
+import 'fake-indexeddb/auto'
 
 // Mock window.matchMedia for components using useBreakpoint.
 //
