@@ -26,6 +26,8 @@ import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { GenresResponse } from "@/types/genres";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
+import { PausedBanner } from "@/components/PausedBanner";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
@@ -155,20 +157,15 @@ function AppInner() {
   // directly from the slug-based connect SESSION_EVENT.
   const { slug } = useParams<{ slug?: string }>();
 
-  // Display name — read from localStorage (sq:display-name).
+  // Display name — persisted via useDisplayName (localStorage-backed).
   // Set by ConnectScreen handleStart, or by NamePrompt in slug-mode.
-  const [displayName, setDisplayName] = useState<string | null>(
-    () => localStorage.getItem("sq:display-name"),
+  // The hook syncs across component instances in the same tab so
+  // ConnectScreen's setName propagates to AppInner without a remount.
+  const { name: displayName, setName: setDisplayName } = useDisplayName();
+  const handleNameSubmit = useCallback(
+    (name: string) => setDisplayName(name),
+    [setDisplayName],
   );
-
-  const handleNameSubmit = useCallback((name: string) => {
-    try {
-      localStorage.setItem("sq:display-name", name);
-    } catch {
-      // non-critical
-    }
-    setDisplayName(name);
-  }, []);
 
   // Bug 2: Hydrate from sessionStorage on mount (HMR recovery)
   const hmrState = loadHmrState();
@@ -226,6 +223,13 @@ function AppInner() {
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>("");
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
+
+  // Pause-on-drop (MP-02): server broadcasts GAME_PAUSED when any seated
+  // player disconnects and GAME_RESUMED when all seated players are back.
+  // `pauseWaitingFor` carries the player_ids the server is waiting on so
+  // the PausedBanner can name them.
+  const [paused, setPaused] = useState(false);
+  const [pauseWaitingFor, setPauseWaitingFor] = useState<string[]>([]);
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
@@ -503,6 +507,21 @@ function AppInner() {
       return;
     }
 
+    // Pause-on-drop (MP-02) — server broadcasts these when seated-player
+    // presence changes. The banner is advisory only; PLAYER_ACTION is
+    // still blocked server-side while paused, so the UI just mirrors state.
+    if (msg.type === MessageType.GAME_PAUSED) {
+      const waitingFor = (msg.payload.waiting_for as string[] | undefined) ?? [];
+      setPaused(true);
+      setPauseWaitingFor(waitingFor);
+      return;
+    }
+    if (msg.type === MessageType.GAME_RESUMED) {
+      setPaused(false);
+      setPauseWaitingFor([]);
+      return;
+    }
+
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
@@ -716,6 +735,8 @@ function AppInner() {
     setConfrontationData(null);
     setDiceRequest(null);
     setDiceResult(null);
+    setPaused(false);
+    setPauseWaitingFor([]);
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
@@ -973,6 +994,7 @@ function AppInner() {
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <ReconnectBanner visible={isReconnecting} />
+      <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
       <main className="flex flex-col flex-1 min-h-0">
         {sessionPhase === "connect" && !slug && (
           <ErrorBoundary name="Connect">

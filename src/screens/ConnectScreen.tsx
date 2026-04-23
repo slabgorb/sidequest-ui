@@ -10,6 +10,7 @@ import { JourneyHistory } from "./lobby/JourneyHistory";
 import { appendHistory, type JourneyEntry } from "./lobby/historyStore";
 import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 export interface ConnectScreenProps {
   /**
@@ -77,6 +78,7 @@ export function ConnectScreen({
   );
   const [mode, setMode] = useState<GameMode>("solo");
   const { start } = useStartGame();
+  const { setName: setDisplayName } = useDisplayName();
   const navigate = useNavigate();
   const [startError, setStartError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -222,11 +224,10 @@ export function ConnectScreen({
     // "Past journeys" entries for sessions that were never created.
     const trimmedName = playerName.trim();
     if (trimmedName) {
-      try {
-        localStorage.setItem("sq:display-name", trimmedName);
-      } catch {
-        // non-critical
-      }
+      // Writes localStorage and fires the same-tab custom event so
+      // AppInner's useDisplayName instance picks up the name without a
+      // remount before we navigate to the slug route.
+      setDisplayName(trimmedName);
       saveState(trimmedName, genreSlug, worldSlug);
       appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
     }
