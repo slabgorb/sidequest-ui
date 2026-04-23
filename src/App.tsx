@@ -190,9 +190,10 @@ function AppInner() {
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
   // Slug-mode: metadata fetched from GET /api/games/:slug before WS connect fires.
-  // Null means "not yet loaded" (or no slug). gameMetaError surfaces in the alert region.
-  const [gameMeta, setGameMeta] = useState<{ genre_slug: string; world_slug: string; mode: string } | null>(null);
+  // gameMetaError surfaces in the alert region; retryCount re-runs the fetch when
+  // the user clicks Retry after a transient failure.
   const [gameMetaError, setGameMetaError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [thinking, setThinking] = useState(false);
   // Unified input lock: false after submit, true when narration arrives.
   // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
@@ -281,9 +282,9 @@ function AppInner() {
     fetchGenres();
   }, [fetchGenres]);
 
-  // (Metadata is fetched inline in the slug-connect effect below; no separate
-  // effect is needed. gameMeta state is set there too so the connecting
-  // indicator and chrome archetype can react to it.)
+  // Metadata is fetched inline in the slug-connect effect below; no separate
+  // effect needed. currentGenre is the only consumer — chrome archetype and
+  // GameBoard key both read currentGenre.
 
   // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
@@ -829,7 +830,6 @@ function AppInner() {
         // Seed genre state before WS connect fires so theming is applied
         // immediately — GameBoard key, chrome archetype, resource SFX all
         // depend on currentGenre being non-null on first game render.
-        setGameMeta(body);
         setCurrentGenre(body.genre_slug);
         saveSession(slug);
         setConnectedPlayerName(displayName);
@@ -849,11 +849,11 @@ function AppInner() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        slugConnectFired.current = false; // Allow retry on name resubmit
+        slugConnectFired.current = false; // Allow retry via retryCount increment
         setGameMetaError(err instanceof Error ? err.message : "Failed to load game metadata");
       });
     return () => { cancelled = true; };
-  }, [slug, displayName, connect]);
+  }, [slug, displayName, connect, retryCount]);
 
   // WebSocket OPEN transitions — two separate concerns, split into two effects
   // so the cleanup path doesn't depend on App-level `connected` state.
@@ -1049,9 +1049,22 @@ function AppInner() {
               ── ◇ ──
             </span>
             {alertError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {alertError}
-              </p>
+              <>
+                <p role="alert" className="text-sm text-destructive">
+                  {alertError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGameMetaError(null);
+                    slugConnectFired.current = false;
+                    setRetryCount((c) => c + 1);
+                  }}
+                  className="rounded bg-primary px-6 py-2 text-primary-foreground text-sm tracking-wide uppercase"
+                >
+                  Retry
+                </button>
+              </>
             ) : (
               <p
                 role="status"

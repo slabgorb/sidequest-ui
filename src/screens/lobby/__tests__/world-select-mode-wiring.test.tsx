@@ -74,6 +74,17 @@ describe('world-select mode wiring', () => {
       if (typeof url === 'string' && url === '/api/games' && opts?.method === 'POST') {
         return Promise.resolve({ ok: true, status: 201, json: async () => GAME_RESPONSE });
       }
+      // GET /api/games/:slug — AppInner fetches this on slug-route mount to seed
+      // currentGenre. Must return a valid GameResponse shape so the metadata gate
+      // is satisfied and the WS connect fires (not the error path).
+      if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url) && !opts?.method) {
+        return Promise.resolve(
+          new Response(JSON.stringify(GAME_RESPONSE), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
+      }
       return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -97,5 +108,9 @@ describe('world-select mode wiring', () => {
     await waitFor(() => {
       expect(screen.getByTestId('app')).toBeInTheDocument();
     });
+
+    // Critical #3: verify we are NOT on the error path — the alert role must
+    // not be present (i.e. GET /api/games/:slug succeeded, not 404'd).
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
