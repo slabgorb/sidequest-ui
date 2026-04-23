@@ -26,6 +26,10 @@ import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { GenresResponse } from "@/types/genres";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
+import { PausedBanner } from "@/components/PausedBanner";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { useDisplayName } from "@/hooks/useDisplayName";
+import { usePeerEventCache } from "@/hooks/usePeerEventCache";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
@@ -155,20 +159,15 @@ function AppInner() {
   // directly from the slug-based connect SESSION_EVENT.
   const { slug } = useParams<{ slug?: string }>();
 
-  // Display name — read from localStorage (sq:display-name).
+  // Display name — persisted via useDisplayName (localStorage-backed).
   // Set by ConnectScreen handleStart, or by NamePrompt in slug-mode.
-  const [displayName, setDisplayName] = useState<string | null>(
-    () => localStorage.getItem("sq:display-name"),
+  // The hook syncs across component instances in the same tab so
+  // ConnectScreen's setName propagates to AppInner without a remount.
+  const { name: displayName, setName: setDisplayName } = useDisplayName();
+  const handleNameSubmit = useCallback(
+    (name: string) => setDisplayName(name),
+    [setDisplayName],
   );
-
-  const handleNameSubmit = useCallback((name: string) => {
-    try {
-      localStorage.setItem("sq:display-name", name);
-    } catch {
-      // non-critical
-    }
-    setDisplayName(name);
-  }, []);
 
   // Bug 2: Hydrate from sessionStorage on mount (HMR recovery)
   const hmrState = loadHmrState();
@@ -226,6 +225,25 @@ function AppInner() {
   const [connectedPlayerName, setConnectedPlayerName] = useState<string>("");
   const [activePlayerName, setActivePlayerName] = useState<string | null>(null);
   const [turnStatusEntries, setTurnStatusEntries] = useState<TurnStatusEntry[]>([]);
+
+  // Pause-on-drop (MP-02): server broadcasts GAME_PAUSED when any seated
+  // player disconnects and GAME_RESUMED when all seated players are back.
+  // `pauseWaitingFor` carries the player_ids the server is waiting on so
+  // the PausedBanner can name them.
+  const [paused, setPaused] = useState(false);
+  const [pauseWaitingFor, setPauseWaitingFor] = useState<string[]>([]);
+
+  // MP-03 event cache — per-(slug, player) IndexedDB durable log of
+  // seq-carrying events. Populated as messages arrive; consulted at connect
+  // time via `getLatestSeq()` so the SESSION_EVENT carries the right
+  // `last_seen_seq` without the slug-connect effect needing to wait on
+  // async IDB open.
+  const { getLatestSeq: getCachedLatestSeq, appendEvent: appendCachedEvent } =
+    usePeerEventCache(slug, displayName);
+  // Seq-dedupe: MP-03 reconnect replays emit events we may already have in
+  // `messages`. Drop any (kind, seq) pair we've processed before so the
+  // narration log doesn't double-render on reconnect.
+  const seenEventKeysRef = useRef<Set<string>>(new Set());
 
   // Confrontation state from CONFRONTATION messages (structured encounters)
   const [confrontationData, setConfrontationData] = useState<ConfrontationData | null>(null);
@@ -308,6 +326,27 @@ function AppInner() {
   const { state: gameState } = useGameState();
 
   const handleMessage = useCallback((msg: GameMessage) => {
+    // MP-03 seq-dedupe + cache. Narrator-host tags durable events with
+    // `payload.seq`. On reconnect the server replays events > last_seen_seq
+    // which overlaps live events that arrived during the handshake — we
+    // drop any (type, seq) pair we've already processed and persist the
+    // first-seen copy to IndexedDB so future reconnects know our high-water
+    // mark. THINKING et al. don't carry seq and fall through unchanged.
+    const payloadSeq = (msg.payload as { seq?: number } | undefined)?.seq;
+    if (typeof payloadSeq === "number" && payloadSeq > 0) {
+      const key = `${msg.type}:${payloadSeq}`;
+      if (seenEventKeysRef.current.has(key)) {
+        return; // Replay duplicate — already rendered and cached
+      }
+      seenEventKeysRef.current.add(key);
+      // Fire-and-forget: IndexedDB latency must not block the render path.
+      // Errors here are non-fatal (we keep a stale high-water mark; next
+      // reconnect sees more replay) — log instead of throw.
+      void appendCachedEvent({ seq: payloadSeq, kind: msg.type, payload: msg.payload }).catch(
+        (err) => console.warn("[mp-03] peer cache append failed", err),
+      );
+    }
+
     // Thinking indicator: show on THINKING, hide on first content
     if (msg.type === MessageType.THINKING) {
       setThinking(true);
@@ -367,6 +406,11 @@ function AppInner() {
           setMessages((prev) =>
             prev.filter((m) => m.type === MessageType.SESSION_EVENT),
           );
+          // MP-03: messages are about to be re-populated by the server's
+          // last_seen_seq replay. Clear the seq-dedupe set in lockstep so
+          // replayed events aren't dropped as duplicates of the (now-gone)
+          // in-memory state.
+          seenEventKeysRef.current.clear();
         }
       }
       // Let theme_css events through to the messages array for useGenreTheme
@@ -503,6 +547,21 @@ function AppInner() {
       return;
     }
 
+    // Pause-on-drop (MP-02) — server broadcasts these when seated-player
+    // presence changes. The banner is advisory only; PLAYER_ACTION is
+    // still blocked server-side while paused, so the UI just mirrors state.
+    if (msg.type === MessageType.GAME_PAUSED) {
+      const waitingFor = (msg.payload.waiting_for as string[] | undefined) ?? [];
+      setPaused(true);
+      setPauseWaitingFor(waitingFor);
+      return;
+    }
+    if (msg.type === MessageType.GAME_RESUMED) {
+      setPaused(false);
+      setPauseWaitingFor([]);
+      return;
+    }
+
     // Capture overlay data from server — these update the panels/overlays
     if (msg.type === MessageType.MAP_UPDATE) {
       setMapData(msg.payload as unknown as MapState);
@@ -543,7 +602,7 @@ function AppInner() {
     }
 
     setMessages((prev) => [...prev, msg]);
-  }, [connectedPlayerName]);
+  }, [connectedPlayerName, appendCachedEvent]);
 
   const sendRef = useRef<typeof send | null>(null);
 
@@ -551,6 +610,22 @@ function AppInner() {
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
     onMessage: handleMessage,
   });
+
+  // MP-03 Task 8 — escalate from "reconnecting" to "offline" after 3s. The
+  // ReconnectBanner covers the first few seconds of a dropped socket; if
+  // recovery takes longer than that, we tell players the narrator is
+  // unreachable and the view is cached/read-only. Clears instantly on
+  // successful reconnect.
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    if (readyState === WebSocket.OPEN) {
+      setOffline(false);
+      return;
+    }
+    if (!isReconnecting) return;
+    const timer = setTimeout(() => setOffline(true), 3000);
+    return () => clearTimeout(timer);
+  }, [readyState, isReconnecting]);
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
 
@@ -716,6 +791,10 @@ function AppInner() {
     setConfrontationData(null);
     setDiceRequest(null);
     setDiceResult(null);
+    setPaused(false);
+    setPauseWaitingFor([]);
+    setOffline(false);
+    seenEventKeysRef.current.clear();
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
@@ -819,6 +898,11 @@ function AppInner() {
     if (!displayName) return; // Wait for NamePrompt
     if (slugConnectFired.current) return;
     slugConnectFired.current = true;
+    // MP-03: snapshot the peer cache high-water mark at the moment the
+    // effect fires. `getLatestSeq` is ref-backed so this is synchronous and
+    // reflects whatever IDB has loaded by now. If IDB hasn't resolved yet,
+    // we send 0 and accept an unnecessary replay (which dedupe handles).
+    const lastSeenSeq = getCachedLatestSeq();
     let cancelled = false;
     fetch(`/api/games/${encodeURIComponent(slug)}`)
       .then(async (resp) => {
@@ -842,7 +926,7 @@ function AppInner() {
         setTimeout(() => {
           sendRef.current?.({
             type: MessageType.SESSION_EVENT,
-            payload: { event: "connect", game_slug: slug },
+            payload: { event: "connect", game_slug: slug, last_seen_seq: lastSeenSeq },
             player_id: displayName,
           });
         }, 300);
@@ -853,7 +937,7 @@ function AppInner() {
         setGameMetaError(err instanceof Error ? err.message : "Failed to load game metadata");
       });
     return () => { cancelled = true; };
-  }, [slug, displayName, connect, retryCount]);
+  }, [slug, displayName, connect, retryCount, getCachedLatestSeq]);
 
   // WebSocket OPEN transitions — two separate concerns, split into two effects
   // so the cleanup path doesn't depend on App-level `connected` state.
@@ -973,6 +1057,8 @@ function AppInner() {
   return (
     <div data-testid="app" className="min-h-screen flex flex-col bg-background text-foreground">
       <ReconnectBanner visible={isReconnecting} />
+      <OfflineBanner offline={offline} />
+      <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
       <main className="flex flex-col flex-1 min-h-0">
         {sessionPhase === "connect" && !slug && (
           <ErrorBoundary name="Connect">

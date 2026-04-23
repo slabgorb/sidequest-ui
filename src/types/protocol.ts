@@ -42,6 +42,12 @@ export const MessageType = {
   DICE_THROW: "DICE_THROW",
   DICE_RESULT: "DICE_RESULT",
   SCRAPBOOK_ENTRY: "SCRAPBOOK_ENTRY",
+  // MP-02 presence + pause protocol (see sidequest-server protocol/messages.py)
+  PLAYER_PRESENCE: "PLAYER_PRESENCE",
+  PLAYER_SEAT: "PLAYER_SEAT",
+  SEAT_CONFIRMED: "SEAT_CONFIRMED",
+  GAME_PAUSED: "GAME_PAUSED",
+  GAME_RESUMED: "GAME_RESUMED",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];

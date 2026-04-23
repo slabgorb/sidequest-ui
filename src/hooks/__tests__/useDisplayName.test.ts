@@ -24,4 +24,16 @@ describe('useDisplayName', () => {
     const { result } = renderHook(() => useDisplayName());
     expect(result.current.name).toBe('bob');
   });
+
+  it('syncs across hook instances in the same tab', () => {
+    // AppInner and ConnectScreen both mount useDisplayName; when ConnectScreen
+    // calls setName, AppInner's instance must see it without a remount.
+    const a = renderHook(() => useDisplayName());
+    const b = renderHook(() => useDisplayName());
+    expect(a.result.current.name).toBeNull();
+    expect(b.result.current.name).toBeNull();
+    act(() => a.result.current.setName('alice'));
+    expect(a.result.current.name).toBe('alice');
+    expect(b.result.current.name).toBe('alice');
+  });
 });
