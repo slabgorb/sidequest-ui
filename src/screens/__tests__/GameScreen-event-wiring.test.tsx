@@ -7,7 +7,7 @@
 //   2. Transitions sessionPhase to "game" when the server sends SESSION_EVENT{ready}.
 //   3. GameBoard renders after the "ready" transition (not the scaffold narration-log).
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -16,17 +16,50 @@ import { installWebAudioMock, installLocalStorageMock } from '@/audio/__tests__/
 import { AudioEngine } from '@/audio/AudioEngine';
 import App from '../../App';
 
+// Minimal fetch mock: handles the two endpoints AppInner calls in slug-mode.
+// GET /api/games/:slug — game metadata (seeds currentGenre, gates WS connect).
+// GET /api/genres     — genre list (always called on mount).
+function installFetchMock() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url)) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ genre_slug: 'low_fantasy', world_slug: 'greyhawk', mode: 'solo' }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (typeof url === 'string' && url.includes('/api/genres')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ low_fantasy: { name: 'Low Fantasy', worlds: [] } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    }),
+  );
+}
+
 describe('AppInner slug-route event wiring', () => {
   beforeEach(() => {
     AudioEngine.resetInstance();
     installWebAudioMock();
     installLocalStorageMock();
     localStorage.setItem('sq:display-name', 'alice');
+    // AppInner now fetches GET /api/games/:slug on slug-mode mount to seed
+    // currentGenre before WS connect fires. Mock this endpoint so the tests
+    // do not time out waiting for the fetch gate to resolve.
+    installFetchMock();
   });
 
   afterEach(() => {
     WS.clean();
     AudioEngine.resetInstance();
+    vi.unstubAllGlobals();
     localStorage.clear();
   });
 

@@ -189,6 +189,10 @@ function AppInner() {
   const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
+  // Slug-mode: metadata fetched from GET /api/games/:slug before WS connect fires.
+  // Null means "not yet loaded" (or no slug). gameMetaError surfaces in the alert region.
+  const [gameMeta, setGameMeta] = useState<{ genre_slug: string; world_slug: string; mode: string } | null>(null);
+  const [gameMetaError, setGameMetaError] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   // Unified input lock: false after submit, true when narration arrives.
   // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
@@ -276,6 +280,10 @@ function AppInner() {
   useEffect(() => {
     fetchGenres();
   }, [fetchGenres]);
+
+  // (Metadata is fetched inline in the slug-connect effect below; no separate
+  // effect is needed. gameMeta state is set there too so the connecting
+  // indicator and chrome archetype can react to it.)
 
   // Audio engine — unified mixer for music, SFX, ambience
   const audio = useAudio();
@@ -785,12 +793,23 @@ function AppInner() {
   }, [navigate]);
 
   // Slug-mode connect: when AppInner mounts at /solo/:slug or /play/:slug,
-  // fire SESSION_EVENT{connect, game_slug} immediately (or after name is set).
+  // fetch GET /api/games/:slug (metadata) and then fire SESSION_EVENT{connect}.
+  //
+  // The fetch is inlined here (rather than a separate effect) so that the
+  // connect fires in the same async chain as the metadata resolution — this
+  // avoids an extra React render cycle and keeps tests straightforward.
+  //
+  // Gate order:
+  //   1. slug must be present.
+  //   2. displayName must be set (NamePrompt may still be showing).
+  //   3. Metadata fetch must succeed — seeds currentGenre before the WS
+  //      connect fires so genre theming is already applied.
+  //   If metadata fetch fails, gameMetaError is set and connect does NOT fire.
+  //
   // The existing sessionPhase state machine takes over from the server response:
   //   connected + !has_character → "creation"
   //   ready                      → "game"
   //
-  // This effect is the single connect entry point for the slug-based flow.
   // Dependency on `displayName` means it re-fires after NamePrompt confirms —
   // which is the intended behavior (we need a name before connecting).
   const slugConnectFired = useRef(false);
@@ -799,22 +818,41 @@ function AppInner() {
     if (!displayName) return; // Wait for NamePrompt
     if (slugConnectFired.current) return;
     slugConnectFired.current = true;
-    saveSession(slug);
-    setCurrentGenre(null); // Will be populated from PARTY_STATUS or theme events
-    setConnectedPlayerName(displayName);
-    justConnectedRef.current = true;
-    connect();
-    setConnected(true);
-    // Allow the WebSocket to open before sending the connect payload.
-    // 300ms gives the socket one event-loop tick to transition to OPEN
-    // before the SESSION_EVENT connect is sent.
-    setTimeout(() => {
-      sendRef.current?.({
-        type: MessageType.SESSION_EVENT,
-        payload: { event: "connect", game_slug: slug },
-        player_id: displayName,
+    let cancelled = false;
+    fetch(`/api/games/${encodeURIComponent(slug)}`)
+      .then(async (resp) => {
+        if (!resp.ok) throw new Error(`failed to load game: ${resp.status}`);
+        return resp.json() as Promise<{ genre_slug: string; world_slug: string; mode: string }>;
+      })
+      .then((body) => {
+        if (cancelled) return;
+        // Seed genre state before WS connect fires so theming is applied
+        // immediately — GameBoard key, chrome archetype, resource SFX all
+        // depend on currentGenre being non-null on first game render.
+        setGameMeta(body);
+        setCurrentGenre(body.genre_slug);
+        saveSession(slug);
+        setConnectedPlayerName(displayName);
+        justConnectedRef.current = true;
+        connect();
+        setConnected(true);
+        // Allow the WebSocket to open before sending the connect payload.
+        // 300ms gives the socket one event-loop tick to transition to OPEN
+        // before the SESSION_EVENT connect is sent.
+        setTimeout(() => {
+          sendRef.current?.({
+            type: MessageType.SESSION_EVENT,
+            payload: { event: "connect", game_slug: slug },
+            player_id: displayName,
+          });
+        }, 300);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        slugConnectFired.current = false; // Allow retry on name resubmit
+        setGameMetaError(err instanceof Error ? err.message : "Failed to load game metadata");
       });
-    }, 300);
+    return () => { cancelled = true; };
   }, [slug, displayName, connect]);
 
   // WebSocket OPEN transitions — two separate concerns, split into two effects
@@ -885,6 +923,8 @@ function AppInner() {
 
   const isConnecting = connected && readyState !== WebSocket.OPEN;
   const socketError = error ? "Connection failed. Is the game server running?" : null;
+  // Unified alert string: surface both socket errors and game-metadata load failures.
+  const alertError = [socketError, gameMetaError].filter(Boolean).join(" — ") || null;
 
   // Build game messages including character info
   const gameMessages = character
@@ -939,7 +979,7 @@ function AppInner() {
             <ConnectScreen
               genres={genres}
               isConnecting={isConnecting}
-              error={socketError}
+              error={alertError}
               genreError={genreError}
               onRetryGenres={fetchGenres}
             />
@@ -998,7 +1038,8 @@ function AppInner() {
         )}
         {/* In slug-mode while sessionPhase is still "connect" (waiting for server
             response after sending the slug-based SESSION_EVENT), show a connecting
-            indicator rather than the ConnectScreen (which requires genre selection). */}
+            indicator rather than the ConnectScreen (which requires genre selection).
+            If metadata load or socket connection failed, surface the error here. */}
         {sessionPhase === "connect" && slug && (
           <div className="flex flex-col items-center justify-center flex-1 min-h-screen gap-4">
             <span
@@ -1007,12 +1048,18 @@ function AppInner() {
             >
               ── ◇ ──
             </span>
-            <p
-              role="status"
-              className="text-sm italic text-muted-foreground/50 animate-pulse"
-            >
-              The pages are turning…
-            </p>
+            {alertError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {alertError}
+              </p>
+            ) : (
+              <p
+                role="status"
+                className="text-sm italic text-muted-foreground/50 animate-pulse"
+              >
+                The pages are turning…
+              </p>
+            )}
           </div>
         )}
       </main>
