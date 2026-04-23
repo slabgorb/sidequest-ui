@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import type { GenresResponse } from "@/types/genres";
 
@@ -58,6 +59,18 @@ const GENRES: GenresResponse = {
   },
 };
 
+/**
+ * Wraps ConnectScreen in a MemoryRouter so that useNavigate() (wired in
+ * commit 3beb815) has a valid router context during unit tests.
+ */
+function renderConnect(props: Parameters<typeof ConnectScreen>[0]) {
+  return render(
+    <MemoryRouter>
+      <ConnectScreen {...props} />
+    </MemoryRouter>,
+  );
+}
+
 describe("ConnectScreen", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -73,12 +86,12 @@ describe("ConnectScreen", () => {
 
   // -- rendering -------------------------------------------------------------
   it("renders a player name input", () => {
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
     expect(screen.getByLabelText(/what name shall be yours/i)).toBeInTheDocument();
   });
 
   it("renders a genre radio group with one row per genre", () => {
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
     const genreGroup = screen.getByRole("radiogroup", { name: /genre/i });
     expect(genreGroup).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /low fantasy/i })).toBeInTheDocument();
@@ -86,13 +99,13 @@ describe("ConnectScreen", () => {
   });
 
   it("renders the empty-state preview when no genre is selected", () => {
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
     expect(screen.getByText(/choose a genre to see what awaits/i)).toBeInTheDocument();
   });
 
   it("shows the world radio group only after a genre is picked", async () => {
     const user = userEvent.setup();
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
     // No world group yet.
     expect(screen.queryByRole("radiogroup", { name: /world/i })).toBeNull();
@@ -107,7 +120,7 @@ describe("ConnectScreen", () => {
 
   it("renders the world preview description after a world is picked", async () => {
     const user = userEvent.setup();
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
     await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
     await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
@@ -119,13 +132,13 @@ describe("ConnectScreen", () => {
 
   // -- validation ------------------------------------------------------------
   it("disables submit when fields are empty", () => {
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
-    expect(screen.getByRole("button", { name: /begin/i })).toBeDisabled();
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
+    expect(screen.getByRole("button", { name: /start/i })).toBeDisabled();
   });
 
   it("auto-selects the sole world when a single-world genre is picked", async () => {
     const user = userEvent.setup();
-    render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+    renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
     await user.click(screen.getByRole("radio", { name: /road warrior/i }));
 
@@ -134,57 +147,55 @@ describe("ConnectScreen", () => {
   });
 
   // -- submit ----------------------------------------------------------------
+  // NOTE: commit 3beb815 changed the Start button to POST /api/games and
+  // navigate — onConnect is now called from the form's onSubmit handler,
+  // not from the Start button click. The form submit path is tested here via
+  // fireEvent.submit on the form element after filling all required fields.
   it("calls onConnect with name, genre, and world on submit", async () => {
     const user = userEvent.setup();
     const onConnect = vi.fn();
-    render(<ConnectScreen onConnect={onConnect} genres={GENRES} />);
+    renderConnect({ onConnect, genres: GENRES });
 
+    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+    await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
     await user.type(
       screen.getByLabelText(/what name shall be yours/i),
       "Aberu",
     );
-    await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
-    await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
-    await user.click(screen.getByRole("button", { name: /begin/i }));
+    // The form's onSubmit handler (not the Start button) calls onConnect.
+    // fireEvent.submit is the most direct way to exercise this path in jsdom.
+    // The form element has no explicit role; query it directly.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    fireEvent.submit(document.querySelector("form")!);
 
     expect(onConnect).toHaveBeenCalledWith("Aberu", "low_fantasy", "greyhawk");
   });
 
   // -- loading state ---------------------------------------------------------
   it("shows a connecting indicator during connection", () => {
-    render(
-      <ConnectScreen
-        onConnect={vi.fn()}
-        genres={GENRES}
-        isConnecting={true}
-      />,
-    );
+    renderConnect({ onConnect: vi.fn(), genres: GENRES, isConnecting: true });
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 
   // -- error state -----------------------------------------------------------
   it("shows an error message on connection failure", () => {
-    render(
-      <ConnectScreen
-        onConnect={vi.fn()}
-        genres={GENRES}
-        error="Connection refused"
-      />,
-    );
+    renderConnect({
+      onConnect: vi.fn(),
+      genres: GENRES,
+      error: "Connection refused",
+    });
     expect(screen.getByRole("alert")).toHaveTextContent(/connection refused/i);
   });
 
   it("shows a retry button when genres failed to load", async () => {
     const user = userEvent.setup();
     const onRetryGenres = vi.fn();
-    render(
-      <ConnectScreen
-        onConnect={vi.fn()}
-        genres={{}}
-        genreError
-        onRetryGenres={onRetryGenres}
-      />,
-    );
+    renderConnect({
+      onConnect: vi.fn(),
+      genres: {},
+      genreError: true,
+      onRetryGenres,
+    });
 
     const retry = screen.getByRole("button", { name: /retry/i });
     await user.click(retry);
@@ -199,7 +210,7 @@ describe("ConnectScreen", () => {
         JSON.stringify({ playerName: "Rincewind", genre: "", world: "" }),
       );
 
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
       expect(
         screen.getByLabelText(/what name shall be yours/i),
       ).toHaveValue("Rincewind");
@@ -215,7 +226,7 @@ describe("ConnectScreen", () => {
         }),
       );
 
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
       const lowFantasyRadio = screen.getByRole("radio", {
         name: /low fantasy/i,
@@ -227,7 +238,7 @@ describe("ConnectScreen", () => {
     });
 
     it("renders with empty fields when localStorage is empty", () => {
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
       expect(
         screen.getByLabelText(/what name shall be yours/i),
       ).toHaveValue("");
@@ -240,7 +251,7 @@ describe("ConnectScreen", () => {
         JSON.stringify({ playerName: "Rincewind", genre: "", world: "" }),
       );
 
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
       const nameInput = screen.getByLabelText(/what name shall be yours/i);
       expect(nameInput).toHaveValue("Rincewind");
@@ -261,9 +272,9 @@ describe("ConnectScreen", () => {
         }),
       );
 
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
 
-      await user.click(screen.getByRole("button", { name: /begin/i }));
+      await user.click(screen.getByRole("button", { name: /start/i }));
 
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
       expect(stored).toEqual({
@@ -275,7 +286,7 @@ describe("ConnectScreen", () => {
 
     it("handles corrupted localStorage gracefully", () => {
       localStorage.setItem(STORAGE_KEY, "not-valid-json{{{");
-      render(<ConnectScreen onConnect={vi.fn()} genres={GENRES} />);
+      renderConnect({ onConnect: vi.fn(), genres: GENRES });
       expect(
         screen.getByLabelText(/what name shall be yours/i),
       ).toHaveValue("");
