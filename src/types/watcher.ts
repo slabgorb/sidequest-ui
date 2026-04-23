@@ -36,7 +36,6 @@ export interface TurnSpan {
 export interface TurnCompleteFields {
   turn_id?: number;
   turn_number?: number;
-  classified_intent?: string;
   agent_name?: string;
   agent_duration_ms?: number;
   total_duration_ms?: number;
