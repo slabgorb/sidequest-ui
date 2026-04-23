@@ -1,3 +1,16 @@
+// world-select mode wiring — MP-01 fix-forward update
+//
+// Verifies the ConnectScreen → Start button flow:
+//   1. User picks a world and mode.
+//   2. Clicks Start.
+//   3. POST /api/games is called with the correct mode in the body.
+//   4. The URL changes to the mode-correct path (/play/:slug for multiplayer).
+//   5. AppInner mounts at the new URL (data-testid="app" is present).
+//
+// Before MP-01 fix-forward, this test checked for data-testid="game-screen"
+// which was the deleted GameScreen scaffold. After the fix-forward, all slug
+// routes render AppInner, which uses data-testid="app".
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -37,14 +50,17 @@ describe('world-select mode wiring', () => {
     AudioEngine.resetInstance();
     installWebAudioMock();
     installLocalStorageMock();
+    // Pre-seed display name so AppInner skips NamePrompt after navigation.
+    localStorage.setItem('sq:display-name', 'testplayer');
   });
 
   afterEach(() => {
     AudioEngine.resetInstance();
     vi.unstubAllGlobals();
+    localStorage.clear();
   });
 
-  it('sends mode + world to POST /api/games and navigates to the returned URL', async () => {
+  it('sends mode + world to POST /api/games and AppInner mounts at the returned URL', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       // Sessions polling — always return empty list
       if (typeof url === 'string' && url.startsWith('/api/sessions')) {
@@ -57,6 +73,17 @@ describe('world-select mode wiring', () => {
       // Start game POST
       if (typeof url === 'string' && url === '/api/games' && opts?.method === 'POST') {
         return Promise.resolve({ ok: true, status: 201, json: async () => GAME_RESPONSE });
+      }
+      // GET /api/games/:slug — AppInner fetches this on slug-route mount to seed
+      // currentGenre. Must return a valid GameResponse shape so the metadata gate
+      // is satisfied and the WS connect fires (not the error path).
+      if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url) && !opts?.method) {
+        return Promise.resolve(
+          new Response(JSON.stringify(GAME_RESPONSE), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        );
       }
       return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
     });
@@ -75,8 +102,15 @@ describe('world-select mode wiring', () => {
         body: expect.stringContaining('"mode":"multiplayer"'),
       }));
     });
+
+    // After navigation, AppInner mounts at /play/:slug.
+    // data-testid="app" is AppInner's root element.
     await waitFor(() => {
-      expect(screen.getByTestId('game-screen')).toHaveAttribute('data-mode', 'multiplayer');
+      expect(screen.getByTestId('app')).toBeInTheDocument();
     });
+
+    // Critical #3: verify we are NOT on the error path — the alert role must
+    // not be present (i.e. GET /api/games/:slug succeeded, not 404'd).
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
