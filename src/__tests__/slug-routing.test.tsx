@@ -18,6 +18,7 @@
 // mount to seed currentGenre before the WS connect fires. All WS tests must mock
 // that endpoint so the gameMeta gate is satisfied and connect fires.
 
+import { StrictMode } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -306,6 +307,88 @@ describe('slug routing — currentGenre flows through to chrome archetype', () =
 // ---------------------------------------------------------------------------
 // Issue 6: Retry button re-fires metadata fetch after transient failure
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// StrictMode regression — fresh-mount slug-connect under React 18 double-invoke
+// ---------------------------------------------------------------------------
+//
+// Playtest 2026-04-23 regression: fresh page load at /solo/:slug stuck on the
+// "pages are turning…" loader forever. Server log showed zero new
+// `WebSocket /ws [accepted]` lines — the WS upgrade never fired.
+//
+// Root cause: the slug-connect effect in AppInner latched
+// `slugConnectFired.current = true` BEFORE the metadata fetch resolved, then
+// closed over a `cancelled` flag set by the effect's cleanup. Under React 18
+// StrictMode (which is enabled in main.tsx), the dev-mode double-invoke runs
+// effect → cleanup → effect on initial mount:
+//   - Pass #1: latches slugConnectFired, starts fetch with cancelled1=false
+//   - Cleanup #1: sets cancelled1=true
+//   - Pass #2: short-circuits on slugConnectFired.current (already true)
+//   - Pass #1's fetch resolves: `if (cancelled) return` → connect() never fires
+//
+// SPA-navigation worked because the effect re-fires on a slug-change deps
+// update, not on initial mount, so StrictMode's double-invoke doesn't apply.
+// Production builds (no StrictMode) also worked. The bug was dev-only — but
+// dev IS the playtest harness.
+//
+// Fix: latch slugConnectFired AFTER the success path runs connect(), with a
+// belt-and-suspenders re-check inside the success closure to defend against
+// both StrictMode passes' fetches resolving as winners.
+//
+// This test wraps the render in <StrictMode> to reproduce the double-invoke
+// at test time. Without the fix, server.nextMessage hangs forever.
+describe('slug routing — fresh mount under StrictMode (playtest 2026-04-23)', () => {
+  it('opens WS and sends SESSION_EVENT{connect} on initial mount even with StrictMode double-invoke', async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
+          <App />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    // Under the bug, the WS never opens — `await server.connected` would hang
+    // until the test timeout. With the fix, the surviving StrictMode pass
+    // resolves the latch race, calls connect(), and the WS upgrade completes.
+    await server.connected;
+
+    const msg = await server.nextMessage as { type: string; payload: Record<string, unknown> };
+    expect(msg.type).toBe('SESSION_EVENT');
+    expect(msg.payload.event).toBe('connect');
+    expect(msg.payload.game_slug).toBe('2026-04-22-moldharrow-keep');
+  });
+
+  it('does not double-fire the connect handshake under StrictMode', async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
+          <App />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    await server.connected;
+    const first = await server.nextMessage as { type: string; payload: Record<string, unknown> };
+    expect(first.type).toBe('SESSION_EVENT');
+    expect(first.payload.event).toBe('connect');
+
+    // Give any straggler send() calls (the 300ms post-connect timeout from
+    // the losing StrictMode pass, if it had escaped the latch re-check) a
+    // chance to fire. Then assert no second SESSION_EVENT connect arrived.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const extras = server.messages.filter((m) => {
+      const parsed = m as { type?: string; payload?: { event?: string } };
+      return parsed.type === 'SESSION_EVENT' && parsed.payload?.event === 'connect';
+    });
+    expect(extras).toHaveLength(1);
+  });
+});
 
 describe('slug routing — Retry button re-fires metadata fetch after transient failure', () => {
   it('renders Retry on failure, re-fetches on click, and fires WS connect on success', async () => {

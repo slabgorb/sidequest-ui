@@ -594,8 +594,12 @@ function AppInner() {
       if (saved && sendRef.current) {
         sendRef.current({
           type: MessageType.SESSION_EVENT,
-          payload: { event: "connect", game_slug: saved.gameSlug },
-          player_id: "",
+          payload: {
+            event: "connect",
+            game_slug: saved.gameSlug,
+            player_name: connectedPlayerName ?? undefined,
+          },
+          player_id: connectedPlayerName ?? "",
         });
       }
       return; // Don't show this error in the narrative
@@ -897,7 +901,14 @@ function AppInner() {
     if (!slug) return;
     if (!displayName) return; // Wait for NamePrompt
     if (slugConnectFired.current) return;
-    slugConnectFired.current = true;
+    // Do NOT latch slugConnectFired here. In React 18 StrictMode the dev-mode
+    // double-invoke runs effect → cleanup → effect on initial mount; latching
+    // up-front would have the cleanup mark the in-flight fetch as `cancelled`,
+    // and the second effect run would short-circuit on the already-true latch
+    // — net result: fetch resolves into a cancelled closure, connect() never
+    // fires, and the UI sticks on the "pages are turning…" loader forever.
+    // Instead, latch *after* the success path runs connect(); cancelled-pass
+    // returns are no-ops, and the surviving pass is the one that latches.
     // MP-03: snapshot the peer cache high-water mark at the moment the
     // effect fires. `getLatestSeq` is ref-backed so this is synchronous and
     // reflects whatever IDB has loaded by now. If IDB hasn't resolved yet,
@@ -911,6 +922,11 @@ function AppInner() {
       })
       .then((body) => {
         if (cancelled) return;
+        // Re-check the latch under the surviving closure: if a sibling
+        // StrictMode pass already won the race and called connect(), bail
+        // out so we don't double-fire the SESSION_EVENT connect handshake.
+        if (slugConnectFired.current) return;
+        slugConnectFired.current = true;
         // Seed genre state before WS connect fires so theming is applied
         // immediately — GameBoard key, chrome archetype, resource SFX all
         // depend on currentGenre being non-null on first game render.
@@ -926,14 +942,26 @@ function AppInner() {
         setTimeout(() => {
           sendRef.current?.({
             type: MessageType.SESSION_EVENT,
-            payload: { event: "connect", game_slug: slug, last_seen_seq: lastSeenSeq },
+            // player_name carries the human-readable display name from
+            // localStorage['sq:display-name']. Required: without it the
+            // server falls back to the opaque player_id for the lobby
+            // name, and any genre without a name-entry chargen scene
+            // (mutant_wasteland etc.) ends up with a UUID on the
+            // character sheet header. See playtest 2026-04-23 Bug 1.
+            payload: {
+              event: "connect",
+              game_slug: slug,
+              last_seen_seq: lastSeenSeq,
+              player_name: displayName,
+            },
             player_id: displayName,
           });
         }, 300);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        slugConnectFired.current = false; // Allow retry via retryCount increment
+        // Latch was never set (we only latch on the success path now), so
+        // the retryCount increment will naturally re-fire the effect.
         setGameMetaError(err instanceof Error ? err.message : "Failed to load game metadata");
       });
     return () => { cancelled = true; };
@@ -991,8 +1019,12 @@ function AppInner() {
       if (saved) {
         send({
           type: MessageType.SESSION_EVENT,
-          payload: { event: "connect", game_slug: saved.gameSlug },
-          player_id: "",
+          payload: {
+            event: "connect",
+            game_slug: saved.gameSlug,
+            player_name: displayName ?? undefined,
+          },
+          player_id: displayName ?? "",
         });
       }
     }
