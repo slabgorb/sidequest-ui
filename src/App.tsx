@@ -525,6 +525,8 @@ function AppInner() {
             class: (rawLocal.class as string) ?? "",
             race: (sheetFacet.race as string) || undefined,
             level: (rawLocal.level as number) ?? 1,
+            hp: typeof rawLocal.current_hp === "number" ? (rawLocal.current_hp as number) : undefined,
+            hp_max: typeof rawLocal.max_hp === "number" ? (rawLocal.max_hp as number) : undefined,
             stats: (sheetFacet.stats as Record<string, number>) ?? {},
             abilities: (sheetFacet.abilities as string[]) ?? [],
             backstory: (sheetFacet.backstory as string) ?? "",

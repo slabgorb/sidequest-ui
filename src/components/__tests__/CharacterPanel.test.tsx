@@ -377,6 +377,63 @@ describe("CharacterPanel — AC-6: integrated party list", () => {
     render(<CharacterPanel character={CHARACTER} characters={[]} />);
     expect(screen.queryByTestId("party-section")).not.toBeInTheDocument();
   });
+
+  it("renders inline HP per party row sourced from CharacterSummary.hp/hp_max", () => {
+    render(<CharacterPanel character={CHARACTER} characters={PARTY} />);
+    // Kael at 24/30 — full opacity tone
+    const kaelHp = screen.getByTestId("party-member-hp-p1");
+    expect(kaelHp).toHaveTextContent("HP 24/30");
+    // Lyra at 8/40 = 20% — at or below the 25% threshold, should show
+    // destructive tone class for at-a-glance "in trouble" signaling.
+    const lyraHp = screen.getByTestId("party-member-hp-p2");
+    expect(lyraHp).toHaveTextContent("HP 8/40");
+    expect(lyraHp.className).toMatch(/destructive/);
+  });
+
+  it("hides inline HP for genres that don't model HP (both 0)", () => {
+    const NO_HP_PARTY = [
+      {
+        ...PARTY[0],
+        player_id: "p3",
+        hp: 0,
+        hp_max: 0,
+      },
+    ];
+    render(<CharacterPanel character={CHARACTER} characters={NO_HP_PARTY} />);
+    expect(screen.queryByTestId("party-member-hp-p3")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HP badge in the header — Sebastien-axis (mechanical visibility)
+// ---------------------------------------------------------------------------
+
+describe("CharacterPanel — HP badge in header", () => {
+  it("renders HP badge when hp + hp_max are present", () => {
+    render(
+      <CharacterPanel
+        character={{ ...CHARACTER, hp: 18, hp_max: 30 }}
+      />,
+    );
+    const badge = screen.getByTestId("character-hp-badge");
+    expect(badge).toHaveTextContent("HP 18/30");
+    expect(badge).toHaveAttribute("aria-label", "Hit points 18 of 30");
+  });
+
+  it("flags HP badge as destructive when current is at/below 25% of max", () => {
+    render(
+      <CharacterPanel
+        character={{ ...CHARACTER, hp: 5, hp_max: 30 }}
+      />,
+    );
+    const badge = screen.getByTestId("character-hp-badge");
+    expect(badge.className).toMatch(/destructive/);
+  });
+
+  it("does not render HP badge when hp/hp_max are absent (genres without HP)", () => {
+    render(<CharacterPanel character={CHARACTER} />);
+    expect(screen.queryByTestId("character-hp-badge")).not.toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

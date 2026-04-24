@@ -7,6 +7,12 @@ export interface CharacterSheetData {
    *  is the rulebook, not part of character identity). */
   race?: string;
   level: number;
+  /** Current edge / hit points. Sourced from PARTY_STATUS members[].current_hp.
+   *  Surfaced in the CharacterPanel header so Sebastien-axis (mechanical)
+   *  players can see how close they are to going down. */
+  hp?: number;
+  /** Maximum edge / hit points. Sourced from PARTY_STATUS members[].max_hp. */
+  hp_max?: number;
   stats: Record<string, number>;
   abilities: string[];
   backstory: string;
