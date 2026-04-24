@@ -61,6 +61,37 @@ describe("StateTab — PlayerCard rendering (story 30-3)", () => {
     expect(locations.length).toBeGreaterThanOrEqual(1);
   });
 
+  // Playtest 2026-04-24 — State tab was showing debugState[0], which in
+  // practice was the OLDEST save instead of the active one. The server
+  // now sorts by mtime and exposes `last_activity_ts`; the UI defensively
+  // picks the max-ts entry so older servers also work.
+  it("picks the most-recently-touched session by last_activity_ts", () => {
+    const stale = makeSession({
+      session_key: "2026-04-22-old_save",
+      current_location: "Graveyard",
+      last_activity_ts: 1000,
+    });
+    const active = makeSession({
+      session_key: "2026-04-24-flickering_reach",
+      current_location: "The Filtration Warren",
+      last_activity_ts: 9999,
+    });
+    // Deliberately pass stale first to prove sort (not index-0) wins.
+    render(<StateTab debugState={[stale, active]} onRefresh={vi.fn()} />);
+    // Active session's unique location appears; stale one's does not.
+    expect(screen.getAllByText(/The Filtration Warren/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/Graveyard/)).toBeNull();
+  });
+
+  it("falls back to first entry when last_activity_ts is missing", () => {
+    // Back-compat: older server that hasn't deployed the mtime field yet.
+    const a = makeSession({ session_key: "a", current_location: "Alpha" });
+    const b = makeSession({ session_key: "b", current_location: "Bravo" });
+    render(<StateTab debugState={[a, b]} onRefresh={vi.fn()} />);
+    // With both ts missing the sort is a no-op; first entry wins.
+    expect(screen.getAllByText(/Alpha/).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("renders multiple players without crashing", () => {
     const session = makeSession({
       players: [
