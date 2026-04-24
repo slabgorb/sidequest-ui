@@ -500,6 +500,32 @@ export function GameBoard({
   // every action. Removed outright. The tab auto-opens on
   // `confrontationData` arrival and auto-closes when it clears.
 
+  // Running header (shared by mobile and desktop). Mobile users were
+  // previously trapped in-session because the header — and its Leave button
+  // — only rendered in the desktop branch (playtest 2026-04-23).
+  const runningHeader = (
+    <div
+      data-testid="running-header"
+      className="flex items-baseline justify-between px-6 py-2 border-b border-border/50 bg-[var(--surface,theme(colors.card))] shrink-0 z-10"
+    >
+      <span className="text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
+        {chapterTitle ?? "\u00A0"}
+      </span>
+      <div className="flex items-center gap-2">
+        {onLeave && (
+          <button
+            type="button"
+            onClick={onLeave}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
+            title="Return to lobby"
+          >
+            Leave
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   // Mobile fallback
   if (isMobile) {
     return (
@@ -507,6 +533,7 @@ export function GameBoard({
         renderWidget={renderWidgetContent}
         availableWidgets={availableWidgets}
         contentSignals={contentSignals}
+        header={runningHeader}
       >
         {inputBar}
       </MobileTabView>
@@ -518,27 +545,7 @@ export function GameBoard({
     <div data-testid="game-board" className="flex flex-col h-screen overflow-hidden">
       <BackgroundCanvas />
 
-      {/* Running header */}
-      <div
-        data-testid="running-header"
-        className="flex items-baseline justify-between px-6 py-2 border-b border-border/50 bg-[var(--surface,theme(colors.card))] shrink-0 z-10"
-      >
-        <span className="text-xs tracking-widest uppercase text-muted-foreground/50 font-light">
-          {chapterTitle ?? "\u00A0"}
-        </span>
-        <div className="flex items-center gap-2">
-          {onLeave && (
-            <button
-              type="button"
-              onClick={onLeave}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted/50"
-              title="Return to lobby"
-            >
-              Leave
-            </button>
-          )}
-        </div>
-      </div>
+      {runningHeader}
 
       {/* Depletion/resource alerts */}
       {depletions && depletions.length > 0 && (

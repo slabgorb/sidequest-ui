@@ -523,6 +523,7 @@ function AppInner() {
           const built: CharacterSheetData = {
             name: (rawLocal.character_name as string) ?? (rawLocal.name as string) ?? "",
             class: (rawLocal.class as string) ?? "",
+            race: (sheetFacet.race as string) || undefined,
             level: (rawLocal.level as number) ?? 1,
             stats: (sheetFacet.stats as Record<string, number>) ?? {},
             abilities: (sheetFacet.abilities as string[]) ?? [],
@@ -776,7 +777,12 @@ function AppInner() {
     [diceRequest, send],
   );
 
-  // Bug 6: Leave game — disconnect, clear state, return to lobby
+  const navigate = useNavigate();
+
+  // Bug 6: Leave game — disconnect, clear state, return to lobby.
+  // Playtest 2026-04-23: must also navigate to "/" — at /solo/:slug, leaving
+  // state-only causes the slug-connect effect to re-fire and immediately
+  // reload the same session, making the button look broken.
   const handleLeave = useCallback(() => {
     disconnect();
     clearSession();
@@ -802,7 +808,10 @@ function AppInner() {
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
-  }, [disconnect]);
+    // Route off the slug — otherwise the slug-connect effect re-fires.
+    // disconnect() above already flushed the SESSION_EVENT outbound.
+    navigate("/");
+  }, [disconnect, navigate]);
 
   // Unlock AudioContext on first user gesture (click or keypress).
   // Chrome's autoplay policy blocks audio until a user interaction occurs.
@@ -825,8 +834,6 @@ function AppInner() {
       document.removeEventListener("keydown", unlock);
     };
   }, [audio.engine]);
-
-  const navigate = useNavigate();
 
   // Scene harness: if ?scene=NAME is in the URL, POST to /dev/scene/:name
   // to stage the save. Server returns { slug } (game_slug). Dev harness only —

@@ -38,6 +38,12 @@ interface MobileTabViewProps {
    * prop is only the change-detection signal, not the badge storage.
    */
   contentSignals?: Partial<Record<WidgetId, number>>;
+  /**
+   * Running header — chapter title + Leave button. Lifted into MobileTabView
+   * so mobile users have the same way to leave the game as desktop users.
+   * Without this, mobile players were trapped in-session (playtest 2026-04-23).
+   */
+  header?: ReactNode;
   children?: ReactNode; // InputBar slot
 }
 
@@ -45,6 +51,7 @@ export function MobileTabView({
   renderWidget,
   availableWidgets,
   contentSignals,
+  header,
   children,
 }: MobileTabViewProps) {
   const [activeTab, setActiveTab] = useState<WidgetId>("narrative");
@@ -101,6 +108,7 @@ export function MobileTabView({
 
   return (
     <div data-testid="game-board" className="flex flex-col h-screen">
+      {header}
       {/* Content area */}
       <div className="flex-1 min-h-0 overflow-auto">
         {renderWidget(activeTab)}
