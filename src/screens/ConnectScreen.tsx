@@ -205,9 +205,9 @@ export function ConnectScreen({
       // Audio unlock is best-effort; never block game entry.
     }
 
-    let url: string;
+    let result;
     try {
-      url = await start({ genreSlug, worldSlug, mode });
+      result = await start({ genreSlug, worldSlug, mode });
     } catch (err) {
       setStartError(
         err instanceof Error ? err.message : "Failed to start game. Please try again.",
@@ -229,18 +229,46 @@ export function ConnectScreen({
       // remount before we navigate to the slug route.
       setDisplayName(trimmedName);
       saveState(trimmedName, genreSlug, worldSlug);
-      appendHistory({ player_name: trimmedName, genre: genreSlug, world: worldSlug });
+      // game_slug + mode let Past Journeys offer one-click resume
+      // instead of starting a new game on every revisit (playtest
+      // 2026-04-24 BLOCKING bug).
+      appendHistory({
+        player_name: trimmedName,
+        genre: genreSlug,
+        world: worldSlug,
+        game_slug: result.slug,
+        mode: result.mode,
+      });
     }
-    navigate(url);
+    navigate(result.url);
   };
 
-  // Click handler for "Past journeys" rows. Prefills all three fields
-  // but does not auto-submit — the player still confirms with Begin.
-  const handleSelectHistory = useCallback((entry: JourneyEntry) => {
-    setPlayerName(entry.player_name);
-    setGenreSlug(entry.genre);
-    setWorldSlug(entry.world);
-  }, []);
+  // Click handler for "Past journeys" rows. New entries (post-2026-04-24)
+  // carry a game_slug so we navigate straight to the resume route.
+  // Old entries lack the slug — fall back to legacy prefill behavior so
+  // the player can re-enter and click Begin.
+  const handleSelectHistory = useCallback(
+    (entry: JourneyEntry) => {
+      if (entry.game_slug) {
+        // Set displayName ahead of the navigate so AppInner's slug-mount
+        // skips NamePrompt and connects immediately. saveState mirrors
+        // legacy prefill writes so a subsequent lobby visit shows the
+        // same defaults.
+        if (entry.player_name) {
+          setDisplayName(entry.player_name);
+        }
+        saveState(entry.player_name, entry.genre, entry.world);
+        const prefix = entry.mode === "multiplayer" ? "/play" : "/solo";
+        navigate(`${prefix}/${entry.game_slug}`);
+        return;
+      }
+      // Legacy fallback: prefill only.
+      setPlayerName(entry.player_name);
+      setGenreSlug(entry.genre);
+      setWorldSlug(entry.world);
+    },
+    [navigate, setDisplayName],
+  );
 
   // Pretty-name resolvers for JourneyHistory rows. Fall back to the
   // prettified slug if the genre/world is no longer in the current

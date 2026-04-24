@@ -875,13 +875,21 @@ function AppInner() {
   // Navigates to /solo/:slug — AppInner owns the WebSocket session.
   // No fallback to the legacy genre+world+player path: if there is no slug,
   // the session is stale (pre-MP-01) and must not be reconnected silently.
+  //
+  // Playtest 2026-04-24: respect URL slug. If the user typed (or was
+  // navigated to) /solo/:slug or /play/:slug — e.g. via a Past Journeys
+  // click, a shared link, or manual URL entry — trust the URL and let
+  // the slug-connect effect below run against it. Without this guard,
+  // localStorage's last session unconditionally overrode the URL and
+  // shareable/resumable links became inert.
   useEffect(() => {
     if (autoReconnectAttempted.current) return;
     autoReconnectAttempted.current = true;
+    if (slug) return;
     const saved = loadSession();
     if (!saved) return;
     navigate(`/solo/${saved.gameSlug}`);
-  }, [navigate]);
+  }, [navigate, slug]);
 
   // Slug-mode connect: when AppInner mounts at /solo/:slug or /play/:slug,
   // fetch GET /api/games/:slug (metadata) and then fire SESSION_EVENT{connect}.

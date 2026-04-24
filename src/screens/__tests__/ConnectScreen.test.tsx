@@ -1,7 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { ConnectScreen } from "@/screens/ConnectScreen";
 import type { GenresResponse } from "@/types/genres";
 
@@ -459,6 +460,125 @@ describe("ConnectScreen", () => {
 
       // The sq:display-name key must also not have been written.
       expect(localStorage.getItem("sq:display-name")).toBeNull();
+    });
+  });
+
+  // -- Past Journeys → resume (playtest 2026-04-24 BLOCKING bug) --------------
+  //
+  // Pre-fix: clicking a Past Journeys row only prefilled the lobby fields,
+  // and pressing Start always created a brand-new game with a fresh slug —
+  // silently orphaning the player's actual save. The fix records `game_slug`
+  // when each game is created and routes Past Journeys clicks straight to
+  // `/solo/:slug` (or `/play/:slug`) so the existing save resumes.
+  describe("Past Journeys resume", () => {
+    it("Begin records game_slug + mode in journey history", async () => {
+      const user = userEvent.setup();
+      // Pre-load lobby fields so the Start button is enabled.
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          playerName: "Rincewind",
+          genre: "low_fantasy",
+          world: "greyhawk",
+        }),
+      );
+
+      renderConnect({ genres: GENRES });
+      await user.click(screen.getByRole("button", { name: /start/i }));
+
+      const stored = JSON.parse(localStorage.getItem("sidequest-history") ?? "[]");
+      expect(stored).toHaveLength(1);
+      expect(stored[0]).toMatchObject({
+        player_name: "Rincewind",
+        genre: "low_fantasy",
+        world: "greyhawk",
+        game_slug: "test-slug",
+        mode: "solo",
+      });
+    });
+
+    /**
+     * Tiny helper that reports MemoryRouter location changes back to a spy.
+     * Lets us assert "ConnectScreen navigated to /solo/:slug" without mocking
+     * the router internals.
+     */
+    function LocationWatcher({ onChange }: { onChange: (path: string) => void }) {
+      const location = useLocation();
+      useEffect(() => {
+        onChange(location.pathname);
+      }, [location.pathname, onChange]);
+      return null;
+    }
+
+    it("clicking a Past Journeys row with a slug navigates straight to the slug route", async () => {
+      const user = userEvent.setup();
+
+      // Stub a past journey carrying a game_slug — the post-fix shape.
+      localStorage.setItem(
+        "sidequest-history",
+        JSON.stringify([
+          {
+            player_name: "Rincewind",
+            genre: "low_fantasy",
+            world: "greyhawk",
+            last_played_iso: new Date().toISOString(),
+            game_slug: "2026-04-23-resume-me",
+            mode: "solo",
+          },
+        ]),
+      );
+
+      const onPathChange = vi.fn();
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <ConnectScreen genres={GENRES} />
+          <LocationWatcher onChange={onPathChange} />
+        </MemoryRouter>,
+      );
+
+      // The journey row text contains the player name — click that button.
+      const row = screen.getByText(/Rincewind/).closest("button");
+      expect(row).not.toBeNull();
+      await user.click(row!);
+
+      expect(onPathChange).toHaveBeenCalledWith("/solo/2026-04-23-resume-me");
+    });
+
+    it("clicking a legacy Past Journeys row (no slug) falls back to prefill (no slug navigate)", async () => {
+      const user = userEvent.setup();
+
+      // Pre-fix entry — no game_slug. Should keep the legacy prefill behavior.
+      localStorage.setItem(
+        "sidequest-history",
+        JSON.stringify([
+          {
+            player_name: "OldEntry",
+            genre: "low_fantasy",
+            world: "greyhawk",
+            last_played_iso: new Date().toISOString(),
+          },
+        ]),
+      );
+
+      const onPathChange = vi.fn();
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <ConnectScreen genres={GENRES} />
+          <LocationWatcher onChange={onPathChange} />
+        </MemoryRouter>,
+      );
+
+      const row = screen.getByText(/OldEntry/).closest("button");
+      await user.click(row!);
+
+      // Legacy: prefill name in the input, never leave "/".
+      expect(screen.getByLabelText(/what name shall be yours/i)).toHaveValue(
+        "OldEntry",
+      );
+      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
+        /^\/(solo|play)\//.test(path),
+      );
+      expect(slugCalls).toHaveLength(0);
     });
   });
 });

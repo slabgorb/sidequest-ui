@@ -23,13 +23,15 @@ describe('useStartGame', () => {
       }),
     });
     const { result } = renderHook(() => useStartGame());
-    const url = await result.current.start({
+    const started = await result.current.start({
       genreSlug: 'low_fantasy',
       worldSlug: 'moldharrow-keep',
       mode: 'multiplayer',
     });
     expect(fetchMock).toHaveBeenCalledWith('/api/games', expect.objectContaining({ method: 'POST' }));
-    expect(url).toBe('/play/2026-04-22-moldharrow-keep');
+    expect(started.url).toBe('/play/2026-04-22-moldharrow-keep');
+    expect(started.slug).toBe('2026-04-22-moldharrow-keep');
+    expect(started.mode).toBe('multiplayer');
   });
 
   it('uses /solo/:slug when mode is solo', async () => {
@@ -42,9 +44,11 @@ describe('useStartGame', () => {
       }),
     });
     const { result } = renderHook(() => useStartGame());
-    const url = await result.current.start({
+    const started = await result.current.start({
       genreSlug: 'low_fantasy', worldSlug: 'moldharrow-keep', mode: 'solo',
     });
-    expect(url).toBe('/solo/2026-04-22-moldharrow-keep');
+    expect(started.url).toBe('/solo/2026-04-22-moldharrow-keep');
+    expect(started.slug).toBe('2026-04-22-moldharrow-keep');
+    expect(started.mode).toBe('solo');
   });
 });

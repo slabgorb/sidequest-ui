@@ -234,7 +234,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
             role="textbox"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Or tell her in your own words..."
+            placeholder="Or describe it in your own words..."
             className="flex-1 rounded-md border border-input bg-background text-sm px-3 py-2 placeholder:italic placeholder:text-muted-foreground/50"
           />
             <button type="submit" className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border/50">Submit</button>

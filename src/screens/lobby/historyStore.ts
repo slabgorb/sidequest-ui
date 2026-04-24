@@ -21,6 +21,19 @@ export interface JourneyEntry {
   world: string;
   /** ISO-8601 timestamp of the most recent connection with this combo. */
   last_played_iso: string;
+  /**
+   * Slug of the most recent game created for this (player, genre, world).
+   * Optional because pre-2026-04-24 entries were prefill-only and don't
+   * carry a slug — the lobby falls back to legacy prefill behavior for
+   * those, while new entries get one-click resume.
+   */
+  game_slug?: string;
+  /**
+   * Mode the most recent game was started in. Used to pick the route
+   * prefix (`/solo` vs `/play`) on resume. Optional for the same
+   * backward-compat reason as `game_slug`.
+   */
+  mode?: "solo" | "multiplayer";
 }
 
 /**
@@ -34,6 +47,7 @@ export function loadHistory(): JourneyEntry[] {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     // Filter out any malformed entries (defensive — schema may evolve).
+    // game_slug + mode are optional (added 2026-04-24); old entries lack them.
     const valid = parsed.filter((e): e is JourneyEntry => {
       if (!e || typeof e !== "object") return false;
       const obj = e as Record<string, unknown>;
@@ -75,6 +89,10 @@ export function appendHistory(entry: Omit<JourneyEntry, "last_played_iso">): voi
         e.world === entry.world
       ),
   );
+  // Spread last so callers can pass `game_slug`/`mode` (optional) without
+  // having to construct a fully-typed object — and so a missing slug is
+  // recorded as `undefined` rather than serialized as a stale value from
+  // a previous tuple.
   existing.unshift({ ...entry, last_played_iso: now });
   saveHistory(existing.slice(0, MAX_ENTRIES));
 }
