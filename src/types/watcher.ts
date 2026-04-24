@@ -124,4 +124,8 @@ export interface SessionStateView {
   has_music_director: boolean;
   has_audio_mixer: boolean;
   region_names: [string, string][];
+  /** Save-file mtime in ms since epoch. Added 2026-04-24 so the State tab
+   *  can pick the most-recently-touched session when multiple saves exist.
+   *  Optional for back-compat with servers that haven't deployed yet. */
+  last_activity_ts?: number;
 }

@@ -27,8 +27,20 @@ export function StateTab({ debugState, onRefresh }: Props) {
     );
   }
 
-  // For now, show the first (or only) session. Multi-session support: tabs/dropdown later if needed.
-  const session = debugState[0];
+  // Pick the most-recently-touched session.
+  //
+  // Playtest 2026-04-24: with multiple saves in ~/.sidequest/saves/games/,
+  // the dashboard used to pick `debugState[0]` from the server's
+  // alphabetically-sorted list — which landed on the oldest save, not the
+  // active one. The server now sorts by save-file mtime (newest first) and
+  // exposes `last_activity_ts` on each view; we still sort defensively here
+  // so older servers (and any future unsorted responses) still land on the
+  // correct session.
+  const session = [...debugState].sort((a, b) => {
+    const aTs = a.last_activity_ts ?? 0;
+    const bTs = b.last_activity_ts ?? 0;
+    return bTs - aTs;
+  })[0];
 
   return (
     <div style={{ padding: 16 }}>

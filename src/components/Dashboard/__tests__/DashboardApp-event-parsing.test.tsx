@@ -107,11 +107,139 @@ describe("DashboardApp event parsing (playtest 2026-04-23)", () => {
       onEventCapture.fn!(spanClose);
     });
 
-    // agent_span_close does NOT increment turns — that's turn_complete only.
+    // turn.agent_llm.inference alone is NOT a turn boundary — it's a
+    // contributing signal, but the aggregator waits for
+    // orchestrator.process_action before synthesizing a turn.
     expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*0/);
     // But it DOES land in allEvents → the Console tab surfaces it.
     expect(
       screen.getByText(/turn\.agent_llm\.inference/),
     ).toBeInTheDocument();
+  });
+
+  // ════════════════════════════════════════════════════════════════════════
+  // Playtest 2026-04-24 regression — Turns counter stuck at 0.
+  //
+  // Bug: the semantic `turn_complete` event stopped arriving in live
+  // traffic but OTEL span closes (orchestrator.process_action,
+  // turn.agent_llm.inference, narrator.canonical_leak_audit) kept
+  // flowing — so the Console tab filled while the Turns counter / Timeline
+  // / Timing / Prompt / Lore tabs stayed empty.
+  //
+  // Fix: treat `agent_span_close { name: "orchestrator.process_action" }`
+  // as the canonical turn boundary. Accumulate turn_id / player_id from
+  // narrator.canonical_leak_audit and duration from turn.agent_llm.inference,
+  // then synthesize a turn_complete on the orchestrator.process_action close.
+  // ════════════════════════════════════════════════════════════════════════
+  it("increments Turns counter when orchestrator.process_action closes (span-close fallback)", async () => {
+    const DashboardApp = await loadDashboard();
+    render(<DashboardApp />);
+
+    // Mimic the real 2026-04-24 playtest sequence: leak_audit carries
+    // turn_id, inference carries duration, then process_action closes.
+    const leakAudit: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.000Z",
+      component: "sidequest-server",
+      event_type: "agent_span_close",
+      severity: "info",
+      fields: {
+        name: "narrator.canonical_leak_audit",
+        duration_ms: 12,
+        turn_id: "mutant_wasteland:flickering_reach:Slabgorb:7",
+      },
+    };
+    const inference: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.100Z",
+      component: "sidequest-server",
+      event_type: "agent_span_close",
+      severity: "info",
+      fields: {
+        name: "turn.agent_llm.inference",
+        duration_ms: 20192,
+        model: "claude-opus-4-5",
+      },
+    };
+    const processAction: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.200Z",
+      component: "sidequest-server",
+      event_type: "agent_span_close",
+      severity: "info",
+      fields: {
+        name: "orchestrator.process_action",
+        duration_ms: 22000,
+        action_len: 92,
+      },
+    };
+
+    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*0/);
+
+    act(() => {
+      onEventCapture.fn!(leakAudit);
+      onEventCapture.fn!(inference);
+      onEventCapture.fn!(processAction);
+    });
+
+    // The aggregator synthesized a turn_complete from the span closes.
+    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+  });
+
+  it("does not double-count when a real turn_complete follows a synthesized one for the same turn_id", async () => {
+    const DashboardApp = await loadDashboard();
+    render(<DashboardApp />);
+
+    const turnKey = "mutant_wasteland:flickering_reach:Slabgorb:7";
+
+    const leakAudit: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.000Z",
+      component: "sidequest-server",
+      event_type: "agent_span_close",
+      severity: "info",
+      fields: {
+        name: "narrator.canonical_leak_audit",
+        duration_ms: 12,
+        turn_id: turnKey,
+      },
+    };
+    const processAction: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.100Z",
+      component: "sidequest-server",
+      event_type: "agent_span_close",
+      severity: "info",
+      fields: {
+        name: "orchestrator.process_action",
+        duration_ms: 22000,
+        action_len: 92,
+      },
+    };
+    // Server eventually also emits the semantic turn_complete with the
+    // same turn_id — the aggregator must replace-in-place, not append.
+    const semanticTurnComplete: WatcherEvent = {
+      timestamp: "2026-04-24T17:00:00.300Z",
+      component: "orchestrator",
+      event_type: "turn_complete",
+      severity: "info",
+      fields: {
+        turn_id: turnKey,
+        turn_number: 7,
+        agent_name: "narrator",
+        agent_duration_ms: 22000,
+        player_id: "Slabgorb",
+        genre: "mutant_wasteland",
+        world: "flickering_reach",
+      },
+    };
+
+    act(() => {
+      onEventCapture.fn!(leakAudit);
+      onEventCapture.fn!(processAction);
+    });
+    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
+
+    act(() => {
+      onEventCapture.fn!(semanticTurnComplete);
+    });
+    // Still 1 — the real turn_complete replaced the synthesized entry
+    // instead of appending a duplicate.
+    expect(screen.getByText(/Turns:/i).textContent).toMatch(/Turns:\s*1/);
   });
 });
