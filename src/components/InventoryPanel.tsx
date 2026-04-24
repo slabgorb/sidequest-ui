@@ -9,6 +9,16 @@ export interface InventoryItem {
 export interface InventoryData {
   items: InventoryItem[];
   gold: number;
+  /**
+   * Genre-declared currency noun from the active pack's
+   * inventory.yaml::currency.name. Examples: "gold" (C&C),
+   * "credits" (space_opera), "Salvage" (mutant_wasteland),
+   * "Dollars" (spaghetti_western). When absent (legacy payload
+   * or a pack that doesn't declare one) we render the neutral
+   * fallback "coin" — never the word "gold", which leaks
+   * fantasy tone into every other genre.
+   */
+  currency_name?: string | null;
 }
 
 export interface InventoryPanelProps {
@@ -45,7 +55,9 @@ export function InventoryPanel({ data }: InventoryPanelProps) {
     <div data-testid="inventory-panel" className="p-6 space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-[var(--primary)]">Inventory</h2>
-        <span className="text-sm font-mono">{data.gold} gold</span>
+        <span className="text-sm font-mono">
+          {data.gold} {data.currency_name ?? "coin"}
+        </span>
       </div>
 
       {Array.from(grouped.entries()).map(([type, items]) => (
