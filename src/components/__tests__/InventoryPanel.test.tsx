@@ -39,6 +39,32 @@ describe('InventoryPanel', () => {
     expect(screen.getByText(/42/)).toBeInTheDocument();
   });
 
+  it('renders the genre-declared currency noun when present', () => {
+    // Pingpong 2026-04-24 "500 gold in Space Opera" — server emits
+    // ``currency_name`` on the inventory payload from the active pack's
+    // inventory.yaml (e.g. "credits" for space_opera, "Salvage" for
+    // mutant_wasteland). UI must render that noun, not the hardcoded
+    // fantasy word "gold".
+    render(
+      <InventoryPanel
+        data={{ items: [], gold: 500, currency_name: 'credits' }}
+      />,
+    );
+    expect(screen.getByText(/500 credits/)).toBeInTheDocument();
+    // Defensive: no leftover "gold" label on a non-fantasy pack.
+    expect(screen.queryByText(/gold/)).not.toBeInTheDocument();
+  });
+
+  it('falls back to "coin" when the payload omits currency_name', () => {
+    // Legacy pre-fix servers won't send currency_name — the UI must
+    // render a neutral "coin" fallback rather than the former hardcoded
+    // "gold" (which leaked fantasy tone into every genre). "coin" is
+    // deliberately genre-agnostic.
+    render(<InventoryPanel data={{ items: [], gold: 5 }} />);
+    expect(screen.getByText(/5 coin/)).toBeInTheDocument();
+    expect(screen.queryByText(/gold/)).not.toBeInTheDocument();
+  });
+
   it('renders with empty items list', () => {
     render(<InventoryPanel data={{ items: [], gold: 0 }} />);
     expect(screen.getByTestId('inventory-panel')).toBeInTheDocument();
