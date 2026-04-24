@@ -202,6 +202,15 @@ function AppInner() {
   // Latched when slug-connect fires so the mid-session reconnect effect
   // doesn't double-send SESSION_EVENT on the same WS OPEN transition.
   const justConnectedRef = useRef(false);
+  // Latched AFTER the slug-connect fetch + connect() runs successfully.
+  // Declared here (alongside the other session-lifecycle refs) rather than
+  // inline next to the effect so `handleLeave` can reset it — AppInner is a
+  // single persistent instance across "/" and "/solo/:slug" (react-router-dom
+  // v6 reuses the LobbyRoot element across route matches), so this ref
+  // survives navigate() and must be explicitly cleared on Leave or the
+  // next game's slug-connect effect short-circuits and never opens the WS
+  // (playtest 2026-04-24 "post-lobby hang" bug).
+  const slugConnectFired = useRef(false);
 
   // Overlay data from server messages
   const [characterSheet, setCharacterSheet] = useState<CharacterSheetData | null>(null);
@@ -821,6 +830,19 @@ function AppInner() {
     sessionPhaseRef.current = "connect";
     setSessionPhase("connect");
     autoReconnectAttempted.current = false;
+    // Reset slug-connect session state so the NEXT game's slug-connect
+    // effect fetches GET /api/games/:new-slug and opens a fresh WebSocket.
+    // Without this, `slugConnectFired.current` stays latched to `true` from
+    // the prior session — the short-circuit at the top of the effect
+    // (`if (slugConnectFired.current) return;`) fires, no fetch happens,
+    // no WS opens, UI hangs on "The pages are turning…" forever. The user
+    // can only escape by typing the URL manually (full page reload resets
+    // all refs). Playtest 2026-04-24 "Post-lobby hang on new-genre first
+    // game" bug — confirmed genre-agnostic (MW → C&C, C&C → SO).
+    slugConnectFired.current = false;
+    justConnectedRef.current = false;
+    setGameMetaError(null);
+    setCurrentGenre(null);
     // Route off the slug — otherwise the slug-connect effect re-fires.
     // disconnect() above already flushed the SESSION_EVENT outbound.
     navigate("/");
@@ -924,7 +946,8 @@ function AppInner() {
   //
   // Dependency on `displayName` means it re-fires after NamePrompt confirms —
   // which is the intended behavior (we need a name before connecting).
-  const slugConnectFired = useRef(false);
+  // (`slugConnectFired` ref is declared above with the other
+  //  session-lifecycle refs so `handleLeave` can reset it.)
   useEffect(() => {
     if (!slug) return;
     if (!displayName) return; // Wait for NamePrompt
