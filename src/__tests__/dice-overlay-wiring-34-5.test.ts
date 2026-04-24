@@ -246,3 +246,43 @@ describe("Wiring: Physics-is-the-roll (story 34-12)", () => {
     );
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Wiring: NARRATION_END clears the stale dice TARGET + result widget
+// ──────────────────────────────────────────────────────────────────────────────
+// Playtest-pingpong 2026-04-24: after a roll resolves, the TARGET banner and
+// "Rolled N vs M — Fail" readout stayed on screen through the narrator's
+// next turn. Players read the stale numbers as the DC for the next click.
+// The fix: on NARRATION_END (the narrator's turn boundary, which also
+// re-enables input), clear diceRequest + diceResult so the widgets return
+// to a neutral state until the next beat issues a fresh DICE_REQUEST.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("Wiring: NARRATION_END clears dice TARGET + result widget", () => {
+  it("App.tsx clears diceRequest and diceResult inside the NARRATION_END branch", () => {
+    const appSrc = readSrc("App.tsx");
+    // Locate the NARRATION_END branch — the same block that toggles
+    // setCanType(true) and clears confrontation on turn boundary.
+    const narrationEndIdx = appSrc.indexOf(
+      "if (msg.type === MessageType.NARRATION_END) {",
+    );
+    expect(narrationEndIdx).toBeGreaterThanOrEqual(0);
+    // Take a bounded window covering the branch body.
+    const body = appSrc.slice(narrationEndIdx, narrationEndIdx + 2000);
+    // Both dice state setters must be invoked with null inside this block.
+    // Without these, the previous roll's TARGET + result badge persists
+    // until the next DICE_REQUEST arrives.
+    expect(body).toMatch(/setDiceRequest\(\s*null\s*\)/);
+    expect(body).toMatch(/setDiceResult\(\s*null\s*\)/);
+  });
+
+  it("App.tsx still passes the cleared dice state through to the overlay", () => {
+    // Regression guard: if someone later moves the setters out of the
+    // NARRATION_END block, the overlay props wiring still reads from
+    // the same state. Keep the wiring surface pinned so the clear
+    // actually reaches the UI.
+    const appSrc = readSrc("App.tsx");
+    expect(appSrc).toMatch(/diceRequest=\{diceRequest\}/);
+    expect(appSrc).toMatch(/diceResult=\{diceResult\}/);
+  });
+});

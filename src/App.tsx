@@ -259,10 +259,14 @@ function AppInner() {
   const pendingBeatIdRef = useRef<string | null>(null);
 
   // Dice overlay persists after result so the table can see "rolled N vs
-  // target M → outcome" until the next beat begins. Cleared by: (a) a new
-  // DiceRequest arriving (DICE_REQUEST handler below), (b) a local beat
-  // click (handleBeatSelect sets a fresh request), (c) the confrontation
-  // ending — handled by the effect below.
+  // target M → outcome" through the narrator's resolution. Cleared by:
+  // (a) a new DiceRequest arriving (DICE_REQUEST handler below),
+  // (b) a local beat click (handleBeatSelect sets a fresh request),
+  // (c) the confrontation ending — handled by the effect below,
+  // (d) NARRATION_END — the narrator has accepted the roll; holding the
+  //     stale TARGET/result widget past the turn boundary makes players
+  //     read it as the DC for the next click. Cleared in the NARRATION_END
+  //     branch of handleMessage (playtest-pingpong 2026-04-24).
   useEffect(() => {
     if (confrontationData) return;
     setDiceRequest(null);
@@ -372,6 +376,13 @@ function AppInner() {
           setConfrontationData(null);
         }
         confrontationReceivedThisTurnRef.current = false;
+        // Clear the dice TARGET banner and roll-result widget once the
+        // narrator resolves the roll. Without this, the previous roll's
+        // "TARGET 18 · need 17" + "Rolled 4 vs 18 Fail" stays pinned
+        // beside the next set of beat buttons, and players read it as
+        // the DC for the next click (playtest-pingpong 2026-04-24).
+        setDiceRequest(null);
+        setDiceResult(null);
       }
       return;
     }

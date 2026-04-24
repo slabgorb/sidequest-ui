@@ -302,10 +302,13 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
         </Canvas>
 
         {/* Result readout — "Rolled N vs Target M — Outcome".
-            Persists alongside the target banner above until the next beat
-            issues a new DiceRequest (App.tsx clears on new request / on
-            confrontation end). Tabletop parity: the DM never erases the
-            target number mid-resolution. */}
+            Persists alongside the target banner above through the
+            narrator's resolution. App.tsx clears the request + result on
+            new DiceRequest, on confrontation end, and on NARRATION_END
+            (the narrator's turn boundary) — so the stale TARGET doesn't
+            linger beside the next set of beat buttons. Tabletop parity:
+            the DM never erases the target mid-resolution, but the slate
+            wipes clean before the next roll. */}
         {diceResult && (
           <div
             data-testid="dice-result"
