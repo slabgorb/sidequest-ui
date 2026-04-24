@@ -283,7 +283,14 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
         <Canvas
           shadows
           camera={{
-            position: [0, 1.4, 0.8],
+            // Straight-down, 90° — the top face of the settled icosahedron
+            // is flat to the viewer, so reading the roll is unambiguous.
+            // (Playtest 2026-04-24: oblique cameras made the "up" face
+            // indistinguishable from its neighbors, prompting floating
+            // callouts that could disagree with what the player sees.)
+            position: [0, 2.4, 0],
+            rotation: [-Math.PI / 2, 0, 0],
+            up: [0, 0, -1],
             fov: 50,
             near: 0.01,
             far: 50,
