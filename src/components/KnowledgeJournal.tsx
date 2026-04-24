@@ -71,20 +71,30 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
       </div>
 
       <div className="flex gap-3 mb-3">
+        {/* Sort toggle. Pre-2026-04-24 this rendered as plain muted text
+            and read as a label, not a control — playtesters didn't realize
+            it was clickable. Now styled with a border + chevron so the
+            affordance is unmistakable, while staying low-emphasis. */}
         <button
           data-testid="sort-toggle"
           onClick={() =>
             setSortMode((m) => (m === 'chronological' ? 'categorical' : 'chronological'))
           }
-          className="text-xs text-muted-foreground/50 hover:text-muted-foreground"
+          aria-label={`Switch sort to ${sortMode === 'chronological' ? 'category' : 'time'}`}
+          className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded
+                     border border-border/40 text-muted-foreground
+                     hover:text-foreground hover:border-border/70 transition-colors"
         >
-          {sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}
+          <span>{sortMode === 'chronological' ? 'Sort by Category' : 'Sort by Time'}</span>
+          <span aria-hidden="true" className="opacity-60">⇅</span>
         </button>
         {onRequestJournal && (
           <button
             data-testid="refresh-journal"
             onClick={() => onRequestJournal(activeCategory === 'All' ? undefined : activeCategory)}
-            className="text-xs text-muted-foreground/50 hover:text-muted-foreground"
+            className="inline-flex items-center text-xs px-2 py-0.5 rounded
+                       border border-border/40 text-muted-foreground
+                       hover:text-foreground hover:border-border/70 transition-colors"
           >
             Refresh from server
           </button>
