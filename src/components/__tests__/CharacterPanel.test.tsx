@@ -10,6 +10,7 @@ import type { CharacterSheetData } from "../CharacterSheet";
 const CHARACTER: CharacterSheetData = {
   name: "Kael",
   class: "Ranger",
+  race: "Wood Elf",
   level: 3,
   stats: {
     strength: 14,
@@ -135,16 +136,22 @@ describe("CharacterPanel — 33-7: enriched header", () => {
     expect(placeholder).toHaveTextContent(/^LD$/);
   });
 
-  it("subtitle combines class and genre display names with ·", () => {
+  // Playtest 2026-04-23: subtitle is class · race (character identity), NOT
+  // class · genre (rulebook). Showing the genre slug here ("Beastkin · Mutant
+  // Wasteland") conflated two separate concepts and confused the user.
+  it("subtitle combines class and race display names with ·", () => {
     render(<CharacterPanel character={CHARACTER} genreSlug="mutant_wasteland" />);
-    expect(screen.getByText(/Ranger · Mutant Wasteland/)).toBeInTheDocument();
+    expect(screen.getByText(/Ranger · Wood Elf/)).toBeInTheDocument();
   });
 
-  it("subtitle falls back to class-only when genreSlug is absent", () => {
-    render(<CharacterPanel character={CHARACTER} />);
-    // The subtitle should say "Ranger" but NOT contain the · separator
-    const subtitle = screen.getByText(/Ranger/);
+  it("subtitle falls back to class-only when race is absent", () => {
+    const { race: _race, ...withoutRace } = CHARACTER;
+    render(<CharacterPanel character={withoutRace} genreSlug="mutant_wasteland" />);
+    // Even with a genreSlug present, the subtitle must NOT include genre.
+    const subtitle = screen.getByTestId("character-subtitle");
+    expect(subtitle.textContent).toBe("Ranger");
     expect(subtitle.textContent).not.toContain("·");
+    expect(subtitle.textContent).not.toMatch(/Mutant|Wasteland/);
   });
 
   it("portrait slot is 48px (w-12 h-12) for both img and placeholder", () => {

@@ -105,9 +105,13 @@ export function CharacterPanel({
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-[var(--primary)] truncate">{character.name}</h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
+          {/* Subtitle is class · race ("Beastkin · Uplifted Animal"). Was
+              showing class · genre, which conflated the rulebook with the
+              character's identity (playtest 2026-04-23). Falls back to
+              class-only when race is absent — never to genre. */}
           <p data-testid="character-subtitle" className="text-xs text-muted-foreground leading-tight">
             {toDisplayName(character.class)}
-            {genreSlug ? ` · ${toDisplayName(genreSlug)}` : ""}
+            {character.race ? ` · ${character.race}` : ""}
           </p>
         </div>
         <div

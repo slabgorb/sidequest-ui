@@ -22,7 +22,7 @@ import { StrictMode } from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { WS } from 'jest-websocket-mock';
 import { installWebAudioMock, installLocalStorageMock } from '@/audio/__tests__/web-audio-mock';
 import { AudioEngine } from '@/audio/AudioEngine';
@@ -454,6 +454,56 @@ describe('slug routing — Retry button re-fires metadata fetch after transient 
     // Alert should be gone after success
     await waitFor(() => {
       expect(screen.queryByRole('alert')).toBeNull();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Playtest 2026-04-23: Leave button must navigate off the slug URL
+// ---------------------------------------------------------------------------
+//
+// Bug: clicking Leave at /solo/:slug cleared component state but never changed
+// the route. AppInner's slug-connect effect re-fired on the next render and
+// silently re-loaded the same session — the button looked broken.
+// Fix: handleLeave now calls navigate("/").
+
+describe('slug routing — Leave button navigates back to lobby', () => {
+  // Tiny inline component that exposes the current pathname for assertion.
+  function LocationProbe() {
+    const loc = useLocation();
+    return <span data-testid="current-path">{loc.pathname}</span>;
+  }
+
+  it('clicking Leave from a live game session routes back to "/"', async () => {
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
+        <App />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage; // SESSION_EVENT connect
+
+    // Drive the app into the game phase so GameBoard (and its Leave button)
+    // mounts. The slug-routing tests above prove this transition happens
+    // when the server emits SESSION_EVENT{ready}.
+    act(() => {
+      server.send({ type: 'SESSION_EVENT', payload: { event: 'ready' } });
+    });
+
+    const leaveButton = await screen.findByRole('button', { name: /^leave$/i });
+    expect(screen.getByTestId('current-path').textContent).toBe(
+      '/solo/2026-04-22-moldharrow-keep',
+    );
+
+    await userEvent.click(leaveButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('current-path').textContent).toBe('/');
     });
   });
 });

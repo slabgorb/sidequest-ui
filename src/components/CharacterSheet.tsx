@@ -1,6 +1,11 @@
 export interface CharacterSheetData {
   name: string;
   class: string;
+  /** Race label ("Uplifted Animal", "Beastkin", "Human"). Server emits this on
+   *  PARTY_STATUS as `members[].sheet.race`. Used as the sheet subtitle —
+   *  previously the subtitle showed the genre slug, which is wrong (the genre
+   *  is the rulebook, not part of character identity). */
+  race?: string;
   level: number;
   stats: Record<string, number>;
   abilities: string[];
