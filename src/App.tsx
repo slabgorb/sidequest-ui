@@ -854,6 +854,16 @@ function AppInner() {
     [diceRequest, send],
   );
 
+  // Yield action — player steps out of an active confrontation on their terms.
+  // Sends a YIELD message to the server; server refreshes edge by 1 + statuses taken.
+  const handleYield = useCallback(() => {
+    send({
+      type: MessageType.YIELD,
+      payload: {},
+      player_id: "",
+    });
+  }, [send]);
+
   const navigate = useNavigate();
 
   // Bug 6: Leave game — disconnect, clear state, return to lobby.
@@ -1245,6 +1255,7 @@ function AppInner() {
                 resourceAlerts={gameState.resourceAlerts}
                 confrontationData={confrontationData}
                 onBeatSelect={handleBeatSelect}
+                onYield={handleYield}
                 diceRequest={diceRequest}
                 diceResult={diceResult}
                 onDiceThrow={handleDiceThrow}
