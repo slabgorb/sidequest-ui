@@ -734,6 +734,9 @@ function AppInner() {
         }
         if (slashResult.messages.length > 0) {
           setMessages((prev) => [...prev, ...slashResult.messages]);
+          for (const msg of slashResult.messages) {
+            send(msg);
+          }
         }
         return;
       }
