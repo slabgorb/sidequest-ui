@@ -103,7 +103,12 @@ export function CharacterPanel({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-[var(--primary)] truncate">{character.name}</h2>
+          {/* tracking-wide adds a touch of letter-spacing so tight kerns
+              like "hir" don't read as "ib" at the H2 size on screenshot
+              compression (playtest 2026-04-24 "Sibley vs Shirley"
+              observer report). DOM is authoritative; CSS softens the
+              rendering ambiguity. */}
+          <h2 className="text-lg font-bold tracking-wide text-[var(--primary)] truncate">{character.name}</h2>
           {/* current_location omitted: set once at chargen, never updated — top header is single source of truth. */}
           {/* Subtitle is class · race ("Beastkin · Uplifted Animal"). Was
               showing class · genre, which conflated the rulebook with the

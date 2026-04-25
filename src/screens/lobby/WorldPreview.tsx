@@ -61,9 +61,20 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
   return (
     <div className="flex-1 flex flex-col gap-4 px-6">
       {/* Hero image frame — fixed aspect ratio so layout doesn't jump. */}
-      <div className="relative w-full aspect-video overflow-hidden rounded border border-muted-foreground/20 bg-muted/10">
+      <div
+        data-testid="world-hero-frame"
+        data-image-status={imageStatus}
+        className={`relative w-full aspect-video overflow-hidden rounded border border-muted-foreground/20 bg-muted/10 ${
+          imageStatus === "loading" ? "animate-pulse" : ""
+        }`}
+      >
         {hasImage && imageStatus !== "failed" && (
           <img
+            // Keyed on slug so switching worlds fully remounts the <img>
+            // — otherwise the previous world's image stays visible (with
+            // opacity=1 set imperatively on prior onLoad) until the new
+            // src's onLoad fires, masking the loading state.
+            key={world.slug}
             src={world.hero_image!}
             alt={`${world.name} — ${world.setting ?? pack.name}`}
             className="w-full h-full object-cover opacity-0 transition-opacity duration-300"
@@ -76,18 +87,35 @@ export function WorldPreview({ pack, world }: WorldPreviewProps) {
         )}
         {imageStatus !== "loaded" && (
           <div
-            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-2"
+            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/30"
             role={imageStatus === "loading" ? "status" : undefined}
             aria-live={imageStatus === "failed" ? "polite" : undefined}
           >
             {imageStatus === "loading" && (
               <span
-                className="block w-5 h-5 rounded-full border-2 border-muted-foreground/30
-                           border-t-foreground/60 animate-spin"
+                data-testid="world-hero-spinner"
+                className="block w-10 h-10 rounded-full border-[3px] border-muted-foreground/20
+                           border-t-[var(--primary)] animate-spin"
                 aria-hidden="true"
               />
             )}
-            <p className="text-sm italic text-muted-foreground/40 tracking-wide">
+            {imageStatus === "failed" && (
+              <span
+                aria-hidden="true"
+                className="text-3xl text-muted-foreground/50"
+              >
+                ⚑
+              </span>
+            )}
+            {imageStatus === "idle" && (
+              <span
+                aria-hidden="true"
+                className="text-3xl text-muted-foreground/40"
+              >
+                ◇
+              </span>
+            )}
+            <p className="text-sm italic text-muted-foreground/70 tracking-wide">
               {placeholderCopy}
             </p>
           </div>

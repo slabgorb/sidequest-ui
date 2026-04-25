@@ -445,6 +445,7 @@ export function ConnectScreen({
           </span>
           <button
             type="button"
+            data-testid="lobby-start-button"
             onClick={handleStart}
             disabled={!canStart || isConnecting || isStarting}
             title={
@@ -452,14 +453,18 @@ export function ConnectScreen({
                 ? "Choose a genre and world to begin"
                 : undefined
             }
-            className="text-base italic text-foreground/70 hover:text-foreground
-                       disabled:text-muted-foreground/30 disabled:cursor-default
-                       transition-all bg-transparent border border-muted-foreground/30
-                       hover:border-muted-foreground/50 hover:bg-muted/20
-                       focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none
-                       rounded px-8 py-2.5 cursor-pointer tracking-wide"
+            className="text-lg font-semibold uppercase tracking-[0.25em]
+                       text-[var(--primary-foreground)] bg-[var(--primary)]
+                       hover:bg-[var(--primary)]/90 hover:shadow-[0_0_24px_rgba(255,255,255,0.08)]
+                       disabled:bg-muted/40 disabled:text-muted-foreground/40
+                       disabled:cursor-default disabled:shadow-none
+                       transition-all border-0
+                       focus-visible:ring-2 focus-visible:ring-[var(--primary)]/60
+                       focus-visible:outline-none
+                       rounded-md px-10 py-3.5 cursor-pointer
+                       shadow-[0_0_16px_rgba(0,0,0,0.3)]"
           >
-            {isStarting ? "Starting..." : "Start"}
+            {isStarting ? "Starting..." : "Start Adventure"}
           </button>
         </div>
       </form>

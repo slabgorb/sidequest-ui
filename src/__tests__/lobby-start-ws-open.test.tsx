@@ -214,7 +214,7 @@ describe('lobby → slug navigation — Leave + Start fresh game (playtest 2026-
     await user.click(leaveBtn);
 
     // Back at "/" — ConnectScreen's Start button must be reachable.
-    const startBtn = await screen.findByRole('button', { name: /^start$/i });
+    const startBtn = await screen.findByTestId('lobby-start-button');
 
     // Stand up a SECOND WS server — the first one is closed via disconnect().
     // A fresh WS object is about to be created by the slug-connect effect

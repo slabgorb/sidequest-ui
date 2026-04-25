@@ -110,7 +110,14 @@ export function KnowledgeJournal({ entries, onRequestJournal }: KnowledgeJournal
               <span>Turn {entry.learned_turn}</span>
               {entry.source && <span>{entry.source}</span>}
               {entry.confidence && <span>{entry.confidence}</span>}
-              {entry.is_new && <span className="text-accent-foreground/40 italic">new</span>}
+              {entry.is_new && (
+                <span
+                  data-testid="knowledge-new-pill"
+                  className="inline-flex items-center rounded-full bg-[var(--primary)]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--primary)]"
+                >
+                  New
+                </span>
+              )}
             </div>
           </div>
         ))}

@@ -12,24 +12,29 @@ function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] 
     <aside
       data-testid="world-facts"
       aria-label="World facts learned this turn"
-      className="mt-6 pt-4 border-t-2 border-[var(--primary)]/30 space-y-1.5"
+      className="mt-6 rounded-md border-l-4 border-[var(--primary)]/60 bg-[var(--primary)]/[0.06] pl-4 pr-3 py-3 space-y-1.5"
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--primary)]/70 mb-2">
-        World learned this turn
+      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]/90 mb-3">
+        Knowledge Gained
       </div>
       {footnotes.map((fn, fi) => (
         <div
           key={fi}
           id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
           data-footnote-id={fn.marker != null ? fn.marker : undefined}
-          className="text-sm text-muted-foreground leading-snug flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 py-0.5 transition-colors"
+          className="text-base text-foreground/85 leading-relaxed flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 py-0.5 transition-colors"
         >
           {fn.marker != null && (
-            <span className="text-muted-foreground/50 shrink-0">[{fn.marker}]</span>
+            <span className="text-[var(--primary)]/70 shrink-0 font-semibold">[{fn.marker}]</span>
           )}
           <span>{fn.summary}</span>
           {fn.is_new && (
-            <span className="text-[var(--primary)]/60 italic shrink-0 text-xs self-center">new</span>
+            <span
+              data-testid="knowledge-new-pill"
+              className="shrink-0 self-center inline-flex items-center rounded-full bg-[var(--primary)]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--primary)]"
+            >
+              New
+            </span>
           )}
         </div>
       ))}
@@ -68,8 +73,8 @@ export function renderSegment(
       // History uses base size + relaxed leading — still readable, visually
       // recessed via the wrapper's opacity (see NarrationScroll).
       const textClass = isHistory
-        ? "prose dark:prose-invert text-base leading-relaxed"
-        : "prose dark:prose-invert text-xl leading-loose";
+        ? "prose dark:prose-invert text-lg leading-relaxed"
+        : "prose dark:prose-invert text-2xl leading-loose";
       return (
         <div key={i} className={`${maxTextWidth} mx-auto mb-6`}>
           <div
@@ -160,7 +165,11 @@ export function renderSegment(
           data-testid="chapter-marker"
           className="my-12 max-w-[85ch] mx-auto text-center"
         >
-          <div className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2">
+          <div
+            aria-label="Chapter break"
+            title="Chapter break — new scene or location"
+            className="text-muted-foreground/30 text-xs tracking-[0.5em] mb-2"
+          >
             {dinkusGlyph} {dinkusGlyph} {dinkusGlyph}
           </div>
           <span className="text-lg font-semibold tracking-widest uppercase text-muted-foreground/80">

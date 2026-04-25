@@ -20,6 +20,7 @@ import "@/styles/dockview-theme.css";
 import { useRunningHeader } from "@/hooks/useRunningHeader";
 
 import InputBar from "@/components/InputBar";
+import { MultiplayerTurnBanner } from "@/components/MultiplayerTurnBanner";
 import { useBreakpoint } from "@/hooks/useBreakpoint";
 import { useImageBus } from "@/providers/ImageBusProvider";
 import { useGameBoardLayout } from "@/hooks/useGameBoardLayout";
@@ -357,14 +358,39 @@ export function GameBoard({
       activePlayerId]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
+  const isMultiplayer =
+    (characters?.length ?? 0) > 1 ||
+    (turnStatusEntries?.length ?? 0) > 0 ||
+    activePlayerName != null;
+  const localCharacterName =
+    characters?.find((c) => c.player_id === currentPlayerId)?.character_name ??
+    characters?.find((c) => c.player_id === currentPlayerId)?.name ??
+    null;
   const inputBar = (
-    <InputBar
-      onSend={onSend}
-      disabled={disabled}
-      mobile={isMobile}
-      thinking={thinking}
-      waitingForPlayer={waitingForPlayer}
-    />
+    <div className="flex flex-col">
+      <MultiplayerTurnBanner
+        isMultiplayer={isMultiplayer}
+        // ``disabled`` is true when WS is closed *or* input is locked
+        // (waiting on peer, narrator thinking). For the heartbeat we want
+        // strict WS-open — but we don't have that in props. Pass `true`
+        // here; the OfflineBanner / ReconnectBanner above the GameBoard
+        // already cover hard offline state, so the in-banner dot is a
+        // soft "alive" indicator. Pulse animation conveys the heartbeat.
+        wsConnected={true}
+        activePlayerName={activePlayerName}
+        activePlayerId={activePlayerId}
+        localPlayerId={currentPlayerId}
+        localCharacterName={localCharacterName}
+        thinking={thinking}
+      />
+      <InputBar
+        onSend={onSend}
+        disabled={disabled}
+        mobile={isMobile}
+        thinking={thinking}
+        waitingForPlayer={waitingForPlayer}
+      />
+    </div>
   );
 
   // Context value consumed by the module-level PanelAdapter. See the comment

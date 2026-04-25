@@ -53,12 +53,18 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
   }
 
   if (loading) {
+    // Default copy used to read "Considering your words..." which implies
+    // the player just typed something. After Create Character, no input
+    // was submitted — the player is waiting for the narrator's opening
+    // turn. "Waiting for the narrator..." is true regardless of which
+    // chargen step we're between. Genre packs can override via
+    // ``scene.loading_text``.
     return (
       <div data-testid="character-creation">
         <div data-testid="creation-loading" role="status"
              className="flex items-center justify-center min-h-[200px]">
           <p className="text-sm italic text-muted-foreground/50 animate-pulse">
-            {scene?.loading_text ?? "Considering your words..."}
+            {scene?.loading_text ?? "Waiting for the narrator..."}
           </p>
         </div>
       </div>

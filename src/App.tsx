@@ -242,6 +242,15 @@ function AppInner() {
   const [paused, setPaused] = useState(false);
   const [pauseWaitingFor, setPauseWaitingFor] = useState<string[]>([]);
 
+  // MP-02 Task 5: seat handshake. After CHARACTER_CREATION{phase:complete},
+  // the client claims a `character_slot` via PLAYER_SEAT. The server seats
+  // the player in its `SessionRoom` and broadcasts `SEAT_CONFIRMED` to all
+  // sockets in the room. We track the seated set here so the UI can render
+  // a peer-presence indicator and confirm the handshake landed.
+  const [seatedPlayers, setSeatedPlayers] = useState<
+    Record<string, string /* character_slot */>
+  >({});
+
   // MP-03 event cache — per-(slug, player) IndexedDB durable log of
   // seq-carrying events. Populated as messages arrive; consulted at connect
   // time via `getLatestSeq()` so the SESSION_EVENT carries the right
@@ -452,6 +461,44 @@ function AppInner() {
         setCreationLoading(false);
         sessionPhaseRef.current = "game";
         setSessionPhase("game");
+
+        // MP-02 Task 5: claim the seat. The server-side handler at
+        // session_handler.py::_handle_player_seat seats us in the
+        // SessionRoom and broadcasts SEAT_CONFIRMED to every socket in
+        // the room. Without this, the room sees the socket as
+        // *connected* but never *seated*, so peers can't tell that
+        // this player exists as a PC.
+        //
+        // character_slot must be a stable identifier — character.name
+        // is what the genre packs and chargen state machine treat as
+        // the slot label (caverns_and_claudes uses character display
+        // names; mutant_wasteland uses class+name). The DB primary key
+        // for the seat is (slug, player_id), so the slot is mostly
+        // descriptive metadata that flows back via SEAT_CONFIRMED.
+        const charNameForSeat =
+          (charData?.name as string | undefined) ??
+          (charData?.character_name as string | undefined);
+        if (charNameForSeat && sendRef.current) {
+          sendRef.current({
+            type: MessageType.PLAYER_SEAT,
+            payload: { character_slot: charNameForSeat },
+            player_id: "",
+          });
+        }
+      }
+      return;
+    }
+
+    if (msg.type === MessageType.SEAT_CONFIRMED) {
+      // MP-02 Task 5: server broadcast confirming a player has claimed a
+      // character slot. Update the local seated-roster so the UI can
+      // render peer-presence affordances (turn indicator, "X has joined"
+      // toast, party-roster fallback when PARTY_STATUS hasn't arrived
+      // yet for the peer).
+      const payloadPid = msg.payload?.player_id as string | undefined;
+      const payloadSlot = msg.payload?.character_slot as string | undefined;
+      if (payloadPid && payloadSlot) {
+        setSeatedPlayers((prev) => ({ ...prev, [payloadPid]: payloadSlot }));
       }
       return;
     }
@@ -825,6 +872,7 @@ function AppInner() {
     setDiceResult(null);
     setPaused(false);
     setPauseWaitingFor([]);
+    setSeatedPlayers({});
     setOffline(false);
     seenEventKeysRef.current.clear();
     sessionPhaseRef.current = "connect";

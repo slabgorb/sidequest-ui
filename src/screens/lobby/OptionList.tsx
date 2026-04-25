@@ -110,7 +110,7 @@ export function OptionList({
               focus-visible:outline-none focus-visible:bg-muted/20
               ${
                 isSelected
-                  ? "border-l-accent bg-accent/25 text-foreground font-semibold ring-1 ring-accent/30"
+                  ? "border-l-[var(--primary)] bg-[var(--primary)]/20 text-foreground font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"
                   : "border-l-transparent text-foreground/60 hover:border-l-muted-foreground/40 hover:bg-muted/20 hover:text-foreground/85"
               }
             `}
