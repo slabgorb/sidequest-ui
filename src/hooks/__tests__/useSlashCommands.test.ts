@@ -119,4 +119,15 @@ describe("useSlashCommands", () => {
 
     expect(out.handled).toBe(true);
   });
+
+  it("/yield returns handled=true and a single YIELD-typed message", () => {
+    const { result } = renderSlashCommands();
+    const out = result.current.execute("/yield");
+
+    expect(out.handled).toBe(true);
+    expect(out.widget).toBeUndefined();
+    expect(out.messages).toHaveLength(1);
+    expect(out.messages[0].type).toBe("YIELD");
+    expect(out.messages[0].player_id).toBe("");
+  });
 });

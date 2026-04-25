@@ -8,9 +8,10 @@ interface ConfrontationWidgetProps {
   diceResult?: DiceResultPayload | null;
   playerId?: string;
   onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
+  onYield?: () => void;
 }
 
-export function ConfrontationWidget({ data, onBeatSelect, diceRequest, diceResult, playerId, onDiceThrow }: ConfrontationWidgetProps) {
+export function ConfrontationWidget({ data, onBeatSelect, diceRequest, diceResult, playerId, onDiceThrow, onYield }: ConfrontationWidgetProps) {
   return (
     <ConfrontationOverlay
       data={data}
@@ -20,6 +21,7 @@ export function ConfrontationWidget({ data, onBeatSelect, diceRequest, diceResul
       diceResult={diceResult}
       playerId={playerId}
       onDiceThrow={onDiceThrow}
+      onYield={onYield}
     />
   );
 }
