@@ -734,6 +734,9 @@ function AppInner() {
         }
         if (slashResult.messages.length > 0) {
           setMessages((prev) => [...prev, ...slashResult.messages]);
+          for (const msg of slashResult.messages) {
+            send(msg);
+          }
         }
         return;
       }
@@ -853,6 +856,16 @@ function AppInner() {
     },
     [diceRequest, send],
   );
+
+  // Yield action — player steps out of an active confrontation on their terms.
+  // Sends a YIELD message to the server; server refreshes edge by 1 + statuses taken.
+  const handleYield = useCallback(() => {
+    send({
+      type: MessageType.YIELD,
+      payload: {},
+      player_id: "",
+    });
+  }, [send]);
 
   const navigate = useNavigate();
 
@@ -1245,6 +1258,7 @@ function AppInner() {
                 resourceAlerts={gameState.resourceAlerts}
                 confrontationData={confrontationData}
                 onBeatSelect={handleBeatSelect}
+                onYield={handleYield}
                 diceRequest={diceRequest}
                 diceResult={diceResult}
                 onDiceThrow={handleDiceThrow}

@@ -130,6 +130,7 @@ export interface GameBoardProps {
   knowledgeEntries?: KnowledgeEntry[];
   confrontationData?: ConfrontationData | null;
   onBeatSelect?: (beatId: string) => void;
+  onYield?: () => void;
   diceRequest?: DiceRequestPayload | null;
   diceResult?: DiceResultPayload | null;
   onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
@@ -160,6 +161,7 @@ export function GameBoard({
   knowledgeEntries,
   confrontationData,
   onBeatSelect,
+  onYield,
   diceRequest,
   diceResult,
   onDiceThrow,
@@ -329,6 +331,7 @@ export function GameBoard({
           <ConfrontationWidget
             data={confrontationData}
             onBeatSelect={onBeatSelect}
+            onYield={onYield}
             diceRequest={diceRequest}
             diceResult={diceResult}
             playerId={currentPlayerId}
@@ -351,7 +354,7 @@ export function GameBoard({
         return null;
     }
   }, [messages, thinking, characterSheet, inventoryData, mapData,
-      knowledgeEntries, confrontationData, onBeatSelect, diceRequest, diceResult,
+      knowledgeEntries, confrontationData, onBeatSelect, onYield, diceRequest, diceResult,
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,

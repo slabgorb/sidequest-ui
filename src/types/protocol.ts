@@ -48,6 +48,7 @@ export const MessageType = {
   SEAT_CONFIRMED: "SEAT_CONFIRMED",
   GAME_PAUSED: "GAME_PAUSED",
   GAME_RESUMED: "GAME_RESUMED",
+  YIELD: "YIELD",
 } as const;
 
 export type MessageType = (typeof MessageType)[keyof typeof MessageType];
