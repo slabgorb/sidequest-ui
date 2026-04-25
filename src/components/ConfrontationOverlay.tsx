@@ -1,5 +1,6 @@
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { InlineDiceTray } from "@/dice/InlineDiceTray";
+import { YieldButton } from "@/components/YieldButton";
 
 // ═══════════════════════════════════════════════════════════
 // Types — exported for tests and consumers
@@ -67,6 +68,7 @@ interface ConfrontationOverlayProps {
   diceResult?: DiceResultPayload | null;
   playerId?: string;
   onDiceThrow?: (params: DiceThrowParams, face: number[]) => void;
+  onYield?: () => void;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -222,7 +224,7 @@ function SecondaryStatsPanel({ stats }: { stats: SecondaryStats }) {
 // Main component
 // ═══════════════════════════════════════════════════════════
 
-export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, diceResult, playerId, onDiceThrow }: ConfrontationOverlayProps) {
+export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, diceResult, playerId, onDiceThrow, onYield }: ConfrontationOverlayProps) {
   if (!data) return null;
 
   const isStandoff = data.type === 'standoff';
@@ -261,6 +263,13 @@ export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, 
 
       {/* Beat action buttons */}
       <BeatActions beats={data.beats} onBeatSelect={onBeatSelect} />
+
+      {/* Yield button — only rendered when parent supplies the handler */}
+      {onYield !== undefined && (
+        <div className="mt-2">
+          <YieldButton onYield={onYield} disabled={false} />
+        </div>
+      )}
 
       {/* Inline dice tray — rolls right here when a beat is selected */}
       {onDiceThrow && playerId && (

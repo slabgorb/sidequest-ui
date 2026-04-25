@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { GameMessage } from '../types/protocol';
+import { MessageType, type GameMessage } from '../types/protocol';
 import type { WidgetId } from '@/components/GameBoard/widgetRegistry';
 
 /** @deprecated Use WidgetId instead */
@@ -35,6 +35,17 @@ export function useSlashCommands() {
         return { handled: true, messages: [], widget: 'knowledge' };
       case '/gallery':
         return { handled: true, messages: [], widget: 'gallery' };
+      case '/yield':
+        return {
+          handled: true,
+          messages: [
+            {
+              type: MessageType.YIELD,
+              payload: {},
+              player_id: "",
+            } satisfies GameMessage,
+          ],
+        };
       default:
         // Unknown slash command — swallow it client-side. The backend cannot
         // receive slash text as PLAYER_ACTION without erroring. If a command
