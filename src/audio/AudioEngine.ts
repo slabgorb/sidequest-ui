@@ -59,6 +59,11 @@ export class AudioEngine {
     AudioEngine.instance = null;
   }
 
+  /** Return the current singleton without creating one — used by HMR cleanup. */
+  static peekInstance(): AudioEngine | null {
+    return AudioEngine.instance;
+  }
+
   private ctx: AudioContext;
   private channels: Record<ChannelName, GainNode>;
   private masterGain: GainNode;
@@ -209,4 +214,35 @@ export class AudioEngine {
 
     this.ctx.close();
   }
+}
+
+// Vite HMR cleanup — playtest 2026-04-25 [P1-NEW] "Multiple music tracks
+// playing simultaneously". When this module (or a transitive dep that
+// invalidates it) re-evaluates, the static ``AudioEngine.instance`` field
+// resets to null but the OLD instance's ``AudioContext`` stays alive and
+// connected to ``destination``. The next ``getInstance()`` call spawns a
+// fresh context; both are routed to the speakers and any in-flight music
+// buffers from the orphan layer audibly. Each subsequent HMR stacks
+// another layer.
+//
+// Closing the singleton's context BEFORE the module swaps is the only
+// hook Vite gives us to break that chain — ``import.meta.hot.dispose``
+// runs while the old module is still reachable, so we can call into the
+// instance's existing ``dispose()`` which closes the AudioContext and
+// disconnects all gains. The new module's ``getInstance()`` then sees
+// ``ctx.state === "closed"`` and constructs a fresh engine cleanly.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    const inst = AudioEngine.peekInstance();
+    if (inst) {
+      try {
+        inst.dispose();
+      } catch (err) {
+        // Best-effort cleanup — if dispose throws, the new context will
+        // still play but we'll have logged the leak source.
+        console.warn("[AudioEngine] HMR dispose failed:", err);
+      }
+    }
+    AudioEngine.resetInstance();
+  });
 }

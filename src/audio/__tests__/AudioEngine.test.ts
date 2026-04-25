@@ -276,6 +276,53 @@ describe("AudioEngine", () => {
   });
 
   // -----------------------------------------------------------------------
+  // HMR-leak guard — playtest 2026-04-25 [P1-NEW]
+  // "Multiple music tracks playing simultaneously"
+  // -----------------------------------------------------------------------
+
+  describe("HMR cleanup", () => {
+    afterEach(() => {
+      AudioEngine.resetInstance();
+    });
+
+    it("peekInstance returns null when no singleton is active", () => {
+      AudioEngine.resetInstance();
+      expect(AudioEngine.peekInstance()).toBeNull();
+    });
+
+    it("peekInstance does NOT create a new singleton (HMR-safe)", () => {
+      AudioEngine.resetInstance();
+      const before = AudioEngine.peekInstance();
+      expect(before).toBeNull();
+      // Direct read should not have constructed a fresh AudioContext —
+      // the cleanup hook needs to know if there's nothing to dispose.
+      expect(ctx.close).not.toHaveBeenCalled();
+    });
+
+    it("peekInstance returns the active singleton after getInstance", () => {
+      const inst = AudioEngine.getInstance();
+      expect(AudioEngine.peekInstance()).toBe(inst);
+      inst.dispose();
+    });
+
+    it("HMR-style cleanup closes the orphan AudioContext", () => {
+      // Simulate the import.meta.hot.dispose() path: read the active
+      // singleton via peekInstance and call dispose on it. This is the
+      // exact sequence the module-level HMR hook performs.
+      const inst = AudioEngine.getInstance();
+      const peeked = AudioEngine.peekInstance();
+      expect(peeked).toBe(inst);
+      peeked?.dispose();
+      AudioEngine.resetInstance();
+
+      expect(ctx.close).toHaveBeenCalled();
+      expect(ctx.state).toBe("closed");
+      // After cleanup, no orphan singleton remains.
+      expect(AudioEngine.peekInstance()).toBeNull();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Audio graph topology
   // -----------------------------------------------------------------------
 
