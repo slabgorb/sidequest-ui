@@ -14,6 +14,7 @@ import { TimingTab } from "./tabs/TimingTab";
 import { ConsoleTab } from "./tabs/ConsoleTab";
 import { PromptTab } from "./tabs/PromptTab";
 import { LoreTab } from "./tabs/LoreTab";
+import { EncounterTab } from "./tabs/EncounterTab";
 import { THEME } from "./shared/constants";
 
 // ---------------------------------------------------------------------------
@@ -307,6 +308,18 @@ export function DashboardApp() {
     }
   }, [state.turns.length, loadDebugState]);
 
+  // Derive the active session slug from debugState (same sort logic as StateTab).
+  // Used by EncounterTab to fetch encounter events for the live session.
+  const activeSlug: string | null = (() => {
+    if (!state.debugState || state.debugState.length === 0) return null;
+    const sorted = [...state.debugState].sort((a, b) => {
+      const aTs = a.last_activity_ts ?? 0;
+      const bTs = b.last_activity_ts ?? 0;
+      return bTs - aTs;
+    });
+    return sorted[0].session_key;
+  })();
+
   const errorCount = state.allEvents.filter(
     (e) => e.severity === "error",
   ).length;
@@ -377,6 +390,9 @@ export function DashboardApp() {
         )}
         {state.activeTab === 6 && (
           <LoreTab loreEvents={state.loreEvents} />
+        )}
+        {state.activeTab === 7 && (
+          <EncounterTab slug={activeSlug} />
         )}
       </div>
     </div>
