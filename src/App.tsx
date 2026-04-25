@@ -810,7 +810,10 @@ function AppInner() {
       // The server will receive beat_id + face + seed in one DiceThrow message.
       const statVal = characterSheet?.stats[beat.stat_check] ?? 10;
       const modifier = Math.floor((statVal - 10) / 2);
-      const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.metric_delta) * 2));
+      // DC scales with `base` (BeatDef scalar magnitude). Defaults to the
+      // server-side default of 1 when absent. Replaces the legacy
+      // `metric_delta` field that was removed in the dual-track migration.
+      const rawDc = Math.min(30, Math.max(10, 10 + Math.abs(beat.base ?? 1) * 2));
       const charName = characterSheet?.name ?? character?.name ?? "Unknown";
       const localReq: DiceRequestPayload = {
         request_id: crypto.randomUUID(),

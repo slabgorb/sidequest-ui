@@ -14,17 +14,21 @@ const STANDOFF_DATA: ConfrontationData = {
     { name: "The Stranger", role: "duelist", portrait_url: "/portraits/stranger.png" },
     { name: "Black Bart", role: "duelist", portrait_url: "/portraits/bart.png" },
   ],
-  metric: {
+  player_metric: {
     name: "tension",
     current: 3,
     starting: 0,
-    direction: "ascending",
-    threshold_high: 10,
-    threshold_low: null,
+    threshold: 10,
+  },
+  opponent_metric: {
+    name: "tension",
+    current: 1,
+    starting: 0,
+    threshold: 10,
   },
   beats: [
-    { id: "stare", label: "Stare Down", metric_delta: 2, stat_check: "CHA", risk: "blink" },
-    { id: "draw", label: "Draw!", metric_delta: 5, stat_check: "DEX", resolution: true },
+    { id: "stare", label: "Stare Down", kind: "press", base: 2, stat_check: "CHA", risk: "blink" },
+    { id: "draw", label: "Draw!", kind: "finisher", base: 5, stat_check: "DEX", resolution: true },
   ],
   secondary_stats: null,
   genre_slug: "spaghetti_western",
@@ -39,17 +43,21 @@ const CHASE_DATA: ConfrontationData = {
     { name: "Road Hog", role: "pursuer" },
     { name: "Sam", role: "quarry" },
   ],
-  metric: {
+  player_metric: {
     name: "distance",
     current: 5,
-    starting: 3,
-    direction: "bidirectional",
-    threshold_high: 10,
-    threshold_low: 0,
+    starting: 0,
+    threshold: 10,
+  },
+  opponent_metric: {
+    name: "closing",
+    current: 3,
+    starting: 0,
+    threshold: 10,
   },
   beats: [
-    { id: "floor-it", label: "Floor It", metric_delta: 2, stat_check: "SPD" },
-    { id: "swerve", label: "Swerve", metric_delta: 1, stat_check: "MAN", risk: "rollover" },
+    { id: "floor-it", label: "Floor It", kind: "press", base: 2, stat_check: "SPD" },
+    { id: "swerve", label: "Swerve", kind: "press", base: 1, stat_check: "MAN", risk: "rollover" },
   ],
   secondary_stats: {
     stats: {
@@ -118,18 +126,20 @@ describe("AC2: Confrontation type rendering", () => {
 // AC3: Metric bar renders correctly
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("AC3: Metric bar display", () => {
-  it("renders the metric bar with correct name", () => {
+describe("AC3: Dual-dial metric display", () => {
+  it("renders both player and opponent metric bars", () => {
     render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
-    expect(screen.getByTestId("metric-bar")).toBeInTheDocument();
-    expect(screen.getByText("tension")).toBeInTheDocument();
+    const bars = screen.getAllByTestId("metric-bar");
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveAttribute("data-metric-side", "player");
+    expect(bars[1]).toHaveAttribute("data-metric-side", "opponent");
   });
 
-  it("renders the metric bar fill element", () => {
+  it("renders fill elements for both bars", () => {
     render(<ConfrontationWidget data={STANDOFF_DATA} />);
 
-    expect(screen.getByTestId("metric-bar-fill")).toBeInTheDocument();
+    expect(screen.getAllByTestId("metric-bar-fill")).toHaveLength(2);
   });
 });
 

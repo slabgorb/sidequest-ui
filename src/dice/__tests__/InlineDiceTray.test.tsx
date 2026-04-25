@@ -136,13 +136,17 @@ describe("InlineDiceTray — wiring (consumed by ConfrontationOverlay)", () => {
           label: "Cold Negotiation",
           category: "social",
           actors: [{ name: "Mira", role: "player" }],
-          metric: {
+          player_metric: {
             name: "leverage",
             current: 4,
-            starting: 4,
-            direction: "bidirectional",
-            threshold_high: 10,
-            threshold_low: 0,
+            starting: 0,
+            threshold: 10,
+          },
+          opponent_metric: {
+            name: "leverage",
+            current: 2,
+            starting: 0,
+            threshold: 10,
           },
           beats: [],
           secondary_stats: null,
