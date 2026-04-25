@@ -1,4 +1,8 @@
-/** Mirrors Rust WatcherEventType (sidequest-server/src/lib.rs). */
+// Mirrors the Python WatcherEvent contract emitted by:
+//   - sidequest-server/sidequest/telemetry/spans.py (SPAN_ROUTES)
+//   - sidequest-server/sidequest/server/watcher.py  (WatcherSpanProcessor)
+//   - sidequest-server/sidequest/telemetry/validator.py (Layer-3 events)
+// See ADR-031 (Game Watcher) and ADR-089 (Dashboard Restoration).
 export type WatcherEventType =
   | "agent_span_open"
   | "agent_span_close"
@@ -12,10 +16,10 @@ export type WatcherEventType =
   | "prompt_assembled"
   | "game_state_snapshot";
 
-/** Mirrors Rust Severity. */
+/** Mirrors Python Severity. */
 export type Severity = "info" | "warning" | "error";
 
-/** A watcher telemetry event from the Rust API's /ws/watcher stream. */
+/** A watcher telemetry event from the Python API's /ws/watcher stream. */
 export interface WatcherEvent {
   timestamp: string;
   component: string;
