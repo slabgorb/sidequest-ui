@@ -193,6 +193,13 @@ function AppInner() {
   // the user clicks Retry after a transient failure.
   const [gameMetaError, setGameMetaError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  // Fatal WebSocket-frame error: ERROR with reconnect_required=false. The
+  // socket will keep trying to reconnect forever otherwise (and re-hit the
+  // same exception); we capture the typed message + code, surface a full-
+  // screen escape panel, and explicitly disconnect so the loop stops.
+  // Playtest 2026-04-25 — legacy save schema crashes session_handler;
+  // without this UI gate the user is trapped on "Reconnecting…" indefinitely.
+  const [fatalError, setFatalError] = useState<{ message: string; code: string | null } | null>(null);
   const [thinking, setThinking] = useState(false);
   // Unified input lock: false after submit, true when narration arrives.
   // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
@@ -684,10 +691,28 @@ function AppInner() {
       return; // Don't show this error in the narrative
     }
 
+    // Fatal ERROR frame (reconnect_required=false): the server cannot
+    // recover by retrying the connect handshake — typically a typed
+    // failure like `save_schema_invalid` or `server_error`. Stop the
+    // reconnect loop and surface a full-screen escape panel so the user
+    // can return to the lobby instead of staring at "Reconnecting…"
+    // indefinitely. Playtest 2026-04-25.
+    if (msg.type === MessageType.ERROR && msg.payload.reconnect_required === false) {
+      setFatalError({
+        message: msg.payload.message,
+        code: msg.payload.code ?? null,
+      });
+      disconnectRef.current?.();
+      return;
+    }
+
     setMessages((prev) => [...prev, msg]);
   }, [connectedPlayerName, appendCachedEvent]);
 
   const sendRef = useRef<typeof send | null>(null);
+  // Disconnect ref so handleMessage (declared above useGameSocket) can stop
+  // the reconnect loop synchronously when a fatal ERROR frame arrives.
+  const disconnectRef = useRef<(() => void) | null>(null);
 
   const { connect, disconnect, send, readyState, isReconnecting, error } = useGameSocket({
     url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
@@ -711,6 +736,8 @@ function AppInner() {
   }, [readyState, isReconnecting]);
   // eslint-disable-next-line react-hooks/immutability
   sendRef.current = send;
+  // eslint-disable-next-line react-hooks/immutability
+  disconnectRef.current = disconnect;
 
   const handleCreationRespond = useCallback(
     (payload: Record<string, unknown>) => {
@@ -1208,6 +1235,59 @@ function AppInner() {
   // connecting. Do not show ConnectScreen — the session already exists.
   if (slug && !displayName) {
     return <NamePrompt onSubmit={handleNameSubmit} />;
+  }
+
+  // Fatal WebSocket-frame error preempts all other UI — the user is
+  // disconnected and needs an explicit escape. Per UX addendum: full-screen
+  // panel (not a banner — the amber strip was easy to miss), plain-language
+  // message, two explicit actions. The panel intentionally lives outside the
+  // game ErrorBoundary so it survives crashes that happen inside the game.
+  if (fatalError) {
+    const isSchemaError = fatalError.code === "save_schema_invalid";
+    const headline = isSchemaError
+      ? "This save can't be loaded"
+      : "The server returned an error";
+    const subheading = isSchemaError
+      ? "The save predates the current game schema. Start a new adventure or move the save aside."
+      : "The session ended unexpectedly. You can return to the lobby or try connecting again.";
+    return (
+      <div
+        data-testid="fatal-error-panel"
+        data-error-code={fatalError.code ?? undefined}
+        className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-8 gap-6"
+      >
+        <div className="max-w-xl flex flex-col items-center gap-4 text-center">
+          <h1 className="text-2xl font-bold text-destructive">{headline}</h1>
+          <p className="text-base text-muted-foreground">{subheading}</p>
+          <pre className="text-xs text-muted-foreground/80 whitespace-pre-wrap break-words bg-muted/30 rounded p-3 max-w-full">
+            {fatalError.message}
+          </pre>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setFatalError(null);
+                clearSession();
+                navigate("/");
+              }}
+              className="rounded bg-primary px-6 py-2 text-primary-foreground text-sm tracking-wide uppercase"
+            >
+              Start a New Adventure
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFatalError(null);
+                setRetryCount((c) => c + 1);
+              }}
+              className="rounded border border-border bg-background px-6 py-2 text-foreground text-sm tracking-wide uppercase hover:bg-muted"
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

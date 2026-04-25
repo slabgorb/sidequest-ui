@@ -161,6 +161,17 @@ export interface ConfrontationPayload {
 export interface ErrorPayload {
   message: string;
   reconnect_required?: boolean;
+  /**
+   * Optional machine-readable error code so the UI can branch without
+   * keyword-matching the human message. Known codes:
+   *  - `save_schema_invalid` — saved snapshot does not match the current
+   *    schema (legacy single-metric encounter under dual-dial migration,
+   *    etc.). The UI should NOT auto-reconnect; show a fatal error panel
+   *    with escape actions.
+   *  - `server_error` — unexpected exception during message handling
+   *    (caught at the WebSocket boundary as a safety net).
+   */
+  code?: string;
 }
 
 export interface ImagePayload {
