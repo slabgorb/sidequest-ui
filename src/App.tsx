@@ -1376,17 +1376,32 @@ function AppInner() {
                 <p role="alert" className="text-sm text-destructive">
                   {alertError}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setGameMetaError(null);
-                    slugConnectFired.current = false;
-                    setRetryCount((c) => c + 1);
-                  }}
-                  className="rounded bg-primary px-6 py-2 text-primary-foreground text-sm tracking-wide uppercase"
-                >
-                  Retry
-                </button>
+                <div className="flex flex-wrap gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGameMetaError(null);
+                      slugConnectFired.current = false;
+                      setRetryCount((c) => c + 1);
+                    }}
+                    className="rounded bg-primary px-6 py-2 text-primary-foreground text-sm tracking-wide uppercase"
+                  >
+                    Retry
+                  </button>
+                  {/* Back to Lobby — every error state needs an escape per UX
+                      addendum. Without this, the player is stranded on
+                      /solo/<bad-slug> with only Retry, which loops on the
+                      same 404. handleLeave clears local session state and
+                      navigates to /; safe to call even from the error path. */}
+                  <button
+                    type="button"
+                    onClick={handleLeave}
+                    data-testid="lobby-escape-from-error"
+                    className="rounded border border-border bg-background px-6 py-2 text-foreground text-sm tracking-wide uppercase hover:bg-muted"
+                  >
+                    Back to Lobby
+                  </button>
+                </div>
               </>
             ) : (
               <p
