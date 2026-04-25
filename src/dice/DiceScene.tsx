@@ -24,6 +24,7 @@ import {
 import { Text } from "@react-three/drei";
 import { D20_COLLIDER_VERTICES, D20_RADIUS, computeFaceInfo, readD20Value } from "./d20";
 import { useDiceThrowGesture } from "./useDiceThrowGesture";
+import { DEFAULT_DICE_THEME, type DiceTheme } from "./diceTheme";
 
 // drei's <Text> uses troika-three-text. Two bugs landed here in quick
 // succession:
@@ -40,7 +41,6 @@ import { useDiceThrowGesture } from "./useDiceThrowGesture";
 //      from `/public/fonts/Inter-Bold.ttf` (Google Fonts, OFL).
 // Story 34-12 — physics-is-the-roll close-out.
 const FACE_LABEL_FONT = "/fonts/Inter-Bold.ttf";
-const BASTARDA_FONT = "/fonts/Bastarda-K.ttf";
 
 // Precompute face info once at module load — same for every die instance
 const FACE_INFO = computeFaceInfo();
@@ -166,40 +166,20 @@ function FaceLabels({ color = "#1a1a1a", font = FACE_LABEL_FONT }: { color?: str
   );
 }
 
-/** Die appearance — driven by genre. */
-export interface DiceTheme {
-  /** Die body color */
-  dieColor: string;
-  /** Face number color */
-  labelColor: string;
-  /** Font URL for face numbers (.ttf only — troika doesn't support .woff2) */
-  labelFont?: string;
-  /** Surface roughness (0 = glossy, 1 = matte) */
-  roughness?: number;
-  /** Metalness (0 = plastic, 1 = chrome) */
-  metalness?: number;
-  /** Normal map URL for surface detail (scratches, pitting, wear) */
-  normalMap?: string;
-  /** Normal map intensity (default 1.0) */
-  normalScale?: number;
-}
-
-export const DEFAULT_DICE_THEME: DiceTheme = {
-  dieColor: "#e8e0d0",   // ivory
-  labelColor: "#1a1a1a", // near-black
-  roughness: 0.3,
-  metalness: 0.1,
-  normalMap: "/textures/dice/scratched-plastic-normal.jpg",
-  normalScale: 0.15,
-};
-
 function D20Mesh({ theme = DEFAULT_DICE_THEME }: { theme?: DiceTheme }) {
   // Load normal map if specified. useLoader suspends until loaded.
-  const normalTex = useLoader(
+  const baseTex = useLoader(
     TextureLoader,
     theme.normalMap ?? "/textures/dice/scratched-plastic-normal.jpg",
   );
-  normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
+  // Clone before configuring — react-hooks/immutability forbids mutating a
+  // hook's return value. The clone shares the underlying GPU image data but
+  // gets its own wrap/repeat config.
+  const normalTex = useMemo(() => {
+    const tex = baseTex.clone();
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }, [baseTex]);
 
   const normalScaleVec = useMemo(
     () => new THREE.Vector2(theme.normalScale ?? 0.5, theme.normalScale ?? 0.5),
@@ -302,20 +282,35 @@ function PhysicsDie({
 
 // --- Pickup Die (pre-throw, idle with fidget spin) ---
 
+interface SpinState {
+  vx: number;
+  vy: number;
+  nextKick: number;
+}
+
 function PickupDie({ onThrow, theme }: { onThrow: (params: ThrowParams) => void; theme?: DiceTheme }) {
   const { onPointerDown: handlePointerDown } = useDiceThrowGesture({ onThrow });
   const groupRef = useRef<THREE.Group>(null);
   // Idle fidget: angular velocity with friction decay. Random kicks
-  // give it a "snap-spin on the table" feel.
-  const spinRef = useRef({
-    vx: 0, vy: 0,
-    nextKick: performance.now() + 2000 + Math.random() * 4000,
-  });
+  // give it a "snap-spin on the table" feel. Lazy-init via ref so the
+  // impure performance.now()/Math.random() calls don't run during render
+  // (react-hooks/purity).
+  const spinRef = useRef<SpinState | null>(null);
+  const getSpin = (): SpinState => {
+    if (spinRef.current === null) {
+      spinRef.current = {
+        vx: 0,
+        vy: 0,
+        nextKick: performance.now() + 2000 + Math.random() * 4000,
+      };
+    }
+    return spinRef.current;
+  };
 
   useFrame((_state, delta) => {
     const group = groupRef.current;
     if (!group) return;
-    const spin = spinRef.current;
+    const spin = getSpin();
     const now = performance.now();
 
     // Random kick — like flicking the die with a finger
@@ -335,7 +330,11 @@ function PickupDie({ onThrow, theme }: { onThrow: (params: ThrowParams) => void;
   });
 
   return (
-    <group ref={groupRef} position={[0, D20_RADIUS + 0.01, 0]}>
+    <group
+      ref={groupRef}
+      position={[0, D20_RADIUS + 0.01, 0]}
+      onPointerDown={handlePointerDown}
+    >
       <D20Mesh theme={theme} />
     </group>
   );

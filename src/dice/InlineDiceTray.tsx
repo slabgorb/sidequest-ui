@@ -12,7 +12,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { DiceScene, type ThrowParams, type DiceTheme, DEFAULT_DICE_THEME } from "./DiceScene";
+import { DiceScene, type ThrowParams } from "./DiceScene";
+import { type DiceTheme, DEFAULT_DICE_THEME } from "./diceTheme";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import { replayThrowParams } from "./replayThrowParams";
 

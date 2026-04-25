@@ -127,7 +127,6 @@ function parseScrapbookEntry(payload: Record<string, unknown>): ScrapbookEntry |
     typeof excerpt !== "string" ||
     excerpt.length === 0
   ) {
-    // eslint-disable-next-line no-console
     console.error("SCRAPBOOK_ENTRY dropped — missing required fields", payload);
     return null;
   }
