@@ -59,10 +59,19 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
     // turn. "Waiting for the narrator..." is true regardless of which
     // chargen step we're between. Genre packs can override via
     // ``scene.loading_text``.
+    //
+    // The heartbeat dot is the "system is alive" cue — playtest 2026-04-24
+    // flagged the all-text spinner as indistinguishable from a crash. Pulse
+    // matches the in-game MultiplayerTurnBanner idiom (emerald, w-2 h-2).
     return (
       <div data-testid="character-creation">
         <div data-testid="creation-loading" role="status"
-             className="flex items-center justify-center min-h-[200px]">
+             className="flex items-center justify-center gap-2 min-h-[200px]">
+          <span
+            data-testid="chargen-heartbeat-dot"
+            aria-hidden="true"
+            className="inline-block w-2 h-2 rounded-full shrink-0 bg-emerald-500 animate-pulse"
+          />
           <p className="text-sm italic text-muted-foreground/50 animate-pulse">
             {scene?.loading_text ?? "Waiting for the narrator..."}
           </p>

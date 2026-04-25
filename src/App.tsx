@@ -475,7 +475,15 @@ function AppInner() {
         // names; mutant_wasteland uses class+name). The DB primary key
         // for the seat is (slug, player_id), so the slot is mostly
         // descriptive metadata that flows back via SEAT_CONFIRMED.
+        //
+        // The server emits `character.model_dump()` which nests the
+        // name under `core.name` (Python pydantic model). The flat
+        // `name` / `character_name` fallbacks are kept for any
+        // historical or alternative emission paths but the canonical
+        // location is `core.name`.
+        const charCore = charData?.core as Record<string, unknown> | undefined;
         const charNameForSeat =
+          (charCore?.name as string | undefined) ??
           (charData?.name as string | undefined) ??
           (charData?.character_name as string | undefined);
         if (charNameForSeat && sendRef.current) {
