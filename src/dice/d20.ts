@@ -14,6 +14,25 @@ import * as THREE from "three";
 const PHI = (1 + Math.sqrt(5)) / 2;
 
 /**
+ * Visual + collider scale for the die. Playtest 2026-04-25 bumped the
+ * die from radius=0.24 to radius=0.36 (1.5× larger) so Sebastien
+ * (mechanics-first) and Alex (slower reader) can read the settled face
+ * without leaning forward. Combined with the FOV tightening from 50 to
+ * 42 in InlineDiceTray.tsx, the die now occupies ~39% of the frame
+ * width at default zoom (was ~21% — roughly 1.86× perceptual size).
+ *
+ * The collider scale is held at radius/PHI_VERTEX_LEN so the convex
+ * hull tracks the visual mesh exactly — must scale together or the die
+ * bounces off invisible walls.
+ */
+
+/** Die radius for the visual mesh */
+export const D20_RADIUS = 0.36;
+
+/** Collider vertex scale — derived from D20_RADIUS so visual + physics stay in sync. */
+const _COLLIDER_VERTEX_SCALE = (D20_RADIUS / 0.24) * 0.14;
+
+/**
  * 12 vertices of a regular icosahedron (unit-ish scale).
  * Used for the ConvexHullCollider in Rapier.
  */
@@ -30,10 +49,7 @@ export const D20_COLLIDER_VERTICES = new Float32Array([
    PHI, 0,  1,
   -PHI, 0, -1,
   -PHI, 0,  1,
-].map(v => v * 0.14));
-
-/** Die radius for the visual mesh */
-export const D20_RADIUS = 0.24;
+].map(v => v * _COLLIDER_VERTEX_SCALE));
 
 /**
  * Standard d20 face-to-number mapping.

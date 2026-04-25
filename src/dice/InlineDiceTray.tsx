@@ -289,10 +289,19 @@ export function InlineDiceTray({ diceRequest, diceResult, playerId, onThrow, gen
             // (Playtest 2026-04-24: oblique cameras made the "up" face
             // indistinguishable from its neighbors, prompting floating
             // callouts that could disagree with what the player sees.)
+            //
+            // FOV 42 (was 50) tightens the lens for legibility — Sebastien
+            // reads the number, Alex isn't time-pressured to lean forward.
+            // The tray (1.6 wide) still fits the frame at this distance
+            // (camera y=2.4 → frame width ≈ 1.84 units) with ~0.12 of
+            // padding each side. Combined with D20_RADIUS=0.36 (1.5× the
+            // prior 0.24), the die now occupies ~39% of the frame width
+            // (was ~21%) — roughly 1.86× perceptual size, addressing the
+            // playtest 2026-04-25 readability bug.
             position: [0, 2.4, 0],
             rotation: [-Math.PI / 2, 0, 0],
             up: [0, 0, -1],
-            fov: 50,
+            fov: 42,
             near: 0.01,
             far: 50,
           }}
