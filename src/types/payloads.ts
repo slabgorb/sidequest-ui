@@ -583,6 +583,29 @@ export function isScrapbookEntry(msg: TypedGameMessage): msg is ScrapbookEntryMe
 }
 
 // ---------------------------------------------------------------------------
+// Encounter event types (GM panel — Task 22)
+// REST source: GET /api/sessions/{slug}/encounter_events
+// ---------------------------------------------------------------------------
+
+export type EncounterEventKind =
+  | "ENCOUNTER_STARTED"
+  | "ENCOUNTER_BEAT_APPLIED"
+  | "ENCOUNTER_METRIC_ADVANCE"
+  | "ENCOUNTER_BEAT_SKIPPED"
+  | "ENCOUNTER_TAG_CREATED"
+  | "ENCOUNTER_STATUS_ADDED"
+  | "ENCOUNTER_YIELD"
+  | "ENCOUNTER_RESOLVED"
+  | "ENCOUNTER_RESOLUTION_SIGNAL";
+
+export interface EncounterEvent {
+  seq: number;
+  kind: EncounterEventKind;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
 // Validation helpers (moved from useStateMirror)
 // ---------------------------------------------------------------------------
 
