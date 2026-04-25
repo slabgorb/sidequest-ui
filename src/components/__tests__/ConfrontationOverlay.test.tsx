@@ -18,19 +18,24 @@ const STANDOFF_ACTORS: EncounterActor[] = [
   { name: 'Black Bart', role: 'duelist', portrait_url: '/portraits/bart.png' },
 ];
 
-const STANDOFF_METRIC: EncounterMetric = {
+const STANDOFF_PLAYER_METRIC: EncounterMetric = {
   name: 'tension',
   current: 3,
   starting: 0,
-  direction: 'ascending',
-  threshold_high: 10,
-  threshold_low: null,
+  threshold: 10,
+};
+
+const STANDOFF_OPPONENT_METRIC: EncounterMetric = {
+  name: 'tension',
+  current: 1,
+  starting: 0,
+  threshold: 10,
 };
 
 const STANDOFF_BEATS: BeatOption[] = [
-  { id: 'stare_down', label: 'Stare Down', metric_delta: 2, stat_check: 'NERVE', risk: 'Flinch' },
-  { id: 'taunt', label: 'Taunt', metric_delta: 1, stat_check: 'PRESENCE' },
-  { id: 'draw', label: 'Draw!', metric_delta: 3, stat_check: 'DRAW', resolution: true },
+  { id: 'stare_down', label: 'Stare Down', kind: 'press', base: 2, stat_check: 'NERVE', risk: 'Flinch' },
+  { id: 'taunt', label: 'Taunt', kind: 'press', base: 1, stat_check: 'PRESENCE' },
+  { id: 'draw', label: 'Draw!', kind: 'finisher', base: 3, stat_check: 'DRAW', resolution: true },
 ];
 
 const STANDOFF_DATA: ConfrontationData = {
@@ -38,7 +43,8 @@ const STANDOFF_DATA: ConfrontationData = {
   label: 'High Noon Standoff',
   category: 'pre_combat',
   actors: STANDOFF_ACTORS,
-  metric: STANDOFF_METRIC,
+  player_metric: STANDOFF_PLAYER_METRIC,
+  opponent_metric: STANDOFF_OPPONENT_METRIC,
   beats: STANDOFF_BEATS,
   secondary_stats: null,
   genre_slug: 'spaghetti_western',
@@ -55,18 +61,22 @@ const NEGOTIATION_DATA: ConfrontationData = {
   label: 'Corporate Negotiation',
   category: 'social',
   actors: NEGOTIATION_ACTORS,
-  metric: {
+  player_metric: {
     name: 'leverage',
     current: 5,
-    starting: 5,
-    direction: 'bidirectional',
-    threshold_high: 10,
-    threshold_low: 0,
+    starting: 0,
+    threshold: 10,
+  },
+  opponent_metric: {
+    name: 'leverage',
+    current: 4,
+    starting: 0,
+    threshold: 10,
   },
   beats: [
-    { id: 'pressure', label: 'Apply Pressure', metric_delta: 2, stat_check: 'Cool' },
-    { id: 'concede', label: 'Concede Point', metric_delta: -1, stat_check: 'Net' },
-    { id: 'bluff', label: 'Bluff', metric_delta: 3, stat_check: 'Cool', risk: 'Exposed' },
+    { id: 'pressure', label: 'Apply Pressure', kind: 'press', base: 2, stat_check: 'Cool' },
+    { id: 'concede', label: 'Concede Point', kind: 'soak', base: 1, stat_check: 'Net' },
+    { id: 'bluff', label: 'Bluff', kind: 'press', base: 3, stat_check: 'Cool', risk: 'Exposed' },
   ],
   secondary_stats: null,
   genre_slug: 'neon_dystopia',
@@ -91,17 +101,21 @@ const CHASE_DATA: ConfrontationData = {
     { name: 'War Rig', role: 'pursuer' },
     { name: 'Player', role: 'quarry' },
   ],
-  metric: {
+  player_metric: {
     name: 'separation',
     current: 5,
-    starting: 5,
-    direction: 'ascending',
-    threshold_high: 10,
-    threshold_low: null,
+    starting: 0,
+    threshold: 10,
+  },
+  opponent_metric: {
+    name: 'closing',
+    current: 2,
+    starting: 0,
+    threshold: 10,
   },
   beats: [
-    { id: 'floor_it', label: 'Floor It', metric_delta: 2, stat_check: 'DRAW' },
-    { id: 'swerve', label: 'Swerve', metric_delta: 1, stat_check: 'NERVE', risk: 'Spin out' },
+    { id: 'floor_it', label: 'Floor It', kind: 'press', base: 2, stat_check: 'DRAW' },
+    { id: 'swerve', label: 'Swerve', kind: 'press', base: 1, stat_check: 'NERVE', risk: 'Spin out' },
   ],
   secondary_stats: CHASE_SECONDARY_STATS,
   genre_slug: 'road_warrior',
@@ -116,17 +130,21 @@ const COMBAT_DATA: ConfrontationData = {
     { name: 'Raider', role: 'enemy' },
     { name: 'Player', role: 'combatant' },
   ],
-  metric: {
-    name: 'round',
-    current: 1,
-    starting: 1,
-    direction: 'ascending',
-    threshold_high: null,
-    threshold_low: null,
+  player_metric: {
+    name: 'pressure',
+    current: 0,
+    starting: 0,
+    threshold: 5,
+  },
+  opponent_metric: {
+    name: 'pressure',
+    current: 0,
+    starting: 0,
+    threshold: 5,
   },
   beats: [
-    { id: 'attack', label: 'Attack', metric_delta: 0, stat_check: 'GRIT' },
-    { id: 'defend', label: 'Defend', metric_delta: 0, stat_check: 'NERVE' },
+    { id: 'attack', label: 'Attack', kind: 'press', base: 1, stat_check: 'GRIT' },
+    { id: 'defend', label: 'Defend', kind: 'soak', base: 1, stat_check: 'NERVE' },
   ],
   secondary_stats: null,
   genre_slug: 'spaghetti_western',
@@ -170,37 +188,52 @@ describe('AC1: Renders for any confrontation type', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// AC2: Metric bar displays with genre-themed colors
+// AC2: Dual-dial metric bars (player + opponent edges)
 // ═══════════════════════════════════════════════════════════
 
-describe('AC2: Metric bar display', () => {
-  it('renders the metric bar element', () => {
+describe('AC2: Dual-dial metric display', () => {
+  it('renders both player and opponent metric bars', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getByTestId('metric-bar')).toBeInTheDocument();
+    const bars = screen.getAllByTestId('metric-bar');
+    expect(bars).toHaveLength(2);
+    expect(bars[0]).toHaveAttribute('data-metric-side', 'player');
+    expect(bars[1]).toHaveAttribute('data-metric-side', 'opponent');
   });
 
-  it('shows metric name', () => {
+  it('groups both bars under a dual-dial container', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getByText(/tension/i)).toBeInTheDocument();
+    expect(screen.getByTestId('dual-dial-bars')).toBeInTheDocument();
   });
 
-  it('shows current metric value', () => {
+  it('shows player edge progress relative to its own threshold', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    expect(screen.getByText(/3/)).toBeInTheDocument();
+    // Player metric: current=3, threshold=10 → 30%
+    const fills = screen.getAllByTestId('metric-bar-fill');
+    expect(fills[0]).toHaveStyle({ width: '30%' });
   });
 
-  it('shows metric progress relative to threshold', () => {
+  it('shows opponent edge progress relative to its own threshold', () => {
     render(<ConfrontationOverlay data={STANDOFF_DATA} />);
-    const bar = screen.getByTestId('metric-bar-fill');
-    // 3 out of 10 = 30%
-    expect(bar).toHaveStyle({ width: '30%' });
+    // Opponent metric: current=1, threshold=10 → 10%
+    const fills = screen.getAllByTestId('metric-bar-fill');
+    expect(fills[1]).toHaveStyle({ width: '10%' });
   });
 
-  it('renders bidirectional metric for negotiation', () => {
-    render(<ConfrontationOverlay data={NEGOTIATION_DATA} />);
-    expect(screen.getByText(/leverage/i)).toBeInTheDocument();
-    // Bidirectional: 5 is center of [0, 10]
-    expect(screen.getByTestId('metric-bar-fill')).toBeInTheDocument();
+  it('labels each bar with its side', () => {
+    render(<ConfrontationOverlay data={STANDOFF_DATA} />);
+    expect(screen.getByText(/Player edge/i)).toBeInTheDocument();
+    expect(screen.getByText(/Opponent edge/i)).toBeInTheDocument();
+  });
+
+  it('flags a bar at threshold for visual emphasis', () => {
+    const data: ConfrontationData = {
+      ...STANDOFF_DATA,
+      player_metric: { ...STANDOFF_DATA.player_metric, current: 10 },
+    };
+    render(<ConfrontationOverlay data={data} />);
+    const bars = screen.getAllByTestId('metric-bar');
+    expect(bars[0]).toHaveAttribute('data-at-threshold', 'true');
+    expect(bars[1]).not.toHaveAttribute('data-at-threshold');
   });
 });
 
@@ -299,7 +332,11 @@ describe('AC5: Secondary stats', () => {
   it('shows fuel gauge', () => {
     render(<ConfrontationOverlay data={CHASE_DATA} />);
     expect(screen.getByText(/fuel/i)).toBeInTheDocument();
-    expect(screen.getByText(/10/)).toBeInTheDocument();
+    // Fuel renders as "10 / 10" inside the secondary stats panel.
+    // Disambiguate from the dual-dial bars (which also render
+    // "current / threshold") by scoping to the panel.
+    const panel = screen.getByTestId('secondary-stats');
+    expect(panel).toHaveTextContent(/10\s*\/\s*10/);
   });
 
   it('shows speed and maneuver', () => {

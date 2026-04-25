@@ -12,22 +12,39 @@ export interface EncounterActor {
   portrait_url?: string;
 }
 
+/**
+ * Dual-dial metric — mirrors the server's `EncounterMetric` (sidequest-server
+ * `sidequest/game/encounter.py:122`). Each side has its own ascending dial:
+ * `current` advances toward `threshold` and the side that hits threshold
+ * first triggers resolution. There's no shared/bidirectional bar — see
+ * ADR-024 dual-track tension model.
+ */
 export interface EncounterMetric {
   name: string;
   current: number;
   starting: number;
-  direction: 'ascending' | 'bidirectional';
-  threshold_high: number | null;
-  threshold_low: number | null;
+  threshold: number;
 }
 
+/**
+ * Wire shape matches the server's `BeatDef` (sidequest-server
+ * `sidequest/genre/models/rules.py:73`). Most fields are advisory metadata
+ * the UI doesn't need; we declare the ones the overlay + dice dispatcher
+ * actually read. Per the dual-track schema migration, `base` is the scalar
+ * magnitude that drives DC scaling (replaces the legacy `metric_delta`).
+ */
 export interface BeatOption {
   id: string;
   label: string;
-  metric_delta: number;
+  /** Beat kind: closed enum from BeatKind (drives per-tier delta defaults). */
+  kind?: string;
+  /** Scalar magnitude — drives DC scaling and risk color. Defaults to 1 server-side. */
+  base?: number;
   stat_check: string;
   risk?: string;
   resolution?: boolean;
+  /** Tag created when this beat resolves; required for kind=angle. */
+  target_tag?: string;
 }
 
 export interface StatValue {
@@ -45,7 +62,10 @@ export interface ConfrontationData {
   label: string;
   category: string;
   actors: EncounterActor[];
-  metric: EncounterMetric;
+  /** Player edge — advances on player_metric deltas; resolution at threshold. */
+  player_metric: EncounterMetric;
+  /** Opponent edge — advances on opponent_metric deltas; resolution at threshold. */
+  opponent_metric: EncounterMetric;
   beats: BeatOption[];
   secondary_stats: SecondaryStats | null;
   genre_slug: string;
@@ -72,32 +92,52 @@ interface ConfrontationOverlayProps {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Metric bar
+// Metric bar — one ascending dial, color-coded by side
 // ═══════════════════════════════════════════════════════════
 
-function MetricBar({ metric }: { metric: EncounterMetric }) {
-  let fillPct: number;
-  if (metric.direction === 'bidirectional') {
-    const range = (metric.threshold_high ?? 10) - (metric.threshold_low ?? 0);
-    fillPct = range > 0
-      ? ((metric.current - (metric.threshold_low ?? 0)) / range) * 100
-      : 50;
-  } else {
-    const max = metric.threshold_high ?? 10;
-    fillPct = max > 0 ? (metric.current / max) * 100 : 0;
-  }
-  fillPct = Math.max(0, Math.min(100, fillPct));
+type MetricSide = 'player' | 'opponent';
+
+const SIDE_LABEL: Record<MetricSide, string> = {
+  player: 'Player edge',
+  opponent: 'Opponent edge',
+};
+
+// Cool blue for the player edge, amber/red for the opponent edge — matches
+// the UX addendum recommendation (Adora Belle Dearheart, 2026-04-25). Bars
+// flash when they reach threshold so Sebastien sees the cause before the
+// narrator delivers the effect.
+const SIDE_FILL_CLASS: Record<MetricSide, string> = {
+  player: 'bg-sky-500',
+  opponent: 'bg-amber-500',
+};
+
+function MetricBar({ metric, side }: { metric: EncounterMetric; side: MetricSide }) {
+  const threshold = metric.threshold > 0 ? metric.threshold : 10;
+  const fillPct = Math.max(0, Math.min(100, (metric.current / threshold) * 100));
+  const atThreshold = metric.current >= metric.threshold && metric.threshold > 0;
 
   return (
-    <div data-testid="metric-bar" className="mb-3">
-      <div className="flex justify-between text-xs mb-1">
-        <span className="font-semibold capitalize">{metric.name}</span>
-        <span className="text-muted-foreground">{metric.current}</span>
+    <div
+      data-testid="metric-bar"
+      data-metric-side={side}
+      data-metric-name={metric.name}
+      data-at-threshold={atThreshold ? 'true' : undefined}
+      className="mb-2"
+    >
+      <div className="flex justify-between text-[11px] mb-1">
+        <span className="font-semibold uppercase tracking-wide">
+          {SIDE_LABEL[side]} <span className="text-muted-foreground capitalize">({metric.name})</span>
+        </span>
+        <span className="text-muted-foreground tabular-nums">
+          {metric.current} / {metric.threshold}
+        </span>
       </div>
-      <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+      <div className="relative w-full h-2 bg-muted rounded-full overflow-hidden">
         <div
           data-testid="metric-bar-fill"
-          className="h-full rounded-full transition-all duration-300 bg-primary"
+          className={`h-full rounded-full transition-all duration-300 ${SIDE_FILL_CLASS[side]} ${
+            atThreshold ? 'animate-pulse' : ''
+          }`}
           style={{ width: `${fillPct}%` }}
         />
       </div>
@@ -148,12 +188,13 @@ function ActorPortrait({
 // Beat action buttons
 // ═══════════════════════════════════════════════════════════
 
-// Risk color — maps |metric_delta| to a green→red hue. DC scales with
-// |metric_delta| (see App.tsx handleBeatSelect), so this gives players a
-// qualitative sense of how risky a beat is without revealing the exact DC.
-// Range: |delta| 0 → 10 maps to hue 120 (green) → 0 (red).
-function riskColor(metricDelta: number): string {
-  const risk = Math.min(1, Math.abs(metricDelta) / 10);
+// Risk color — maps |base| to a green→red hue. DC scales with `base` (see
+// App.tsx handleBeatSelect), so this gives players a qualitative sense of
+// how risky a beat is without revealing the exact DC. Range: |base| 0 → 10
+// maps to hue 120 (green) → 0 (red). Beats without an explicit `base` use
+// the server-side default of 1.
+function riskColor(base: number): string {
+  const risk = Math.min(1, Math.abs(base) / 10);
   const hue = 120 * (1 - risk);
   return `hsl(${hue.toFixed(0)}, 60%, 50%)`;
 }
@@ -170,7 +211,8 @@ function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelec
         const tooltip = beat.risk
           ? `${beat.label} (${beat.stat_check}) — ${beat.risk}`
           : `${beat.label} (${beat.stat_check})`;
-        const color = riskColor(beat.metric_delta);
+        const base = beat.base ?? 1;
+        const color = riskColor(base);
         return (
           <button
             key={beat.id}
@@ -178,7 +220,7 @@ function BeatActions({ beats, onBeatSelect }: { beats: BeatOption[]; onBeatSelec
             title={tooltip}
             aria-label={tooltip}
             data-resolution={beat.resolution ? 'true' : undefined}
-            data-risk={Math.min(1, Math.abs(beat.metric_delta) / 10).toFixed(2)}
+            data-risk={Math.min(1, Math.abs(base) / 10).toFixed(2)}
             onClick={() => onBeatSelect?.(beat.id)}
             style={{ borderColor: color, color }}
             className={[
@@ -258,14 +300,21 @@ export function ConfrontationOverlay({ data, onBeatSelect, inline, diceRequest, 
         ))}
       </div>
 
-      {/* Metric bar */}
-      <MetricBar metric={data.metric} />
+      {/* Dual-dial momentum — player edge above, opponent below. Either side
+          hitting its threshold triggers resolution (ADR-024). */}
+      <div data-testid="dual-dial-bars">
+        <MetricBar metric={data.player_metric} side="player" />
+        <MetricBar metric={data.opponent_metric} side="opponent" />
+      </div>
 
       {/* Beat action buttons */}
       <BeatActions beats={data.beats} onBeatSelect={onBeatSelect} />
 
-      {/* Yield button — only rendered when parent supplies the handler */}
-      {onYield !== undefined && (
+      {/* Yield button — only rendered when the player has spent at least one
+          edge of momentum (player_metric advanced past starting). The YIELD
+          handler refunds an edge, so the affordance is only meaningful once
+          there's an edge to refund. */}
+      {onYield !== undefined && data.player_metric.current > data.player_metric.starting && (
         <div className="mt-2">
           <YieldButton onYield={onYield} disabled={false} />
         </div>
