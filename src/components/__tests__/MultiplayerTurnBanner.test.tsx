@@ -64,6 +64,29 @@ describe("MultiplayerTurnBanner", () => {
     expect(banner).toHaveTextContent(/waiting for the narrator/i);
   });
 
+  it("shows 'waiting for the narrator' when actor is thinking AND active (ADR-036)", () => {
+    // Playtest 2026-04-25 regression guard: once the server emits
+    // TURN_STATUS{status="active"} on PLAYER_ACTION receipt, the actor's
+    // tab receives it too — so localIsActive=true alongside thinking=true.
+    // Banner must still show tone="thinking" (the actor knows they
+    // submitted; "Waiting for the narrator…" is the correct cue), not
+    // "you have the floor" (which would lie about the wait).
+    render(
+      <MultiplayerTurnBanner
+        isMultiplayer={true}
+        wsConnected={true}
+        thinking={true}
+        activePlayerId="p1"
+        activePlayerName="Laverne"
+        localPlayerId="p1"
+        localCharacterName="Laverne"
+      />,
+    );
+    const banner = screen.getByTestId("multiplayer-turn-banner");
+    expect(banner).toHaveAttribute("data-tone", "thinking");
+    expect(banner).toHaveTextContent(/waiting for the narrator/i);
+  });
+
   it("renders a heartbeat dot in green when connected", () => {
     render(
       <MultiplayerTurnBanner

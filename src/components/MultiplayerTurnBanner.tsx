@@ -54,8 +54,14 @@ export function MultiplayerTurnBanner({
   let label: string;
   let tone: "you" | "peer" | "thinking";
 
-  if (thinking && !localIsActive) {
-    // Local has submitted; narrator is composing the response.
+  if (thinking) {
+    // Narrator is composing — show "thinking" regardless of who the active
+    // player is. Previously this branch required ``!localIsActive``, but
+    // once the server emits TURN_STATUS{active} on PLAYER_ACTION receipt
+    // (ADR-036 sealed-letter pacing), the actor's tab has BOTH
+    // ``thinking=true`` AND ``localIsActive=true``. "Waiting for the
+    // narrator…" is the right cue for that state — the actor knows they
+    // submitted and is waiting for prose to land.
     label = "Waiting for the narrator…";
     tone = "thinking";
   } else if (
