@@ -245,9 +245,10 @@ function AppInner() {
   // MP-02 Task 5: seat handshake. After CHARACTER_CREATION{phase:complete},
   // the client claims a `character_slot` via PLAYER_SEAT. The server seats
   // the player in its `SessionRoom` and broadcasts `SEAT_CONFIRMED` to all
-  // sockets in the room. We track the seated set here so the UI can render
-  // a peer-presence indicator and confirm the handshake landed.
-  const [seatedPlayers, setSeatedPlayers] = useState<
+  // sockets in the room. We track the seated set so the UI can later render
+  // a peer-presence indicator. The setter is wired now; the consumer (badge
+  // rendering) is pending and will read this state.
+  const [, setSeatedPlayers] = useState<
     Record<string, string /* character_slot */>
   >({});
 

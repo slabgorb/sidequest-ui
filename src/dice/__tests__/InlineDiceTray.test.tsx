@@ -18,7 +18,10 @@ vi.mock("@react-three/fiber", () => ({
   ),
   useFrame: vi.fn(),
   useThree: () => ({ camera: {}, size: { width: 800, height: 600 } }),
-  useLoader: () => ({ wrapS: 0, wrapT: 0 }),
+  useLoader: () => {
+    const tex = { wrapS: 0, wrapT: 0, clone() { return { ...this, clone: this.clone }; } };
+    return tex;
+  },
 }));
 vi.mock("@react-three/rapier", () => ({
   Physics: ({ children }: { children: React.ReactNode }) => <>{children}</>,
