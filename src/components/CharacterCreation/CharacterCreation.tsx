@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { toRoman } from "@/lib/utils";
+import { parseStatLine } from "./parseStatLine";
 
 interface CreationChoice {
   label: string;
@@ -128,25 +129,59 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
         <div data-testid="character-review" className="bg-card/80 border border-border/50 rounded-lg p-6 w-full max-w-lg space-y-3">
           <div className="text-xs tracking-widest uppercase text-muted-foreground/60 mb-4">Character Sheet</div>
           {previewEntries.length > 0 ? (
-            previewEntries.map(([key, value], index) => (
-              <div
-                key={key}
-                data-testid={`review-section-${key}`}
-                className="flex items-center justify-between py-2 border-b border-border/20 last:border-0"
-              >
-                <div>
-                  <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{key}</span>
-                  <p className="text-sm text-card-foreground">{String(value)}</p>
-                </div>
-                <button
-                  onClick={() => onRespond({ action: "edit", target_step: index })}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-                  aria-label={`Edit ${key}`}
+            previewEntries.map(([key, value], index) => {
+              // Stats arrive from the server as a flat string like
+              // "STR 10  DEX 7  CON 12  INT 17  WIS 5  CHA 11" — built in
+              // sidequest-server/sidequest/server/dispatch/chargen_summary.py
+              // ~line 193. Rendered as a single small horizontal line that
+              // is dense and unscannable. Per CLAUDE.md playgroup notes:
+              // Alex (slow reader) loses it at-a-glance and Sebastien
+              // (mechanics-first) wants stats clearly visible. Detect the
+              // stat-line shape and render as a 3-col label-above-value
+              // mini-grid. Pure presentational — wire data shape unchanged.
+              const parsedStats = parseStatLine(value);
+              return (
+                <div
+                  key={key}
+                  data-testid={`review-section-${key}`}
+                  className="flex items-start justify-between py-2 border-b border-border/20 last:border-0"
                 >
-                  Edit
-                </button>
-              </div>
-            ))
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{key}</span>
+                    {parsedStats ? (
+                      <dl
+                        data-testid="review-stats-grid"
+                        className="grid grid-cols-3 gap-2 mt-2"
+                      >
+                        {parsedStats.map(([statName, statValue]) => (
+                          <div
+                            key={statName}
+                            data-testid={`review-stat-${statName}`}
+                            className="flex flex-col items-center rounded bg-background/40 border border-border/30 py-1.5"
+                          >
+                            <dt className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground/70">
+                              {statName}
+                            </dt>
+                            <dd className="text-lg font-bold text-[var(--primary)] tabular-nums m-0">
+                              {statValue}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="text-sm text-card-foreground">{String(value)}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onRespond({ action: "edit", target_step: index })}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 ml-2 shrink-0"
+                    aria-label={`Edit ${key}`}
+                  >
+                    Edit
+                  </button>
+                </div>
+              );
+            })
           ) : (
             <div className="whitespace-pre-wrap text-sm leading-relaxed text-card-foreground font-sans">{scene.summary}</div>
           )}
