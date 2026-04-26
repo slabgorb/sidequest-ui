@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { JourneyHistory } from "@/screens/lobby/JourneyHistory";
+import { modeBadge } from "@/screens/lobby/modeBadge";
 import { appendHistory, loadHistory } from "@/screens/lobby/historyStore";
 
 describe("JourneyHistory", () => {
@@ -128,6 +129,76 @@ describe("JourneyHistory", () => {
     await user.click(forgetBtn);
 
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("renders a mode icon per row (solo / multiplayer / unknown legacy)", () => {
+    appendHistory({
+      player_name: "SoloKid",
+      genre: "victoria",
+      world: "albion",
+      mode: "solo",
+    });
+    appendHistory({
+      player_name: "MPKid",
+      genre: "victoria",
+      world: "albion",
+      mode: "multiplayer",
+    });
+    appendHistory({
+      player_name: "LegacyKid",
+      genre: "victoria",
+      world: "albion",
+      // No mode — simulates a pre-2026-04-24 entry.
+    });
+
+    render(
+      <JourneyHistory
+        onSelect={vi.fn()}
+        prettyGenre={prettyGenre}
+        prettyWorld={prettyWorld}
+      />,
+    );
+
+    // Each row carries a mode-tagged span. Use data-mode to avoid coupling
+    // to the literal glyph (so we can swap ◈/⚑/◇ later without breaking).
+    const soloBadge = screen
+      .getByText("SoloKid")
+      .closest("button")!
+      .querySelector('[data-mode="solo"]');
+    const mpBadge = screen
+      .getByText("MPKid")
+      .closest("button")!
+      .querySelector('[data-mode="multiplayer"]');
+    const legacyBadge = screen
+      .getByText("LegacyKid")
+      .closest("button")!
+      .querySelector('[data-mode="unknown"]');
+
+    expect(soloBadge).not.toBeNull();
+    expect(mpBadge).not.toBeNull();
+    expect(legacyBadge).not.toBeNull();
+    expect(soloBadge!.textContent).toBe("◈");
+    expect(mpBadge!.textContent).toBe("⚑");
+    expect(legacyBadge!.textContent).toBe("◇");
+    // aria-label gives screen-reader users the same signal Alex gets visually.
+    expect(soloBadge!.getAttribute("aria-label")).toMatch(/solo/i);
+    expect(mpBadge!.getAttribute("aria-label")).toMatch(/multiplayer/i);
+    expect(legacyBadge!.getAttribute("aria-label")).toMatch(/unknown/i);
+  });
+
+  it("modeBadge maps each mode value to its glyph + label", () => {
+    expect(modeBadge("solo")).toEqual({
+      glyph: "◈",
+      label: "solo session",
+    });
+    expect(modeBadge("multiplayer")).toEqual({
+      glyph: "⚑",
+      label: "multiplayer session",
+    });
+    expect(modeBadge(undefined)).toEqual({
+      glyph: "◇",
+      label: "unknown mode (legacy entry)",
+    });
   });
 
   it("hides itself after the last entry is removed", async () => {
