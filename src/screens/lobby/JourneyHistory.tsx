@@ -5,6 +5,7 @@ import {
   formatRelativeTime,
   type JourneyEntry,
 } from "./historyStore";
+import { modeBadge } from "./modeBadge";
 
 export interface JourneyHistoryProps {
   /**
@@ -70,6 +71,12 @@ export function JourneyHistory({
         {entries.map((entry) => {
           const genreName = prettyGenre(entry.genre);
           const worldName = prettyWorld(entry.genre, entry.world);
+          // Mode icon: helps Alex (slow reader, MP context) see at-a-glance
+          // whether a row is a solo or multiplayer save before clicking. Pre
+          // 2026-04-24 entries lack `mode` — render a hollow diamond rather
+          // than guessing, so an unknown row visually differs from a known
+          // solo/MP row instead of silently looking like one.
+          const { glyph: modeGlyph, label: modeLabel } = modeBadge(entry.mode);
           return (
             <li key={`${entry.player_name}:${entry.genre}:${entry.world}`}>
               <button
@@ -83,6 +90,14 @@ export function JourneyHistory({
                            focus-visible:outline-none focus-visible:bg-muted/20"
               >
                 <span className="flex items-baseline gap-2 text-sm">
+                  <span
+                    aria-label={modeLabel}
+                    title={modeLabel}
+                    data-mode={entry.mode ?? "unknown"}
+                    className="inline-block w-3 text-center text-muted-foreground/70 tabular-nums"
+                  >
+                    {modeGlyph}
+                  </span>
                   <span className="text-foreground/85">{entry.player_name}</span>
                   <span className="text-muted-foreground/60">·</span>
                   <span className="italic text-foreground/70">
