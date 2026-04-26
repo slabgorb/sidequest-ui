@@ -209,17 +209,21 @@ describe("AC-3: edit buttons on review screen", () => {
     // Click the first edit button (should navigate to that step)
     await user.click(editButtons[0]);
 
-    // Should signal navigation to a specific step, not submission
+    // Should signal navigation to a specific step, not submission.
+    // Wire format must be snake_case (`target_step`) to match the server's
+    // pydantic schema — playtest 2026-04-26 caught the camelCase regression.
     const calls = onRespond.mock.calls;
     const editCall = calls.find((call) => {
       const payload = call[0] as Record<string, unknown>;
-      return (
-        payload.action === "edit" ||
-        payload.navigate === "step" ||
-        typeof payload.targetStep === "number"
-      );
+      return payload.action === "edit";
     });
     expect(editCall).toBeDefined();
+    const editPayload = editCall![0] as Record<string, unknown>;
+    expect(editPayload.action).toBe("edit");
+    expect(typeof editPayload.target_step).toBe("number");
+    // Lock the fix: must NOT use camelCase. Server's pydantic config has
+    // `extra: forbid` and would reject `targetStep` outright.
+    expect(editPayload.targetStep).toBeUndefined();
   });
 });
 

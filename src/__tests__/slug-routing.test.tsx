@@ -67,6 +67,23 @@ beforeEach(() => {
   installLocalStorageMock();
   // Pre-seed a display name so AppInner skips NamePrompt and fires connect immediately.
   localStorage.setItem('sq:display-name', 'alice');
+  // Pre-seed journey history with the test slug so the slug-mode prompt
+  // gate treats this as a returning user (not a fresh direct-URL join).
+  // Without this entry the slug-mode mount would always show the NamePrompt
+  // — see App.tsx slug-mode prompt gate (silent-rebind protection).
+  localStorage.setItem(
+    'sidequest-history',
+    JSON.stringify([
+      {
+        player_name: 'alice',
+        genre: 'low_fantasy',
+        world: 'greyhawk',
+        last_played_iso: new Date().toISOString(),
+        game_slug: '2026-04-22-moldharrow-keep',
+        mode: 'solo',
+      },
+    ]),
+  );
   // Default fetch mock — satisfies both genres and game-metadata fetches.
   vi.stubGlobal('fetch', makeDefaultFetchMock());
 });
@@ -176,8 +193,10 @@ describe('slug routing — AppInner phase transitions driven by server messages'
 
 describe('slug routing — NamePrompt shown when no display name is set', () => {
   it('renders NamePrompt and does NOT fire WS connect when slug URL has no display name', async () => {
-    // Clear the display name seeded in beforeEach — no name in storage.
+    // Clear the display name AND journey history seeded in beforeEach —
+    // simulate a fresh visitor with no identity for this slug.
     localStorage.removeItem('sq:display-name');
+    localStorage.removeItem('sidequest-history');
 
     const wsUrl = `ws://${location.host}/ws`;
     const server = new WS(wsUrl, { jsonProtocol: true });
@@ -208,6 +227,35 @@ describe('slug routing — NamePrompt shown when no display name is set', () => 
     expect(nameMsg.type).toBe('SESSION_EVENT');
     expect(nameMsg.payload.event).toBe('connect');
     expect(nameMsg.payload.game_slug).toBe('2026-04-22-moldharrow-keep');
+  });
+
+  // Silent-rebind regression — see playtest 2026-04-26 (Richie / Potsie).
+  // A stale `sq:display-name` from a prior session must NOT silently
+  // identify the joining player when the slug is not in journey history.
+  it('shows NamePrompt with stale name pre-filled when slug is not in journey history', async () => {
+    // Reset to the silent-rebind scenario: stale display name from a prior
+    // session, but no journey history for THIS slug. Player 2's direct-URL
+    // join must hit the prompt rather than silently inheriting 'alice'.
+    localStorage.clear();
+    localStorage.setItem('sq:display-name', 'alice');
+
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/play/2026-04-26-mawdeep-mp-2']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // NamePrompt must be visible — stale name does NOT bypass confirmation.
+    const input = (await screen.findByRole('textbox', {
+      name: /player name/i,
+    })) as HTMLInputElement;
+    // Pre-filled with the cached name as a suggestion (player can edit).
+    expect(input.value).toBe('alice');
+    // Critical: no WS connect frame should be sent before confirmation.
+    expect(server.messages).toHaveLength(0);
   });
 });
 

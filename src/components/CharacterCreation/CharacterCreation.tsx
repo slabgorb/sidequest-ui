@@ -139,7 +139,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
                   <p className="text-sm text-card-foreground">{String(value)}</p>
                 </div>
                 <button
-                  onClick={() => onRespond({ action: "edit", targetStep: index })}
+                  onClick={() => onRespond({ action: "edit", target_step: index })}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
                   aria-label={`Edit ${key}`}
                 >

@@ -30,6 +30,7 @@ import { PausedBanner } from "@/components/PausedBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { useDisplayName } from "@/hooks/useDisplayName";
 import { usePeerEventCache } from "@/hooks/usePeerEventCache";
+import { appendHistory, loadHistory } from "@/screens/lobby/historyStore";
 
 const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
@@ -40,6 +41,35 @@ const LazyDashboard = lazy(() =>
 // for isolated testing.
 
 type SessionPhase = "connect" | "creation" | "game";
+
+// Server ERROR codes that mean the session is unrecoverable and the user
+// must escape (full-screen fatal panel, disconnect WS, no auto-reconnect).
+// Anything NOT in this set is treated as a transient per-message rejection
+// — the WS stays open and a sanitized banner surfaces the failure. Add
+// new codes here only when the server has *also* set reconnect_required to
+// stop the reconnect loop; otherwise the client and server disagree about
+// recovery and the user gets stuck on a fatal panel that the server
+// doesn't think is fatal.
+const FATAL_ERROR_CODES: ReadonlySet<string> = new Set([
+  "save_schema_invalid",
+]);
+
+// Strip Pydantic-validation noise from a server ERROR message before
+// surfacing it to the player. The raw `validation error for GameMessage`
+// dump (with field-path lines like `payload.targetStep — Extra inputs are
+// not permitted` and `errors.pydantic.dev/...` URLs) is useful in OTEL
+// and the dev console but not for end-users — they need an action-shaped
+// sentence, not a schema dump. Keep the first non-empty line up to a
+// reasonable length; everything after the first `\n` is internal detail.
+function sanitizeErrorMessage(raw: string): string {
+  const firstLine = raw.split("\n")[0]?.trim() ?? "";
+  // Pydantic prefixes errors with `N validation errors for X` — replace
+  // with player-shaped copy. Anything else: pass through truncated.
+  if (/validation errors? for /i.test(firstLine)) {
+    return "That action couldn't be processed. Your session is still active.";
+  }
+  return firstLine.length > 200 ? firstLine.slice(0, 197) + "…" : firstLine;
+}
 
 const SESSION_KEY = "sidequest-session";
 
@@ -109,14 +139,23 @@ function saveHmrState(state: HmrState): void {
   }
 }
 
-// NamePrompt — shown in slug-mode when sq:display-name is not yet set.
-// Extracted as a standalone component so AppInner's slug-arrival branch
-// can render it without duplicating the ConnectScreen name field.
-// Decision: we do NOT reuse ConnectScreen here because ConnectScreen
-// requires genres data and the full lobby UI; at the slug-arrival point
-// we only need a name. Keep it minimal.
-function NamePrompt({ onSubmit }: { onSubmit: (name: string) => void }) {
-  const [v, setV] = useState("");
+// NamePrompt — shown in slug-mode when the joining player has not yet
+// confirmed an identity for *this* slug. `initialValue` pre-fills the input
+// from the cached `sq:display-name` (if any) but is treated as a *suggestion*,
+// not an identity — the player must hit Begin to confirm. This avoids the
+// silent "stale localStorage rebinds you to a different player" class of bug
+// (see playtests 2026-04-25 "Lenny resumed Laverne" and 2026-04-26 "Richie /
+// Potsie"). Keep it minimal — we don't reuse ConnectScreen because that
+// requires genres data and the full lobby UI; at slug-arrival we only need
+// a name.
+function NamePrompt({
+  onSubmit,
+  initialValue = "",
+}: {
+  onSubmit: (name: string) => void;
+  initialValue?: string;
+}) {
+  const [v, setV] = useState(initialValue);
   return (
     <div className="flex flex-col items-center justify-center flex-1 min-h-screen gap-8">
       <div aria-hidden="true" className="text-muted-foreground/30 text-sm tracking-[0.5em]">
@@ -164,9 +203,20 @@ function AppInner() {
   // The hook syncs across component instances in the same tab so
   // ConnectScreen's setName propagates to AppInner without a remount.
   const { name: displayName, setName: setDisplayName } = useDisplayName();
+  // Tracks whether the user has *explicitly confirmed* identity for the
+  // current slug in this tab's lifetime. The cached `sq:display-name` is
+  // not enough — see comment on the slug-mode prompt gate below.
+  const [identityConfirmedForSlug, setIdentityConfirmedForSlug] =
+    useState<string | null>(null);
   const handleNameSubmit = useCallback(
-    (name: string) => setDisplayName(name),
-    [setDisplayName],
+    (name: string) => {
+      setDisplayName(name);
+      // Latch confirmation against the current URL slug so a stale cached
+      // name from a prior session can't silently re-bind us if the user
+      // re-renders before the slug-connect effect persists state.
+      setIdentityConfirmedForSlug(slug ?? null);
+    },
+    [setDisplayName, slug],
   );
 
   // Bug 2: Hydrate from sessionStorage on mount (HMR recovery)
@@ -200,6 +250,14 @@ function AppInner() {
   // Playtest 2026-04-25 — legacy save schema crashes session_handler;
   // without this UI gate the user is trapped on "Reconnecting…" indefinitely.
   const [fatalError, setFatalError] = useState<{ message: string; code: string | null } | null>(null);
+  // Transient per-message rejection (server validation failed for one
+  // payload, but the session is still alive). Distinct from fatalError —
+  // does NOT disconnect, does NOT show a full-screen panel, just flashes
+  // an inline banner so the player knows their last input was rejected.
+  // Playtest 2026-04-26 — chargen schema mismatch was wrongly routed to
+  // the fatal panel, telling the player "the session ended unexpectedly"
+  // and offering "Retry Connection" — both wrong, both UX harmful.
+  const [transientError, setTransientError] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   // Unified input lock: false after submit, true when narration arrives.
   // Replaces the old thinking/activePlayerName/isMyTurn three-lock system.
@@ -691,18 +749,37 @@ function AppInner() {
       return; // Don't show this error in the narrative
     }
 
-    // Fatal ERROR frame (reconnect_required=false): the server cannot
-    // recover by retrying the connect handshake — typically a typed
-    // failure like `save_schema_invalid` or `server_error`. Stop the
-    // reconnect loop and surface a full-screen escape panel so the user
-    // can return to the lobby instead of staring at "Reconnecting…"
-    // indefinitely. Playtest 2026-04-25.
-    if (msg.type === MessageType.ERROR && msg.payload.reconnect_required === false) {
-      setFatalError({
-        message: msg.payload.message,
-        code: msg.payload.code ?? null,
-      });
-      disconnectRef.current?.();
+    // ERROR frame routing — split fatal vs transient (playtest 2026-04-26).
+    //
+    // Fatal: a typed unrecoverable failure (`save_schema_invalid` is the
+    // only one today; future ones go in FATAL_ERROR_CODES). Stop the
+    // reconnect loop, show the full-screen escape panel.
+    //
+    // Transient: per-message validation rejection — the session is fine,
+    // one payload couldn't be processed. Flash an inline banner so the
+    // player knows their last input bounced; do NOT disconnect, do NOT
+    // claim "the session ended". The pre-fix code path treated EVERY
+    // ERROR with `reconnect_required: false` as fatal because that was
+    // the default; in practice the server emits validation errors with
+    // that same default and they were getting wrongly escalated.
+    if (msg.type === MessageType.ERROR) {
+      const code = msg.payload.code ?? null;
+      const isFatal = code !== null && FATAL_ERROR_CODES.has(code);
+      if (isFatal) {
+        setFatalError({ message: msg.payload.message, code });
+        disconnectRef.current?.();
+        return;
+      }
+      // Transient — session stays open. Surface a sanitized one-liner.
+      // The raw payload (often a Pydantic dump) goes to the console for
+      // dev/OTEL but never to the player surface.
+      console.warn("server rejected message", msg.payload);
+      setTransientError(sanitizeErrorMessage(msg.payload.message));
+      // Server has nothing more to send for this turn — clear thinking
+      // so the input bar re-enables and the player can correct.
+      setThinking(false);
+      setCreationLoading(false);
+      setCanType(true);
       return;
     }
 
@@ -1083,6 +1160,20 @@ function AppInner() {
         // depend on currentGenre being non-null on first game render.
         setCurrentGenre(body.genre_slug);
         saveSession(slug);
+        // Record this slug in journey history so a page refresh on this
+        // tab doesn't re-trigger the slug-mode NamePrompt. Player 1 already
+        // appends history via ConnectScreen; this call covers Player 2's
+        // direct-URL join path. mode is normalized — the API returns the
+        // raw string but JourneyEntry expects "solo" | "multiplayer".
+        const normalizedMode: "solo" | "multiplayer" =
+          body.mode === "solo" ? "solo" : "multiplayer";
+        appendHistory({
+          player_name: displayName,
+          genre: body.genre_slug,
+          world: body.world_slug,
+          game_slug: slug,
+          mode: normalizedMode,
+        });
         setConnectedPlayerName(displayName);
         justConnectedRef.current = true;
         connect();
@@ -1231,10 +1322,41 @@ function AppInner() {
     [partyMembers, activePlayerName],
   );
 
-  // In slug-mode, if no display name yet, show the name prompt before
-  // connecting. Do not show ConnectScreen — the session already exists.
-  if (slug && !displayName) {
-    return <NamePrompt onSubmit={handleNameSubmit} />;
+  // In slug-mode, gate the WS connect on an explicit identity confirmation.
+  //
+  // Two cases require the prompt:
+  //   1. No cached display name at all — first-time visitor on this host.
+  //   2. Cached name exists, but THIS slug is not in our journey history —
+  //      i.e. we've never confirmed identity for this game. The cached name
+  //      is treated as a *suggestion* (pre-fill), not as an identity.
+  //
+  // Case 2 prevents the silent-rebind bug: if Player 2 navigates directly to
+  // a /play/<slug> URL on a host that previously played a different game,
+  // they MUST hit Begin to confirm — otherwise we'd seat the WS connection
+  // under a stale localStorage name they never typed for this session.
+  // (Once they've confirmed, slugConnectFired latches and the prompt won't
+  // re-fire on remount; subsequent reconnects to the same slug skip the
+  // prompt because saveSession() will have recorded it in history via the
+  // server's CONNECT_OK→appendHistory path.)
+  if (slug) {
+    // "Trusted" sources for an identity on this slug:
+    //   - This tab's user explicitly hit Begin in the NamePrompt for this slug
+    //     (identityConfirmedForSlug latch).
+    //   - The slug appears in journey history (means this client created the
+    //     game via ConnectScreen, which appends history *with the slug* before
+    //     navigating).
+    // The cached `sq:display-name` alone is NOT a trusted source — that's the
+    // silent-rebind footgun.
+    const slugKnown = loadHistory().some((e) => e.game_slug === slug);
+    const confirmedThisSlug = identityConfirmedForSlug === slug;
+    if (!confirmedThisSlug && !slugKnown) {
+      return (
+        <NamePrompt
+          onSubmit={handleNameSubmit}
+          initialValue={displayName ?? ""}
+        />
+      );
+    }
   }
 
   // Fatal WebSocket-frame error preempts all other UI — the user is
@@ -1242,14 +1364,16 @@ function AppInner() {
   // panel (not a banner — the amber strip was easy to miss), plain-language
   // message, two explicit actions. The panel intentionally lives outside the
   // game ErrorBoundary so it survives crashes that happen inside the game.
+  // Only renders for codes in FATAL_ERROR_CODES — per-message validation
+  // failures route to the transient-error banner instead.
   if (fatalError) {
     const isSchemaError = fatalError.code === "save_schema_invalid";
     const headline = isSchemaError
       ? "This save can't be loaded"
-      : "The server returned an error";
+      : "The session can't continue";
     const subheading = isSchemaError
       ? "The save predates the current game schema. Start a new adventure or move the save aside."
-      : "The session ended unexpectedly. You can return to the lobby or try connecting again.";
+      : "The server reported an unrecoverable error. Your in-progress turn was not saved.";
     return (
       <div
         data-testid="fatal-error-panel"
@@ -1259,9 +1383,15 @@ function AppInner() {
         <div className="max-w-xl flex flex-col items-center gap-4 text-center">
           <h1 className="text-2xl font-bold text-destructive">{headline}</h1>
           <p className="text-base text-muted-foreground">{subheading}</p>
-          <pre className="text-xs text-muted-foreground/80 whitespace-pre-wrap break-words bg-muted/30 rounded p-3 max-w-full">
-            {fatalError.message}
-          </pre>
+          {/* Server message is shown collapsed by default — useful when
+              filing a bug, distracting otherwise. The raw payload is in
+              the dev console regardless. */}
+          <details className="text-xs text-muted-foreground/60 max-w-full">
+            <summary className="cursor-pointer select-none">Technical details</summary>
+            <pre className="whitespace-pre-wrap break-words bg-muted/30 rounded p-3 mt-2">
+              {fatalError.message}
+            </pre>
+          </details>
           <div className="flex flex-wrap gap-3 mt-4">
             <button
               type="button"
@@ -1278,11 +1408,12 @@ function AppInner() {
               type="button"
               onClick={() => {
                 setFatalError(null);
-                setRetryCount((c) => c + 1);
+                clearSession();
+                navigate("/");
               }}
               className="rounded border border-border bg-background px-6 py-2 text-foreground text-sm tracking-wide uppercase hover:bg-muted"
             >
-              Retry Connection
+              Back to Lobby
             </button>
           </div>
         </div>
@@ -1295,6 +1426,23 @@ function AppInner() {
       <ReconnectBanner visible={isReconnecting} />
       <OfflineBanner offline={offline} />
       <PausedBanner paused={paused} waitingFor={pauseWaitingFor} />
+      {transientError && (
+        <div
+          role="alert"
+          data-testid="transient-error-banner"
+          className="bg-destructive/15 border-b border-destructive/30 text-destructive-foreground px-4 py-2 flex items-center justify-between gap-3"
+        >
+          <span className="text-sm">{transientError}</span>
+          <button
+            type="button"
+            onClick={() => setTransientError(null)}
+            aria-label="Dismiss error"
+            className="text-xs uppercase tracking-wider px-3 py-1 rounded hover:bg-destructive/20"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <main className="flex flex-col flex-1 min-h-0">
         {sessionPhase === "connect" && !slug && (
           <ErrorBoundary name="Connect">
