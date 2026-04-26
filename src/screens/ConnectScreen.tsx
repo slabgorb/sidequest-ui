@@ -518,7 +518,11 @@ export function ConnectScreen({
                        rounded-md px-10 py-3.5 cursor-pointer
                        shadow-[0_0_16px_rgba(0,0,0,0.3)]"
           >
-            {isStarting ? "Starting..." : "Start Adventure"}
+            {isStarting
+              ? "Starting..."
+              : mode === "multiplayer"
+                ? "Start or Join Adventure"
+                : "Start Adventure"}
           </button>
         </div>
       </form>

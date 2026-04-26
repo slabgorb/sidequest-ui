@@ -785,4 +785,53 @@ describe("ConnectScreen", () => {
       expect(slugCalls).toHaveLength(0);
     });
   });
+
+  // -- MP join affordance (playtest 2026-04-26 S4-UX) -----------------------
+  // Server fix (sidequest-server fix/s4-mp-lobby-join-existing-server)
+  // makes POST /api/games join an existing same-slug MP game by default.
+  // The lobby must signal that intent in MP mode so users on a second
+  // host (no shared local Past Journey state) understand that clicking
+  // Start will JOIN the existing table instead of opening a new one.
+  describe("MP mode Start button copy", () => {
+    it("renders 'Start Adventure' in solo mode", async () => {
+      const user = userEvent.setup();
+      renderConnect({ genres: GENRES });
+
+      // Default mode is solo; pick a world so the button is enabled.
+      await user.click(screen.getByRole("radio", { name: /road warrior/i }));
+
+      // Wasteland auto-selects in single-world genres.
+      const btn = screen.getByTestId("lobby-start-button");
+      expect(btn).toHaveTextContent(/^Start Adventure$/);
+    });
+
+    it("renders 'Start or Join Adventure' in multiplayer mode", async () => {
+      const user = userEvent.setup();
+      renderConnect({ genres: GENRES });
+
+      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+      await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+      await user.click(screen.getByRole("radio", { name: /multiplayer/i }));
+
+      const btn = screen.getByTestId("lobby-start-button");
+      expect(btn).toHaveTextContent(/^Start or Join Adventure$/);
+    });
+
+    it("toggles button copy when switching mode after world is picked", async () => {
+      const user = userEvent.setup();
+      renderConnect({ genres: GENRES });
+
+      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+      await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+
+      const btn = screen.getByTestId("lobby-start-button");
+      expect(btn).toHaveTextContent(/^Start Adventure$/);
+
+      await user.click(screen.getByRole("radio", { name: /multiplayer/i }));
+      expect(btn).toHaveTextContent(/^Start or Join Adventure$/);
+
+      await user.click(screen.getByRole("radio", { name: /solo/i }));
+      expect(btn).toHaveTextContent(/^Start Adventure$/);
+    });
+  });
 });
