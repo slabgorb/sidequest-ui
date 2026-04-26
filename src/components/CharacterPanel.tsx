@@ -204,13 +204,39 @@ export function CharacterPanel({
                     {isSelf && (
                       <>
                         {" "}
-                        <span className="ml-1 text-[10px] text-muted-foreground/50 font-normal">(YOU)</span>
+                        <span
+                          data-testid={`party-member-you-badge-${c.player_id}`}
+                          className="ml-1 text-[11px] text-muted-foreground/60 font-normal"
+                        >
+                          (YOU)
+                        </span>
                       </>
                     )}
                     {isActing && (
                       <>
                         {" "}
-                        <span className="ml-1 text-[10px] text-primary font-semibold uppercase">(ACTING)</span>
+                        <span
+                          data-testid={`party-member-acting-badge-${c.player_id}`}
+                          className="ml-1 inline-flex items-center gap-1 align-middle rounded-sm bg-primary/15 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary ring-1 ring-primary/40"
+                        >
+                          <span
+                            data-testid={`party-member-acting-pulse-${c.player_id}`}
+                            aria-hidden="true"
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse"
+                          />
+                          ACTING
+                        </span>
+                      </>
+                    )}
+                    {isWaiting && (
+                      <>
+                        {" "}
+                        <span
+                          data-testid={`party-member-waiting-badge-${c.player_id}`}
+                          className="ml-1 inline-block align-middle rounded-sm border border-muted-foreground/30 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70"
+                        >
+                          Waiting
+                        </span>
                       </>
                     )}
                   </span>
