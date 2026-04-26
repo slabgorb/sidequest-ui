@@ -513,3 +513,178 @@ describe("ScrapbookGallery — absent title (rework 2026-04-15)", () => {
     expect(queryByTestId("scrapbook-title-r-1")).toBeNull();
   });
 });
+
+// ===========================================================================
+// Playtest 2026-04-26 Bug #3: Scrapbook layout completely broken.
+//
+// Root cause: ImageBusProvider Pass 2 emits SCRAPBOOK_ENTRY-only entries
+// with `url: ""` (story 33-18 metadata-only cards). The previous version of
+// this component always rendered `<img src={entry.url}>` — an empty src
+// triggers the browser's broken-image glyph, which crowbars the aspect-ratio
+// box open and visually wrecks the gallery. The fix gates the <img> on a
+// non-empty url and renders a typographic placeholder instead.
+//
+// These tests lock in the new behavior so a future regression that re-adds
+// the unconditional <img> immediately fails.
+// ===========================================================================
+
+describe("ScrapbookGallery — empty-URL metadata-only entries (playtest 2026-04-26 bug #3)", () => {
+  it("does not render an <img> tag for cards whose url is the empty string", () => {
+    // This is the exact shape ImageBusProvider Pass 2 emits when a
+    // SCRAPBOOK_ENTRY arrives without a matching IMAGE: url is "" and the
+    // metadata fields are populated.
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-meta",
+        url: "",
+        turn_number: 5,
+        scene_name: "Forge at Dusk",
+        narrative_beat: "The hammer rang once against cold iron.",
+        location: "The Forge of Broken Oaths",
+      }),
+    ];
+    const { container } = render(<ScrapbookGallery images={images} />);
+    // No <img> anywhere on the card — not even with src="".
+    const imgs = container.querySelectorAll("img");
+    expect(imgs).toHaveLength(0);
+  });
+
+  it("renders a metadata-only placeholder in place of the image", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-meta",
+        url: "",
+        scene_name: "Forge at Dusk",
+        narrative_beat: "The hammer rang once against cold iron.",
+      }),
+    ];
+    const { getByTestId } = render(<ScrapbookGallery images={images} />);
+    expect(getByTestId("scrapbook-entry-r-meta-no-image")).toBeTruthy();
+  });
+
+  it("marks the card with data-has-image='false' when url is empty", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({ render_id: "r-meta", url: "" }),
+    ];
+    const { getByTestId } = render(<ScrapbookGallery images={images} />);
+    expect(
+      getByTestId("scrapbook-entry-r-meta").getAttribute("data-has-image"),
+    ).toBe("false");
+  });
+
+  it("marks the card with data-has-image='true' when url is populated", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-img",
+        url: "https://example.invalid/a.webp",
+      }),
+    ];
+    const { getByTestId } = render(<ScrapbookGallery images={images} />);
+    expect(
+      getByTestId("scrapbook-entry-r-img").getAttribute("data-has-image"),
+    ).toBe("true");
+  });
+
+  it("still renders title, caption, and badges on metadata-only cards", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-meta",
+        url: "",
+        turn_number: 7,
+        scene_name: "Forge at Dusk",
+        narrative_beat: "The hammer rang once against cold iron.",
+      }),
+    ];
+    const { getByTestId } = render(<ScrapbookGallery images={images} />);
+    // Title and caption still surface — only the visual is missing.
+    expect(getByTestId("scrapbook-title-r-meta").textContent).toBe(
+      "Forge at Dusk",
+    );
+    expect(getByTestId("scrapbook-caption-r-meta").textContent).toBe(
+      "The hammer rang once against cold iron.",
+    );
+    expect(getByTestId("scrapbook-turn-badge-r-meta").textContent).toContain(
+      "Turn 7",
+    );
+  });
+
+  it("uses a metadata-only aria-label on the click affordance instead of 'Enlarge'", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-meta",
+        url: "",
+        scene_name: "Forge at Dusk",
+      }),
+    ];
+    const { container } = render(<ScrapbookGallery images={images} />);
+    const button = container.querySelector(
+      '[data-testid="scrapbook-entry-r-meta"] [role="button"]',
+    );
+    const label = button?.getAttribute("aria-label") ?? "";
+    expect(label.toLowerCase()).toContain("metadata only");
+    expect(label.toLowerCase()).not.toContain("enlarge");
+  });
+
+  it("opens a metadata-only lightbox (no <img>) when a metadata-only card is clicked", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-meta",
+        url: "",
+        scene_name: "Forge at Dusk",
+        narrative_beat: "The hammer rang once against cold iron.",
+      }),
+    ];
+    const { container, getByTestId } = render(
+      <ScrapbookGallery images={images} />,
+    );
+    const button = container.querySelector(
+      '[data-testid="scrapbook-entry-r-meta"] [role="button"]',
+    ) as HTMLElement;
+    fireEvent.click(button);
+    const lightbox = getByTestId("scrapbook-lightbox");
+    expect(lightbox.getAttribute("data-has-image")).toBe("false");
+    expect(getByTestId("scrapbook-lightbox-no-image")).toBeTruthy();
+    expect(lightbox.querySelectorAll("img")).toHaveLength(0);
+  });
+
+  it("opens a regular lightbox with an <img> when a normal card is clicked", () => {
+    const images: ScrapbookEntry[] = [
+      baseEntry({
+        render_id: "r-img",
+        url: "https://example.invalid/a.webp",
+        scene_name: "Forge at Dawn",
+      }),
+    ];
+    const { container, getByTestId } = render(
+      <ScrapbookGallery images={images} />,
+    );
+    const button = container.querySelector(
+      '[data-testid="scrapbook-entry-r-img"] [role="button"]',
+    ) as HTMLElement;
+    fireEvent.click(button);
+    const lightbox = getByTestId("scrapbook-lightbox");
+    expect(lightbox.getAttribute("data-has-image")).toBe("true");
+    expect(lightbox.querySelectorAll("img")).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wiring proof: ScrapbookGallery is reachable from the production GameBoard.
+// Per CLAUDE.md "Every Test Suite Needs a Wiring Test" — verify the chain
+// widgetRegistry.gallery → ImageGalleryWidget → ScrapbookGallery is intact
+// and that the empty-URL pathway from ImageBusProvider arrives unaltered.
+// ---------------------------------------------------------------------------
+
+describe("ScrapbookGallery — wiring (gallery widget → component)", () => {
+  it("ImageGalleryWidget renders ScrapbookGallery with the empty-URL entries from ImageBusProvider", async () => {
+    const widgetMod = await import("../ImageGalleryWidget");
+    const galleryMod = await import("../ScrapbookGallery");
+    // ImageGalleryWidget must import ScrapbookGallery (string-source check).
+    const widgetSrc = (await import("../ImageGalleryWidget.tsx?raw")) as unknown as {
+      default: string;
+    };
+    expect(widgetSrc.default).toContain("ScrapbookGallery");
+    expect(typeof widgetMod.ImageGalleryWidget).toBe("function");
+    expect(typeof galleryMod.ScrapbookGallery).toBe("function");
+  });
+});

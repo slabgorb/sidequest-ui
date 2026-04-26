@@ -163,6 +163,7 @@ function Lightbox({
 }) {
   const title = titleFor(entry);
   const caption = entry.narrative_beat;
+  const hasImage = typeof entry.url === "string" && entry.url.length > 0;
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -175,6 +176,7 @@ function Lightbox({
   return (
     <div
       data-testid="scrapbook-lightbox"
+      data-has-image={hasImage ? "true" : "false"}
       className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
@@ -182,11 +184,23 @@ function Lightbox({
         className="relative max-w-[90vw] max-h-[90vh] flex flex-col items-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <img
-          src={entry.url}
-          alt={entry.alt ?? title ?? "Scrapbook scene"}
-          className="max-w-full max-h-[80vh] object-contain rounded"
-        />
+        {hasImage ? (
+          <img
+            src={entry.url}
+            alt={entry.alt ?? title ?? "Scrapbook scene"}
+            className="max-w-full max-h-[80vh] object-contain rounded"
+          />
+        ) : (
+          // Lightbox over a metadata-only card. Same reasoning as the
+          // card-level placeholder: don't fake an image. Show a typographic
+          // panel that gives the metadata the room a real lightbox would.
+          <div
+            data-testid="scrapbook-lightbox-no-image"
+            className="w-[60vw] max-w-lg min-h-[40vh] flex items-center justify-center rounded border border-white/10 bg-white/5 text-white/40 italic text-sm px-8 py-12 text-center"
+          >
+            No image — only the scene&rsquo;s record.
+          </div>
+        )}
         {(title || caption) && (
           <div className="mt-2 text-center max-w-lg">
             {title && (
@@ -223,26 +237,64 @@ function ScrapbookCard({
   const title = titleFor(entry);
   const caption = entry.narrative_beat;
   const showCaption = !compact && typeof caption === "string";
+  // Metadata-only entries (story 33-18 SCRAPBOOK_ENTRY arriving without a
+  // matching IMAGE) carry an empty url. Rendering ``<img src="">`` causes
+  // browsers to either reload the page-as-image or display a broken-image
+  // glyph that crowbars the layout open — playtest 2026-04-26 Bug #3
+  // "Scrapbook layout completely broken". Hide the <img> entirely on those
+  // rows; the legend block below still surfaces title/caption/chips so the
+  // entry is not "lost", just imageless.
+  const hasImage = typeof entry.url === "string" && entry.url.length > 0;
+  // The ``bg-surface/40`` shorthand requires a ``--color-surface`` Tailwind
+  // theme token, which the unified-theme CSS does not register (see
+  // src/index.css ``@theme`` block — only ``--color-card`` is defined).
+  // Other widgets (InventoryPanel, WidgetWrapper) already use the
+  // ``var(--surface,var(--card))`` arbitrary-value pattern. Adopting it
+  // here re-grounds the card chrome against the genre theme; without it
+  // every card was unstyled and bled into the panel background.
+  const cardBackground =
+    "bg-[color-mix(in_srgb,var(--surface,var(--card))_40%,transparent)]";
 
   return (
     <article
       data-testid={`scrapbook-entry-${id}`}
-      className="flex flex-col gap-1 bg-surface/40 rounded overflow-hidden border border-border/40"
+      data-has-image={hasImage ? "true" : "false"}
+      className={`flex flex-col gap-1 ${cardBackground} rounded overflow-hidden border border-border/40`}
     >
       <div
         className="relative aspect-[4/3] bg-muted/30 cursor-pointer"
         onClick={() => onSelect(entry)}
         role="button"
         tabIndex={0}
-        aria-label={`Enlarge: ${title ?? "Scrapbook scene"}`}
+        aria-label={
+          hasImage
+            ? `Enlarge: ${title ?? "Scrapbook scene"}`
+            : `Open: ${title ?? "Scrapbook scene"} (metadata only)`
+        }
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(entry); } }}
       >
-        <img
-          src={entry.url}
-          alt={entry.alt ?? title ?? "Scrapbook scene"}
-          loading="lazy"
-          className="w-full h-full object-cover"
-        />
+        {hasImage ? (
+          <img
+            src={entry.url}
+            alt={entry.alt ?? title ?? "Scrapbook scene"}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          // Metadata-only placeholder. We deliberately do NOT show a broken
+          // image icon, a "loading…" spinner, or any pretense that an image
+          // is on the way — per CLAUDE.md "no silent fallbacks" the absence
+          // of a render is a real state, not an error to mask. The empty
+          // glyph echoes the empty-state language ("the world will fill
+          // these pages") so the affordance reads as "scene captured, no
+          // illustration yet" instead of as broken.
+          <div
+            data-testid={`scrapbook-entry-${id}-no-image`}
+            className="w-full h-full flex items-center justify-center text-muted-foreground/50 text-[10px] italic"
+          >
+            no image
+          </div>
+        )}
         {typeof entry.turn_number === "number" && (
           <TurnBadge
             entryId={id}
