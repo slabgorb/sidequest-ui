@@ -544,6 +544,210 @@ describe("ConnectScreen", () => {
       expect(onPathChange).toHaveBeenCalledWith("/solo/2026-04-23-resume-me");
     });
 
+    // Playtest 2026-04-25 BLOCKING bug — typing a fresh name with an
+    // existing past journey for (genre, world) silently resumed the
+    // prior character instead of starting a new session under the typed
+    // name. The fix matches past journeys on (genre, world, mode,
+    // typed_name) and only short-circuits to resume when *all four*
+    // agree. Anything else hits the server with a force_new flag and a
+    // typed player_name so the new slug carries the real name.
+    it("typed name not matching any past journey for (genre, world, mode) starts a new session, not the past one", async () => {
+      const user = userEvent.setup();
+
+      // Past journey for Laverne · low_fantasy / greyhawk in MULTIPLAYER
+      // mode. The standard fixture genre/world stand in for the bug
+      // report's caverns_and_claudes / mawdeep — only the (genre, world,
+      // mode, name) shape matters for the matching logic.
+      const PAST_SLUG = "2026-04-25-greyhawk-mp";
+      localStorage.setItem(
+        "sidequest-history",
+        JSON.stringify([
+          {
+            player_name: "Laverne",
+            genre: "low_fantasy",
+            world: "greyhawk",
+            last_played_iso: new Date().toISOString(),
+            game_slug: PAST_SLUG,
+            mode: "multiplayer",
+          },
+        ]),
+      );
+
+      // Capture the request body so we can assert the dispatched payload.
+      // Mock the server returning a NEW slug — emulating a server that
+      // honors `force_new` by minting a disambiguated slug. The point of
+      // the test is that the LOBBY sends the right request and navigates
+      // to whatever slug the server returns instead of short-circuiting
+      // to the past-journey slug.
+      const NEW_SLUG = "2026-04-25-greyhawk-mp-2";
+      let capturedBody: Record<string, unknown> | null = null;
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((url: string, opts?: RequestInit) => {
+          if (typeof url === "string" && url.startsWith("/api/sessions")) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ sessions: [] }),
+            });
+          }
+          if (
+            typeof url === "string" &&
+            url === "/api/games" &&
+            opts?.method === "POST"
+          ) {
+            capturedBody = JSON.parse(opts.body as string);
+            return Promise.resolve({
+              ok: true,
+              status: 201,
+              json: () =>
+                Promise.resolve({
+                  slug: NEW_SLUG,
+                  mode: "multiplayer",
+                  genre_slug: "low_fantasy",
+                  world_slug: "greyhawk",
+                  resumed: false,
+                }),
+            });
+          }
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({}),
+          });
+        }) as unknown as typeof fetch;
+
+      const onPathChange = vi.fn();
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <ConnectScreen genres={GENRES} />
+          <LocationWatcher onChange={onPathChange} />
+        </MemoryRouter>,
+      );
+
+      // Type a different name from the past journey.
+      const nameInput = screen.getByLabelText(/what name shall be yours/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, "Lenny");
+
+      // Pick the same genre + world the past journey is bound to.
+      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+      await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+
+      // Switch to multiplayer mode — same mode as the past journey, so
+      // (genre, world, mode) collide; the only thing that differs is the
+      // typed name.
+      await user.click(
+        screen.getByRole("radio", { name: /multiplayer/i }),
+      );
+
+      // Hit Start Adventure.
+      await user.click(screen.getByRole("button", { name: /start/i }));
+
+      // The dispatched payload must carry the typed player_name and the
+      // force_new flag — without those the server can't disambiguate.
+      expect(capturedBody).not.toBeNull();
+      expect(capturedBody).toMatchObject({
+        genre_slug: "low_fantasy",
+        world_slug: "greyhawk",
+        mode: "multiplayer",
+        player_name: "Lenny",
+        force_new: true,
+      });
+
+      // Navigation must land on the NEW slug returned by the server, not
+      // on the past-journey slug. The pre-fix behavior would have either
+      // never POSTed at all, or used the past-journey slug regardless.
+      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
+        /^\/(solo|play)\//.test(path),
+      );
+      expect(slugCalls.length).toBeGreaterThan(0);
+      const lastSlugPath = slugCalls[slugCalls.length - 1][0];
+      expect(lastSlugPath).toBe(`/play/${NEW_SLUG}`);
+      expect(lastSlugPath).not.toBe(`/play/${PAST_SLUG}`);
+    });
+
+    // Sanity check the resume path is preserved: typing the SAME name as
+    // a past journey for (genre, world, mode) should short-circuit to
+    // that journey's slug without POSTing /api/games.
+    it("typed name matching a past journey for (genre, world, mode) resumes without POST", async () => {
+      const user = userEvent.setup();
+
+      const PAST_SLUG = "2026-04-25-greyhawk-resume";
+      localStorage.setItem(
+        "sidequest-history",
+        JSON.stringify([
+          {
+            player_name: "Laverne",
+            genre: "low_fantasy",
+            world: "greyhawk",
+            last_played_iso: new Date().toISOString(),
+            game_slug: PAST_SLUG,
+            mode: "multiplayer",
+          },
+        ]),
+      );
+
+      const postSpy = vi.fn();
+      globalThis.fetch = vi
+        .fn()
+        .mockImplementation((url: string, opts?: RequestInit) => {
+          if (typeof url === "string" && url.startsWith("/api/sessions")) {
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ sessions: [] }),
+            });
+          }
+          if (
+            typeof url === "string" &&
+            url === "/api/games" &&
+            opts?.method === "POST"
+          ) {
+            postSpy();
+            return Promise.resolve({
+              ok: true,
+              status: 201,
+              json: () =>
+                Promise.resolve({
+                  slug: "should-not-be-used",
+                  mode: "multiplayer",
+                  genre_slug: "low_fantasy",
+                  world_slug: "greyhawk",
+                  resumed: false,
+                }),
+            });
+          }
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({}),
+          });
+        }) as unknown as typeof fetch;
+
+      const onPathChange = vi.fn();
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <ConnectScreen genres={GENRES} />
+          <LocationWatcher onChange={onPathChange} />
+        </MemoryRouter>,
+      );
+
+      const nameInput = screen.getByLabelText(/what name shall be yours/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, "Laverne");
+      await user.click(screen.getByRole("radio", { name: /low fantasy/i }));
+      await user.click(screen.getByRole("radio", { name: /greyhawk/i }));
+      await user.click(
+        screen.getByRole("radio", { name: /multiplayer/i }),
+      );
+
+      await user.click(screen.getByRole("button", { name: /start/i }));
+
+      expect(postSpy).not.toHaveBeenCalled();
+      const slugCalls = onPathChange.mock.calls.filter(([path]: [string]) =>
+        /^\/(solo|play)\//.test(path),
+      );
+      expect(slugCalls.length).toBeGreaterThan(0);
+      expect(slugCalls[slugCalls.length - 1][0]).toBe(`/play/${PAST_SLUG}`);
+    });
+
     it("clicking a legacy Past Journeys row (no slug) falls back to prefill (no slug navigate)", async () => {
       const user = userEvent.setup();
 

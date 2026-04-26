@@ -7,7 +7,11 @@ import { WorldPreview } from "./lobby/WorldPreview";
 import { CurrentSessions } from "./lobby/CurrentSessions";
 import { useSessions } from "./lobby/useSessions";
 import { JourneyHistory } from "./lobby/JourneyHistory";
-import { appendHistory, type JourneyEntry } from "./lobby/historyStore";
+import {
+  appendHistory,
+  loadHistory,
+  type JourneyEntry,
+} from "./lobby/historyStore";
 import { ModePicker, type GameMode } from "./lobby/ModePicker";
 import { useStartGame } from "./lobby/useStartGame";
 import { useDisplayName } from "@/hooks/useDisplayName";
@@ -205,9 +209,59 @@ export function ConnectScreen({
       // Audio unlock is best-effort; never block game entry.
     }
 
+    // (genre, world, mode, typed_name) match against past journeys —
+    // playtest 2026-04-25 BLOCKING bug. Pre-fix the lobby always called
+    // POST /api/games and let the server's same-day-same-world-same-mode
+    // slug collision silently resume the prior session. That trapped
+    // multiplayer: typing a fresh name (e.g. "Lenny") with an existing
+    // solo journey for the same world dropped the player into the prior
+    // character's seat.
+    //
+    // Now: if the typed name matches an existing past journey for this
+    // (genre, world, mode), navigate straight to that journey's slug —
+    // same outcome as clicking the Past Journeys row, just from the
+    // Start button. If the typed name does NOT match, mark this start as
+    // a forced-new session so the server can disambiguate. Empty name
+    // falls through to the default-resume path so the lobby still works
+    // for unnamed quick-starts.
+    const trimmedTyped = playerName.trim();
+    let matchingJourney: JourneyEntry | undefined;
+    if (trimmedTyped) {
+      matchingJourney = loadHistory().find(
+        (e) =>
+          e.genre === genreSlug &&
+          e.world === worldSlug &&
+          e.mode === mode &&
+          e.player_name === trimmedTyped &&
+          !!e.game_slug,
+      );
+    }
+    if (matchingJourney?.game_slug) {
+      // Resume short-circuit. Mirrors handleSelectHistory side-effects so
+      // AppInner's slug-mount has the same context whether the user
+      // clicked the Past Journeys row or hit Start with a matching name.
+      setDisplayName(trimmedTyped);
+      saveState(trimmedTyped, genreSlug, worldSlug);
+      const prefix = mode === "multiplayer" ? "/play" : "/solo";
+      navigate(`${prefix}/${matchingJourney.game_slug}`);
+      setIsStarting(false);
+      return;
+    }
+
     let result;
     try {
-      result = await start({ genreSlug, worldSlug, mode });
+      result = await start({
+        genreSlug,
+        worldSlug,
+        mode,
+        playerName: trimmedTyped || undefined,
+        // Force-new only fires when the player typed a name that didn't
+        // match any past journey for this (genre, world, mode). Without
+        // a typed name we have no way to know they meant "fresh session"
+        // vs "resume", so we let the server's default same-slug-resume
+        // path handle it (matching pre-fix behavior).
+        forceNew: trimmedTyped !== "" && matchingJourney === undefined,
+      });
     } catch (err) {
       setStartError(
         err instanceof Error ? err.message : "Failed to start game. Please try again.",
