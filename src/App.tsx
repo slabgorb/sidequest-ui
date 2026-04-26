@@ -25,6 +25,7 @@ import type { ConfrontationData, BeatOption } from "@/components/ConfrontationOv
 import type { TurnStatusEntry } from "@/components/TurnStatusPanel";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { GenresResponse } from "@/types/genres";
+import { MultiplayerSessionStatus, type SessionPlayerStatus } from "@/components/MultiplayerSessionStatus";
 import { ReconnectBanner } from "@/components/ReconnectBanner";
 import { PausedBanner } from "@/components/PausedBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -313,9 +314,24 @@ function AppInner() {
   // sockets in the room. We track the seated set so the UI can later render
   // a peer-presence indicator. The setter is wired now; the consumer (badge
   // rendering) is pending and will read this state.
-  const [, setSeatedPlayers] = useState<
+  const [seatedPlayers, setSeatedPlayers] = useState<
     Record<string, string /* character_slot */>
   >({});
+
+  // MP session-state surface (playtest 2026-04-26 GAP). Connected players are
+  // tracked from PLAYER_PRESENCE events emitted by the server on connect /
+  // disconnect. The local player is added on slug-connect-success below.
+  // Combined with `seatedPlayers` (chargen done) this gives the chargen-time
+  // session widget enough to show "creating character" vs "ready" per player.
+  const [connectedPeerIds, setConnectedPeerIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  // Game mode for the current slug — populated from the GET /api/games/:slug
+  // metadata fetch. Used to gate the MP session widget so it only renders
+  // for multiplayer sessions (solo doesn't need invite/roster surfaces).
+  const [sessionMode, setSessionMode] = useState<"solo" | "multiplayer" | null>(
+    null,
+  );
 
   // MP-03 event cache — per-(slug, player) IndexedDB durable log of
   // seq-carrying events. Populated as messages arrive; consulted at connect
@@ -557,6 +573,35 @@ function AppInner() {
             type: MessageType.PLAYER_SEAT,
             payload: { character_slot: charNameForSeat },
             player_id: "",
+          });
+        }
+      }
+      return;
+    }
+
+    if (msg.type === MessageType.PLAYER_PRESENCE) {
+      // Track peer connect/disconnect so the MP session widget can show a
+      // live roster during chargen. The server only broadcasts presence
+      // events to PEERS (exclude_socket_id=self) — the local player is
+      // added directly in the slug-connect success path. Disconnect drops
+      // the peer; the seat (if claimed) stays in seatedPlayers because the
+      // character is still seated even when the player is offline.
+      const pid = msg.payload?.player_id as string | undefined;
+      const state = msg.payload?.state as string | undefined;
+      if (pid) {
+        if (state === "connected") {
+          setConnectedPeerIds((prev) => {
+            if (prev.has(pid)) return prev;
+            const next = new Set(prev);
+            next.add(pid);
+            return next;
+          });
+        } else if (state === "disconnected") {
+          setConnectedPeerIds((prev) => {
+            if (!prev.has(pid)) return prev;
+            const next = new Set(prev);
+            next.delete(pid);
+            return next;
           });
         }
       }
@@ -1167,6 +1212,9 @@ function AppInner() {
         // raw string but JourneyEntry expects "solo" | "multiplayer".
         const normalizedMode: "solo" | "multiplayer" =
           body.mode === "solo" ? "solo" : "multiplayer";
+        // Stash the mode so the MP session widget can decide whether to
+        // render. Solo mode: nothing to share, no roster — widget hidden.
+        setSessionMode(normalizedMode);
         appendHistory({
           player_name: displayName,
           genre: body.genre_slug,
@@ -1290,6 +1338,23 @@ function AppInner() {
         ...messages,
       ]
     : messages;
+
+  // MP session-status roster (playtest 2026-04-26 GAP). Combines:
+  //   - the local player (always present once connectedPlayerName is set)
+  //   - peers from PLAYER_PRESENCE events (connectedPeerIds)
+  // status mapping: in seatedPlayers → "ready", else → "in-chargen". The
+  // widget only renders during sessionPhase === "creation" so "playing"
+  // never appears here in practice; the mapping is left simple.
+  const mpSessionPlayers: SessionPlayerStatus[] = useMemo(() => {
+    if (!connectedPlayerName) return [];
+    const all = new Set<string>(connectedPeerIds);
+    all.add(connectedPlayerName);
+    return Array.from(all).map((id) => ({
+      id,
+      isSelf: id === connectedPlayerName,
+      status: id in seatedPlayers ? "ready" : "in-chargen",
+    }));
+  }, [connectedPlayerName, connectedPeerIds, seatedPlayers]);
 
   // Map characters for PartyPanel — prefer PARTY_STATUS (has portrait_url), fall back to state_delta
   const characters: CharacterSummary[] = useMemo(
@@ -1457,6 +1522,12 @@ function AppInner() {
         )}
         {sessionPhase === "creation" && (
           <ErrorBoundary name="Character Creation">
+            {sessionMode === "multiplayer" && slug && connectedPlayerName && (
+              <MultiplayerSessionStatus
+                slug={slug}
+                players={mpSessionPlayers}
+              />
+            )}
             <CharacterCreation
               scene={creationScene}
               loading={creationLoading}

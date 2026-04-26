@@ -19,7 +19,7 @@
 // that endpoint so the gameMeta gate is satisfied and connect fires.
 
 import { StrictMode } from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -553,5 +553,197 @@ describe('slug routing — Leave button navigates back to lobby', () => {
     await waitFor(() => {
       expect(screen.getByTestId('current-path').textContent).toBe('/');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Playtest 2026-04-26 GAP — MP session widget appears during chargen
+// ---------------------------------------------------------------------------
+
+describe('slug routing — MP session widget surfaces during chargen', () => {
+  it('renders MultiplayerSessionStatus when slug-mode session is multiplayer', async () => {
+    // Override game meta to multiplayer for this test only.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url)) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                genre_slug: 'low_fantasy',
+                world_slug: 'greyhawk',
+                mode: 'multiplayer',
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (typeof url === 'string' && url.includes('/api/genres')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ low_fantasy: { name: 'Low Fantasy', worlds: [] } }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }),
+    );
+
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/play/2026-04-22-moldharrow-keep']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage; // consume SESSION_EVENT connect
+
+    // Drive the UI into "creation" phase: server confirms connect with
+    // has_character=false, then sends the first CHARACTER_CREATION scene.
+    act(() => {
+      server.send({
+        type: 'SESSION_EVENT',
+        payload: { event: 'connected', has_character: false },
+        player_id: '',
+      });
+      server.send({
+        type: 'CHARACTER_CREATION',
+        payload: {
+          phase: 'scene',
+          scene_index: 0,
+          total_scenes: 3,
+          prompt: 'Choose your origin.',
+          choices: [{ label: 'Noble', description: 'Born to privilege' }],
+          input_type: 'choice',
+        },
+        player_id: 'alice',
+      });
+    });
+
+    // Widget visible with the local player on the roster.
+    const widget = await screen.findByTestId('mp-session-status');
+    expect(widget).toBeInTheDocument();
+    expect(within(widget).getByTestId('mp-roster-alice')).toBeInTheDocument();
+    expect(
+      within(widget).getByLabelText(/shareable game url/i),
+    ).toHaveValue(`${window.location.origin}/play/2026-04-22-moldharrow-keep`);
+  });
+
+  it('does NOT render the MP widget for a solo-mode session', async () => {
+    // beforeEach default fetch mock returns mode: 'solo'.
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/solo/2026-04-22-moldharrow-keep']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage;
+
+    act(() => {
+      server.send({
+        type: 'SESSION_EVENT',
+        payload: { event: 'connected', has_character: false },
+        player_id: '',
+      });
+      server.send({
+        type: 'CHARACTER_CREATION',
+        payload: {
+          phase: 'scene',
+          scene_index: 0,
+          total_scenes: 3,
+          prompt: 'Choose your origin.',
+          choices: [{ label: 'Noble', description: 'Born to privilege' }],
+          input_type: 'choice',
+        },
+        player_id: 'alice',
+      });
+    });
+
+    // CharacterCreation is rendered, but the widget is NOT.
+    await screen.findByTestId('character-creation');
+    expect(screen.queryByTestId('mp-session-status')).toBeNull();
+  });
+
+  it('marks a peer as in-chargen when PLAYER_PRESENCE arrives mid-chargen', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string) => {
+        if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url)) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                genre_slug: 'low_fantasy',
+                world_slug: 'greyhawk',
+                mode: 'multiplayer',
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        if (typeof url === 'string' && url.includes('/api/genres')) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ low_fantasy: { name: 'Low Fantasy', worlds: [] } }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } },
+            ),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }),
+    );
+
+    const wsUrl = `ws://${location.host}/ws`;
+    const server = new WS(wsUrl, { jsonProtocol: true });
+
+    render(
+      <MemoryRouter initialEntries={['/play/2026-04-22-moldharrow-keep']}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await server.connected;
+    await server.nextMessage;
+
+    act(() => {
+      server.send({
+        type: 'SESSION_EVENT',
+        payload: { event: 'connected', has_character: false },
+        player_id: '',
+      });
+      server.send({
+        type: 'CHARACTER_CREATION',
+        payload: {
+          phase: 'scene',
+          scene_index: 0,
+          total_scenes: 3,
+          prompt: 'Choose your origin.',
+          choices: [{ label: 'Noble', description: 'Born to privilege' }],
+          input_type: 'choice',
+        },
+        player_id: 'alice',
+      });
+      server.send({
+        type: 'PLAYER_PRESENCE',
+        payload: { player_id: 'potsie', state: 'connected' },
+        player_id: '',
+      });
+    });
+
+    const widget = await screen.findByTestId('mp-session-status');
+    const potsieRow = within(widget).getByTestId('mp-roster-potsie');
+    expect(potsieRow).toHaveAttribute('data-status', 'in-chargen');
+    // The "Waiting on" line surfaces both alice (you) and potsie since
+    // neither has completed chargen yet.
+    const waiting = within(widget).getByTestId('mp-waiting-on');
+    expect(waiting).toHaveTextContent(/alice \(you\)/i);
+    expect(waiting).toHaveTextContent(/potsie/i);
   });
 });
