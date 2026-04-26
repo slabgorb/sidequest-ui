@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { toRoman } from "@/lib/utils";
 
 interface CreationChoice {
@@ -132,7 +133,7 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
               <div
                 key={key}
                 data-testid={`review-section-${key}`}
-                className="flex items-center justify-between py-2 border-b border-border/20 last:border-0"
+                className="group/edit-row flex items-center justify-between py-2 px-2 -mx-2 rounded-md border-b border-border/20 last:border-0 hover:bg-muted/30 transition-colors"
               >
                 <div>
                   <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{key}</span>
@@ -140,10 +141,12 @@ export function CharacterCreation({ scene, loading, onRespond }: CharacterCreati
                 </div>
                 <button
                   onClick={() => onRespond({ action: "edit", target_step: index })}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
+                  data-testid={`review-edit-${key}`}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 group-hover/edit-row:text-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border/30 group-hover/edit-row:border-border/70 hover:border-border bg-transparent group-hover/edit-row:bg-card/40"
                   aria-label={`Edit ${key}`}
                 >
-                  Edit
+                  <Pencil aria-hidden="true" className="w-3 h-3" data-testid={`review-edit-icon-${key}`} />
+                  <span>Edit</span>
                 </button>
               </div>
             ))
