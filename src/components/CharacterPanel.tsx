@@ -126,13 +126,15 @@ export function CharacterPanel({
           >
             Lv {character.level}
           </div>
-          {/* HP/Edge — load-bearing for Sebastien-axis players (mechanical
-              visibility). Server emits current/max on PARTY_STATUS members
-              as current_hp/max_hp; App.tsx fans them out into hp/hp_max on
-              CharacterSheetData. Hidden when both are absent (genres that
-              don't model HP) so we never render a fake "0/0". */}
+          {/* Edge badge — load-bearing for Sebastien-axis players (mechanical
+              visibility). ADR-014 / ADR-078: HP was removed from CreatureCore
+              in favor of EdgePool (composure currency). Server emits current/max
+              on PARTY_STATUS members as current_hp/max_hp (legacy wire field
+              names — protocol rename is a follow-up); App.tsx fans them out
+              into hp/hp_max on CharacterSheetData. Hidden when both are absent
+              (genres that don't model edge) so we never render a fake "0/0". */}
           {typeof character.hp === "number" && typeof character.hp_max === "number" && (
-            <HpBadge current={character.hp} max={character.hp_max} />
+            <EdgeBadge current={character.hp} max={character.hp_max} />
           )}
         </div>
       </div>
@@ -242,21 +244,24 @@ export function CharacterPanel({
                   </span>
                   <span className="block text-[10px] text-muted-foreground">
                     {toDisplayName(c.class)} Lv.{c.level}
-                    {/* Inline HP for party rows so glance value matches the
-                        CharacterPanel header. Skip when the genre doesn't
-                        report HP at all (both 0 = uninitialized). */}
+                    {/* Inline Edge for party rows so glance value matches the
+                        CharacterPanel header. ADR-014 / ADR-078: HP was
+                        removed in favor of EdgePool — wire field names
+                        (hp/hp_max on CharacterSummary) are kept until a
+                        protocol-level rename. Skip when the genre doesn't
+                        report edge at all (both 0 = uninitialized). */}
                     {(c.hp_max > 0 || c.hp > 0) && (
                       <>
                         {" · "}
                         <span
-                          data-testid={`party-member-hp-${c.player_id}`}
+                          data-testid={`party-member-edge-${c.player_id}`}
                           className={
                             c.hp_max > 0 && c.hp / c.hp_max <= 0.25
                               ? "text-destructive font-semibold"
                               : "text-foreground/80"
                           }
                         >
-                          HP {c.hp}/{c.hp_max}
+                          Edge {c.hp}/{c.hp_max}
                         </span>
                       </>
                     )}
@@ -282,11 +287,13 @@ export function CharacterPanel({
 }
 
 /**
- * HP / Edge badge in the CharacterPanel header. Color shifts to destructive
- * when the player drops to 1/4 max so a glance is enough to know "I'm in
- * trouble". Same threshold rule as the inline party-row HP for consistency.
+ * Edge badge in the CharacterPanel header. ADR-014 / ADR-078: edge (composure)
+ * replaced the legacy HP field on CreatureCore — the badge now reflects the
+ * actual schema. Color shifts to destructive when the player drops to 1/4 max
+ * so a glance is enough to know "I'm one push from a yield". Same threshold
+ * rule as the inline party-row edge for consistency.
  */
-function HpBadge({ current, max }: { current: number; max: number }) {
+function EdgeBadge({ current, max }: { current: number; max: number }) {
   const ratio = max > 0 ? current / max : 1;
   const tone =
     ratio <= 0.25
@@ -294,11 +301,11 @@ function HpBadge({ current, max }: { current: number; max: number }) {
       : "border-[var(--primary)]/40 text-[var(--primary)]";
   return (
     <div
-      data-testid="character-hp-badge"
+      data-testid="character-edge-badge"
       className={`px-2 py-0.5 rounded-md text-xs border font-mono ${tone}`}
-      aria-label={`Hit points ${current} of ${max}`}
+      aria-label={`Edge ${current} of ${max}`}
     >
-      HP {current}/{max}
+      Edge {current}/{max}
     </div>
   );
 }

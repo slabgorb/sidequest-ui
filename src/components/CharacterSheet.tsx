@@ -7,11 +7,15 @@ export interface CharacterSheetData {
    *  is the rulebook, not part of character identity). */
   race?: string;
   level: number;
-  /** Current edge / hit points. Sourced from PARTY_STATUS members[].current_hp.
-   *  Surfaced in the CharacterPanel header so Sebastien-axis (mechanical)
-   *  players can see how close they are to going down. */
+  /** Current edge (composure). Sourced from PARTY_STATUS members[].current_hp.
+   *  ADR-014 / ADR-078: HP was removed from CreatureCore in favor of EdgePool;
+   *  the wire field is still named current_hp until the protocol-level rename
+   *  ships, but the value is character.core.edge.current. Surfaced in the
+   *  CharacterPanel header so Sebastien-axis (mechanical) players can see
+   *  how close they are to a yield. */
   hp?: number;
-  /** Maximum edge / hit points. Sourced from PARTY_STATUS members[].max_hp. */
+  /** Maximum edge (composure ceiling). Sourced from PARTY_STATUS
+   *  members[].max_hp. See `hp` field doc for the legacy-name caveat. */
   hp_max?: number;
   stats: Record<string, number>;
   abilities: string[];
