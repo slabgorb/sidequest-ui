@@ -272,7 +272,7 @@ export function GameBoard({
     [audio, genreSlug],
   );
 
-  const { chapterTitle } = useRunningHeader(messages);
+  const { chapterTitle } = useRunningHeader(messages, characters, currentPlayerId);
 
   // Story 33-11: content signals drive the mobile tab notification badges.
   // Each entry is a change-detection scalar for a tab's visible content —
@@ -606,23 +606,28 @@ export function GameBoard({
         />
       </div>
 
-      {/* Turn status */}
-      {characters.length > 1 && activePlayerName && (
+      {/* Turn status — canonical multi-PC turn coordination signal.
+          Renders ONLY the structured TurnStatusPanel ("Waiting on:" widget)
+          which is load-bearing for sealed-letter chargen turns. The plain
+          `[ Paul's turn ]` / `[ Your turn ]` chip was removed as part of the
+          S2-UX banner-cluster dedupe (2026-04-26): the new
+          MultiplayerTurnBanner above the InputBar already announces whose
+          turn it is, the CharacterPanel party-section ACTING badge gives
+          the spatially-located cue, and the InputBar placeholder
+          ("Waiting for X…") covers input gating. Keeping all four was
+          quadruple-banner ambiguity. The structured TurnStatusPanel branch
+          stays because it's a richer per-player roster, not a duplicate
+          of "whose turn it is". */}
+      {characters.length > 1 && activePlayerName && turnStatusEntries.length > 0 && (
         <div
           data-testid="turn-indicator"
           className="px-4 py-1.5 text-xs text-center text-muted-foreground/60 border-t border-border/30 bg-card/20 shrink-0"
         >
-          {turnStatusEntries.length > 0 ? (
-            <TurnStatusPanel
-              entries={turnStatusEntries}
-              localPlayerId={currentPlayerId}
-              gameMode="structured"
-            />
-          ) : (
-            waitingForPlayer
-              ? `[ ${activePlayerName}'s turn ]`
-              : "[ Your turn ]"
-          )}
+          <TurnStatusPanel
+            entries={turnStatusEntries}
+            localPlayerId={currentPlayerId}
+            gameMode="structured"
+          />
         </div>
       )}
 

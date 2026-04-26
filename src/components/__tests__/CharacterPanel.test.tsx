@@ -405,6 +405,143 @@ describe("CharacterPanel — AC-6: integrated party list", () => {
 });
 
 // ---------------------------------------------------------------------------
+// S2-UX (a, b): YOU/ACTING badges legible + non-acting peers show Waiting
+// ---------------------------------------------------------------------------
+
+describe("CharacterPanel — S2-UX: turn-state badges are legible and unambiguous", () => {
+  const PARTY = [
+    {
+      player_id: "p1",
+      name: "Kael",
+      character_name: "Kael",
+      portrait_url: "/renders/kael.png",
+      hp: 24,
+      hp_max: 30,
+      status_effects: [],
+      class: "Ranger",
+      level: 3,
+      current_location: "The Rusty Cantina",
+    },
+    {
+      player_id: "p2",
+      name: "Lyra",
+      character_name: "Lyra Dawnforge",
+      portrait_url: "",
+      hp: 30,
+      hp_max: 40,
+      status_effects: [],
+      class: "Cleric",
+      level: 5,
+      current_location: "The Rusty Cantina",
+    },
+    {
+      player_id: "p3",
+      name: "Thane",
+      character_name: "Thane",
+      portrait_url: "",
+      hp: 15,
+      hp_max: 28,
+      status_effects: [],
+      class: "Fighter",
+      level: 4,
+      current_location: "The Rusty Cantina",
+    },
+  ];
+
+  it("renders YOU badge on the local player party row", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+      />,
+    );
+    const youBadge = screen.getByTestId("party-member-you-badge-p1");
+    expect(youBadge).toBeInTheDocument();
+    expect(youBadge).toHaveTextContent("(YOU)");
+  });
+
+  it("renders ACTING badge with a pulse dot on the active player row", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId="p2"
+      />,
+    );
+    const actingBadge = screen.getByTestId("party-member-acting-badge-p2");
+    expect(actingBadge).toBeInTheDocument();
+    expect(actingBadge).toHaveTextContent(/ACTING/);
+    // The pulse dot is the kinetic signal Alex needs to see at a glance
+    // that someone is mid-turn (per S2-UX (b)).
+    expect(within(actingBadge).getByTestId("party-member-acting-pulse-p2")).toBeInTheDocument();
+  });
+
+  it("ACTING pulse uses animate-pulse so it draws the eye", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId="p2"
+      />,
+    );
+    const pulse = screen.getByTestId("party-member-acting-pulse-p2");
+    expect(pulse.className).toMatch(/animate-pulse/);
+  });
+
+  it("ACTING badge is bumped from text-[10px] (the prior undersized class) to text-[11px]", () => {
+    // Regression guard for S2-UX (a) — badge was text-[10px], hard to spot.
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId="p1"
+      />,
+    );
+    const actingBadge = screen.getByTestId("party-member-acting-badge-p1");
+    expect(actingBadge.className).toMatch(/text-\[11px\]/);
+  });
+
+  it("renders Waiting indicator on every non-acting peer when a turn is in flight", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId="p2"
+      />,
+    );
+    // p2 is acting — no waiting badge on its row.
+    expect(
+      screen.queryByTestId("party-member-waiting-badge-p2"),
+    ).not.toBeInTheDocument();
+    // p1 (local) and p3 (peer) are waiting — both rows get the badge so
+    // Alex can see at a glance "the table is waiting on Lyra, not me".
+    expect(screen.getByTestId("party-member-waiting-badge-p1")).toBeInTheDocument();
+    expect(screen.getByTestId("party-member-waiting-badge-p3")).toBeInTheDocument();
+  });
+
+  it("does NOT render any Waiting / ACTING badges when no player is acting", () => {
+    render(
+      <CharacterPanel
+        character={CHARACTER}
+        characters={PARTY}
+        currentPlayerId="p1"
+        activePlayerId={null}
+      />,
+    );
+    expect(screen.queryByTestId("party-member-waiting-badge-p1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-waiting-badge-p2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-waiting-badge-p3")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-acting-badge-p1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("party-member-acting-badge-p2")).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // HP badge in the header — Sebastien-axis (mechanical visibility)
 // ---------------------------------------------------------------------------
 
