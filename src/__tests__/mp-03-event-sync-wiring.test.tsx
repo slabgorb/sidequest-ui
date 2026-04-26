@@ -60,7 +60,25 @@ function makeFetchMock() {
 let slugCounter = 0;
 function freshSlug(): string {
   slugCounter += 1;
-  return `mp03-test-${Date.now()}-${slugCounter}`;
+  const slug = `mp03-test-${Date.now()}-${slugCounter}`;
+  // Seed journey history for the slug so AppInner's slug-mode trust gate
+  // (silent-rebind protection added 2026-04-26) treats this as an existing
+  // identity. Without this entry, AppInner would render the NamePrompt and
+  // hold the connect — these tests are about WS event sync wiring, not the
+  // identity confirmation flow which has its own coverage in slug-routing.
+  const existing = JSON.parse(
+    localStorage.getItem("sidequest-history") ?? "[]",
+  ) as Array<Record<string, unknown>>;
+  existing.push({
+    player_name: "alice",
+    genre: "low_fantasy",
+    world: "greyhawk",
+    last_played_iso: new Date().toISOString(),
+    game_slug: slug,
+    mode: "multiplayer",
+  });
+  localStorage.setItem("sidequest-history", JSON.stringify(existing));
+  return slug;
 }
 
 beforeEach(() => {
@@ -205,6 +223,10 @@ describe("MP-03 event sync — AppInner ↔ PeerEventStore wiring", () => {
   it("does not fire WS connect without a display name (NamePrompt gate)", async () => {
     localStorage.removeItem("sq:display-name");
     const slug = freshSlug();
+    // freshSlug() seeds journey history for the slug to satisfy the
+    // silent-rebind trust gate in the other tests. For *this* test we want
+    // the unseeded path: no display name + slug unknown → NamePrompt renders.
+    localStorage.removeItem("sidequest-history");
     const server = new WS(`ws://${location.host}/ws`, { jsonProtocol: true });
 
     render(

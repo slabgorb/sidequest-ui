@@ -55,6 +55,23 @@ beforeEach(() => {
   installWebAudioMock();
   installLocalStorageMock();
   localStorage.setItem("sq:display-name", "alice");
+  // Seed journey history for the slug used below so AppInner's slug-mode
+  // trust gate (silent-rebind protection added 2026-04-26) treats this as
+  // an existing identity. Without this entry the direct mount would render
+  // the NamePrompt and the WS connect would never fire.
+  localStorage.setItem(
+    "sidequest-history",
+    JSON.stringify([
+      {
+        player_name: "alice",
+        genre: "low_fantasy",
+        world: "greyhawk",
+        last_played_iso: new Date().toISOString(),
+        game_slug: "2026-04-22-moldharrow-keep",
+        mode: "multiplayer",
+      },
+    ]),
+  );
   vi.stubGlobal("fetch", makeFetchMock());
 });
 

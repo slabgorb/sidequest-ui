@@ -52,6 +52,20 @@ describe('world-select mode wiring', () => {
     installLocalStorageMock();
     // Pre-seed display name so AppInner skips NamePrompt after navigation.
     localStorage.setItem('sq:display-name', 'testplayer');
+    // Pre-seed lobby state with a playerName so ConnectScreen's handleStart
+    // writes a journey-history entry for the returned slug. AppInner's
+    // slug-mode trust gate (silent-rebind protection added 2026-04-26)
+    // requires the slug to be in journey history; without a non-empty
+    // playerName the lobby skips appendHistory and the post-navigate mount
+    // would render the NamePrompt instead of AppInner's app element.
+    localStorage.setItem(
+      'sidequest-connect',
+      JSON.stringify({
+        playerName: 'testplayer',
+        genre: 'low_fantasy',
+        world: 'moldharrow-keep',
+      }),
+    );
   });
 
   afterEach(() => {

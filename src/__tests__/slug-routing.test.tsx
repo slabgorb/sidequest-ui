@@ -257,6 +257,100 @@ describe('slug routing — NamePrompt shown when no display name is set', () => 
     // Critical: no WS connect frame should be sent before confirmation.
     expect(server.messages).toHaveLength(0);
   });
+
+  // Silent-rebind regression — effect-level wiring proof (playtest 2026-04-26).
+  //
+  // The render-time gate above proves the prompt is shown, but the original
+  // regression survived a render-only gate because the slug-connect useEffect
+  // ran unconditionally on the same mount, fetched metadata, and scheduled the
+  // SESSION_EVENT{connect} via a 300ms setTimeout — silently rebinding the
+  // stale name before the user could hit Begin.
+  //
+  // This test closes that gap by:
+  //   1. Letting the metadata fetch microtask resolve.
+  //   2. Letting the 300ms post-connect timeout elapse.
+  //   3. Asserting no SESSION_EVENT{connect} arrived at the WS server, AND
+  //      that the slug was NOT silently appended to journey history.
+  //
+  // If the effect's trust gate regresses, this test will see the connect
+  // frame land on the server and fail loudly.
+  it(
+    'effect does not fetch+connect on stale-name mount before user confirms',
+    async () => {
+      localStorage.clear();
+      localStorage.setItem('sq:display-name', 'alice');
+
+      const slugForTest = '2026-04-26-mawdeep-mp-2';
+
+      // Track whether the metadata endpoint was even hit. Under the bug, the
+      // effect runs unconditionally and fetches metadata; under the fix, the
+      // effect short-circuits and the endpoint is never called.
+      let metaFetchCount = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockImplementation((url: string) => {
+          if (typeof url === 'string' && /\/api\/games\/[^?]+/.test(url)) {
+            metaFetchCount += 1;
+            return Promise.resolve(
+              new Response(JSON.stringify(GAME_META), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }),
+            );
+          }
+          if (typeof url === 'string' && url.includes('/api/genres')) {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({ low_fantasy: { name: 'Low Fantasy', worlds: [] } }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+              ),
+            );
+          }
+          return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+        }),
+      );
+
+      const wsUrl = `ws://${location.host}/ws`;
+      const server = new WS(wsUrl, { jsonProtocol: true });
+
+      render(
+        <MemoryRouter initialEntries={[`/play/${slugForTest}`]}>
+          <App />
+        </MemoryRouter>,
+      );
+
+      // Wait for the prompt to render — proves the component has mounted and
+      // both the render gate and the effect have had a tick to run.
+      await screen.findByRole('textbox', { name: /player name/i });
+
+      // Drain microtasks (metadata fetch resolution path) and wait past the
+      // 300ms post-connect timeout. Under the bug the effect fired the fetch
+      // synchronously on mount, the .then() callback called connect(), and
+      // 300ms later sendRef.current?.(...) sent the SESSION_EVENT{connect}
+      // payload. Real timers + a 500ms wait gives the bug every chance to
+      // expose itself.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Effect must not have called the metadata endpoint at all — that's
+      // the upstream signal that the trust gate held.
+      expect(metaFetchCount).toBe(0);
+
+      // The decisive assertion: no SESSION_EVENT{connect} on the wire.
+      const connectFrames = server.messages.filter((m) => {
+        const parsed = m as { type?: string; payload?: { event?: string } };
+        return parsed.type === 'SESSION_EVENT' && parsed.payload?.event === 'connect';
+      });
+      expect(connectFrames).toHaveLength(0);
+
+      // Slug must NOT have been silently written into journey history —
+      // that side-effect was part of the original bug (next refresh would
+      // skip the prompt because the gate would treat the slug as known).
+      const historyRaw = localStorage.getItem('sidequest-history');
+      const history = historyRaw ? (JSON.parse(historyRaw) as Array<{ game_slug: string }>) : [];
+      expect(history.some((e) => e.game_slug === slugForTest)).toBe(false);
+    },
+    7000,
+  );
 });
 
 // ---------------------------------------------------------------------------

@@ -1173,6 +1173,17 @@ function AppInner() {
   useEffect(() => {
     if (!slug) return;
     if (!displayName) return; // Wait for NamePrompt
+    // Mirror the render-time trust gate (see slug-mode prompt block below):
+    // a cached `sq:display-name` alone is NOT a trusted identity for this
+    // slug. Without this guard the effect would fire on the same mount that
+    // the render returned <NamePrompt>, fetch metadata, open the WS as the
+    // stale name, and write the slug into history — silently rebinding
+    // identity before the user could confirm. See playtest 2026-04-26
+    // (Richie/Potsie regression). identityConfirmedForSlug is added to the
+    // dep array so the effect re-fires after handleNameSubmit latches.
+    const slugKnown = loadHistory().some((e) => e.game_slug === slug);
+    const confirmedThisSlug = identityConfirmedForSlug === slug;
+    if (!confirmedThisSlug && !slugKnown) return; // Wait for NamePrompt confirmation
     if (slugConnectFired.current) return;
     // Do NOT latch slugConnectFired here. In React 18 StrictMode the dev-mode
     // double-invoke runs effect → cleanup → effect on initial mount; latching
@@ -1255,7 +1266,7 @@ function AppInner() {
         setGameMetaError(err instanceof Error ? err.message : "Failed to load game metadata");
       });
     return () => { cancelled = true; };
-  }, [slug, displayName, connect, retryCount, getCachedLatestSeq]);
+  }, [slug, displayName, connect, retryCount, getCachedLatestSeq, identityConfirmedForSlug]);
 
   // WebSocket OPEN transitions — two separate concerns, split into two effects
   // so the cleanup path doesn't depend on App-level `connected` state.
