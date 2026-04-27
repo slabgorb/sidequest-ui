@@ -1,6 +1,29 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+
+// R3F + drei mocks — ConfrontationOverlay renders InlineDiceTray → DiceScene which calls useLoader.
+vi.mock("@react-three/fiber", () => ({
+  Canvas: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="r3f-canvas">{children}</div>
+  ),
+  useFrame: vi.fn(),
+  useThree: () => ({ camera: {}, size: { width: 800, height: 600 } }),
+  useLoader: () => {
+    const tex = { wrapS: 0, wrapT: 0, clone() { return { ...this, clone: this.clone }; } };
+    return tex;
+  },
+}));
+vi.mock("@react-three/rapier", () => ({
+  Physics: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RigidBody: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CuboidCollider: () => null,
+  ConvexHullCollider: () => null,
+}));
+vi.mock("@react-three/drei", () => ({
+  Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
+
 import { ConfrontationWidget } from "@/components/GameBoard/widgets/ConfrontationWidget";
 import { ConfrontationOverlay, type ConfrontationData } from "@/components/ConfrontationOverlay";
 

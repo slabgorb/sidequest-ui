@@ -19,6 +19,28 @@ import {
 } from "@/audio/__tests__/web-audio-mock";
 import { AudioEngine } from "@/audio/AudioEngine";
 
+// R3F + drei mocks — App transitively renders dice components that call useLoader.
+vi.mock("@react-three/fiber", () => ({
+  Canvas: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="r3f-canvas">{children}</div>
+  ),
+  useFrame: vi.fn(),
+  useThree: () => ({ camera: {}, size: { width: 800, height: 600 } }),
+  useLoader: () => {
+    const tex = { wrapS: 0, wrapT: 0, clone() { return { ...this, clone: this.clone }; } };
+    return tex;
+  },
+}));
+vi.mock("@react-three/rapier", () => ({
+  Physics: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  RigidBody: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  CuboidCollider: () => null,
+  ConvexHullCollider: () => null,
+}));
+vi.mock("@react-three/drei", () => ({
+  Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+}));
+
 import App from "../App";
 import { MessageType, type GameMessage } from "@/types/protocol";
 

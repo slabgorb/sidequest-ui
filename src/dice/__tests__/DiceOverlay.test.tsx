@@ -21,6 +21,10 @@ vi.mock("@react-three/fiber", () => ({
     camera: {},
     size: { width: 800, height: 600 },
   }),
+  useLoader: () => {
+    const tex = { wrapS: 0, wrapT: 0, clone() { return { ...this, clone: this.clone }; } };
+    return tex;
+  },
 }));
 
 vi.mock("@react-three/rapier", () => ({
