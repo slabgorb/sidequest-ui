@@ -109,6 +109,11 @@ export function TimingTab({ turns }: Props) {
         />
       </div>
 
+      {/* Phase breakdown — only renders when phase_durations_ms is present.
+          Older servers (pre-phase-timing) don't ship it; the card just
+          short-circuits in that case. */}
+      <PhaseBreakdownCard turnFields={turnFields} />
+
       {/* Charts grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Card title="Agent Duration Histogram">
@@ -185,6 +190,179 @@ function StatCard({ label, value, alert }: { label: string; value: string; alert
       >
         {label}
       </div>
+    </div>
+  );
+}
+
+function PhaseBreakdownCard({ turnFields }: { turnFields: TurnCompleteFields[] }) {
+  const latest = useMemo(() => {
+    for (let i = turnFields.length - 1; i >= 0; i--) {
+      const f = turnFields[i];
+      if (f.phase_durations_ms && Object.keys(f.phase_durations_ms).length > 0) {
+        return f;
+      }
+    }
+    return null;
+  }, [turnFields]);
+
+  const averages = useMemo(() => {
+    const totals: Record<string, number> = {};
+    const counts: Record<string, number> = {};
+    for (const f of turnFields) {
+      const phases = f.phase_durations_ms;
+      if (!phases) continue;
+      for (const [name, ms] of Object.entries(phases)) {
+        totals[name] = (totals[name] || 0) + ms;
+        counts[name] = (counts[name] || 0) + 1;
+      }
+    }
+    return Object.entries(totals)
+      .map(([name, sum]) => ({ name, avgMs: Math.round(sum / counts[name]), turns: counts[name] }))
+      .sort((a, b) => b.avgMs - a.avgMs);
+  }, [turnFields]);
+
+  if (!latest && averages.length === 0) {
+    return null;
+  }
+
+  const latestPhases = latest?.phase_durations_ms ?? {};
+  const latestCallCounts = latest?.phase_call_counts ?? {};
+  const latestTotal = latest?.total_duration_ms ?? 0;
+  const latestUnaccounted = latest?._unaccounted_ms ?? 0;
+  const latestRows = Object.entries(latestPhases)
+    .map(([name, ms]) => ({ name, ms, calls: latestCallCounts[name] ?? 1 }))
+    .sort((a, b) => b.ms - a.ms);
+
+  return (
+    <Card title="Phase Breakdown">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <div
+            style={{
+              color: THEME.muted,
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              marginBottom: 6,
+            }}
+          >
+            Latest Turn — total {(latestTotal / 1000).toFixed(2)}s
+          </div>
+          {latestRows.length === 0 ? (
+            <div style={{ color: THEME.muted, fontSize: 11 }}>No phase data yet</div>
+          ) : (
+            <>
+              {latestRows.map((p) => (
+                <PhaseRow
+                  key={p.name}
+                  name={p.name}
+                  ms={p.ms}
+                  calls={p.calls}
+                  totalMs={latestTotal || 1}
+                />
+              ))}
+              {latestUnaccounted > 0 && (
+                <PhaseRow
+                  name="_unaccounted"
+                  ms={latestUnaccounted}
+                  calls={1}
+                  totalMs={latestTotal || 1}
+                  muted
+                />
+              )}
+            </>
+          )}
+        </div>
+        <div>
+          <div
+            style={{
+              color: THEME.muted,
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              marginBottom: 6,
+            }}
+          >
+            Average across {averages[0]?.turns ?? 0} turn(s)
+          </div>
+          {averages.length === 0 ? (
+            <div style={{ color: THEME.muted, fontSize: 11 }}>No phase data yet</div>
+          ) : (
+            averages.map((p) => (
+              <div
+                key={p.name}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: "3px 0",
+                  fontSize: 12,
+                  fontFamily: "monospace",
+                }}
+              >
+                <span style={{ color: THEME.text }}>{p.name}</span>
+                <span style={{ color: THEME.muted }}>{(p.avgMs / 1000).toFixed(2)}s</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PhaseRow({
+  name,
+  ms,
+  calls,
+  totalMs,
+  muted,
+}: {
+  name: string;
+  ms: number;
+  calls: number;
+  totalMs: number;
+  muted?: boolean;
+}) {
+  const pct = totalMs > 0 ? Math.round((ms / totalMs) * 100) : 0;
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr auto auto",
+        gap: 8,
+        alignItems: "center",
+        padding: "3px 0",
+        fontSize: 12,
+        fontFamily: "monospace",
+      }}
+    >
+      <div style={{ position: "relative" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: `${pct}%`,
+            background: muted ? THEME.border : THEME.accent,
+            opacity: muted ? 0.4 : 0.25,
+          }}
+        />
+        <span
+          style={{
+            position: "relative",
+            color: muted ? THEME.muted : THEME.text,
+            fontStyle: muted ? "italic" : "normal",
+          }}
+        >
+          {name}
+          {calls > 1 ? ` ×${calls}` : ""}
+        </span>
+      </div>
+      <span style={{ color: THEME.muted, minWidth: 50, textAlign: "right" }}>
+        {(ms / 1000).toFixed(2)}s
+      </span>
+      <span style={{ color: THEME.muted, minWidth: 32, textAlign: "right" }}>{pct}%</span>
     </div>
   );
 }

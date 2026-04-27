@@ -60,6 +60,17 @@ export interface TurnCompleteFields {
   genre?: string;
   /** World slug for the active session. See `genre` comment. */
   world?: string;
+  /** Per-phase wall-clock breakdown of the turn pipeline. Map keys are
+   *  phase names (e.g. "preprocess_llm", "narrator_subprocess", "broadcast");
+   *  values are milliseconds. Emitted by the validator when the server has
+   *  the phase-timing instrumentation. Absent on older servers. */
+  phase_durations_ms?: Record<string, number>;
+  /** Per-phase entry counts. Distinguishes single calls from retries
+   *  (e.g. `{preprocess_llm: 2}` indicates a retry). */
+  phase_call_counts?: Record<string, number>;
+  /** Wall-clock not attributed to any named phase. Surfaces instrumentation
+   *  gaps. Always >= 0 (clamped at the validator boundary). */
+  _unaccounted_ms?: number;
 }
 
 
