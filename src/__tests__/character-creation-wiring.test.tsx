@@ -41,8 +41,18 @@ vi.mock("@react-three/drei", () => ({
   Text: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
 
+import { MemoryRouter } from "react-router-dom";
 import App from "../App";
 import { MessageType, type GameMessage } from "@/types/protocol";
+
+/** Wrap App in MemoryRouter — App.tsx uses useRoutes() and panics outside a Router. */
+function renderApp() {
+  return render(
+    <MemoryRouter initialEntries={["/"]}>
+      <App />
+    </MemoryRouter>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // MockWebSocket — reusable from useGameSocket tests
@@ -144,15 +154,24 @@ async function connectPlayer(
     }
   }
 
-  const connectBtn = screen.getByRole("button", { name: /connect|join|play|begin/i });
+  const connectBtn = screen.getByRole("button", { name: /connect|join|play|begin|start/i });
   await user.click(connectBtn);
+
+  // The slug-mode flow fires POST /api/games, navigates to /solo/<slug>,
+  // then AppInner's slug effect runs GET /api/games/<slug>, calls connect()
+  // (which constructs the WebSocket), and finally schedules the
+  // SESSION_EVENT{connect} 300ms after the socket opens. Flush microtasks +
+  // timers so `latestSocket()` resolves to the slug-mode socket below.
+  await act(async () => {
+    vi.advanceTimersByTime(100);
+  });
 
   // Let the WebSocket handshake complete
   await act(async () => {
     latestSocket().simulateOpen();
   });
 
-  // Advance past the join timeout in App.tsx
+  // Advance past the SESSION_EVENT{connect} timeout (300ms) inside AppInner.
   await act(async () => {
     vi.advanceTimersByTime(500);
   });
@@ -292,8 +311,31 @@ beforeEach(() => {
       ],
     },
   };
-  globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+  globalThis.fetch = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    // POST /api/games — start-game endpoint introduced when the lobby moved to
+    // slug-mode. Returns the canonical slug-mode handshake payload so the
+    // post-Start `navigate(/solo/<slug>)` lands on a route that AppInner can
+    // hydrate via GET /api/games/:slug below.
+    if (url.includes("/api/games") && init?.method === "POST") {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ slug: "test-game-slug", mode: "solo" }),
+      } as Response);
+    }
+    // GET /api/games/:slug — slug-mode metadata fetch fired by AppInner once
+    // the URL transitions to /solo/<slug>. Echoes the genre/world the test
+    // selected (low_fantasy default) so theming and session state hydrate.
+    if (url.match(/\/api\/games\/[^/]+$/)) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          genre_slug: "low_fantasy",
+          world_slug: "shimmering_dale",
+          mode: "solo",
+        }),
+      } as Response);
+    }
     if (url.includes("/api/sessions")) {
       return Promise.resolve({
         ok: true,
@@ -322,7 +364,7 @@ afterEach(() => {
 describe("AC-1: new player enters character creation", () => {
   it("renders CharacterCreation when server signals new player", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -356,7 +398,7 @@ describe("AC-1: new player enters character creation", () => {
 
   it("displays the first scene narration text", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -385,7 +427,7 @@ describe("AC-1: new player enters character creation", () => {
 
   it("displays scene progress (e.g. 1 of 3)", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -416,7 +458,7 @@ describe("AC-1: new player enters character creation", () => {
 describe("AC-2: choice response advances builder", () => {
   it("sends CHARACTER_CREATION choice response when player clicks a choice", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -460,7 +502,7 @@ describe("AC-2: choice response advances builder", () => {
 
   it("renders the next scene after server responds to choice", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -509,7 +551,7 @@ describe("AC-2: choice response advances builder", () => {
 describe("AC-3: freeform and name input", () => {
   it("sends freeform response for text input scenes", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -553,7 +595,7 @@ describe("AC-3: freeform and name input", () => {
 
   it("sends name response for name input scenes", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -601,7 +643,7 @@ describe("AC-3: freeform and name input", () => {
 describe("AC-4: complete transitions to game view", () => {
   it("sends confirm action after final scene", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -641,7 +683,7 @@ describe("AC-4: complete transitions to game view", () => {
 
   it("transitions to game view when server sends complete", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -672,7 +714,7 @@ describe("AC-4: complete transitions to game view", () => {
 
   it("integrates character into GameState after completion", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -729,7 +771,7 @@ describe("AC-4: complete transitions to game view", () => {
 describe("AC-5: returning player skips creation", () => {
   it("renders GameView directly when server signals existing character", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -749,7 +791,7 @@ describe("AC-5: returning player skips creation", () => {
 
   it("does not receive CHARACTER_CREATION messages for returning player", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -779,7 +821,7 @@ describe("AC-5: returning player skips creation", () => {
 describe("loading state during creation", () => {
   it("shows loading indicator after player sends response", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -813,7 +855,7 @@ describe("loading state during creation", () => {
 
   it("hides loading indicator when next scene arrives", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -859,7 +901,7 @@ describe("loading state during creation", () => {
 describe("edge cases", () => {
   it("does not crash if CHARACTER_CREATION arrives before session event", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {
@@ -880,7 +922,7 @@ describe("edge cases", () => {
 
   it("handles empty choices array gracefully on choice scene", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
+    renderApp();
     // Wait for ConnectScreen to render after App mounts
     // Advance timers to let App initialize
     await act(async () => {

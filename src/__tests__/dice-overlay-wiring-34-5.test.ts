@@ -22,19 +22,25 @@ function readSrc(relativePath: string): string {
 // Wiring: App.tsx lazy-loads DiceOverlay
 // ══════════════════════════════��═══════════════════════════════════════════════
 
-describe("Wiring: App.tsx lazy-loads DiceOverlay", () => {
-  it("App.tsx imports DiceOverlay via React.lazy()", () => {
+describe("Wiring: dice rendering reaches the production tree", () => {
+  // The 34-5 spike rendered dice via a lazy-loaded full-screen DiceOverlay
+  // hung directly off App.tsx. That overlay was retired (see App.tsx header
+  // comment near line 40): production dice now render inline inside the
+  // Confrontation panel via InlineDiceTray, reached through
+  // GameBoard → ConfrontationWidget → ConfrontationOverlay → InlineDiceTray.
+  // The wiring contract is therefore "App passes dice props to GameBoard, and
+  // ConfrontationOverlay imports InlineDiceTray".
+
+  it("App.tsx passes diceRequest and diceResult through to GameBoard", () => {
     const appSrc = readSrc("App.tsx");
-    // Must use React.lazy() or lazy() for code splitting
-    expect(appSrc).toMatch(/lazy\(\s*\(\)\s*=>\s*import\(['"].*dice.*DiceOverlay['"]\)/i);
+    expect(appSrc).toMatch(/diceRequest=\{diceRequest\}/);
+    expect(appSrc).toMatch(/diceResult=\{diceResult\}/);
   });
 
-  it("App.tsx wraps DiceOverlay in Suspense", () => {
-    const appSrc = readSrc("App.tsx");
-    // Suspense boundary must exist around the lazy-loaded component
-    expect(appSrc).toMatch(/Suspense/);
-    // And the lazy dice overlay variable must be rendered somewhere
-    expect(appSrc).toMatch(/DiceOverlay|LazyDiceOverlay/i);
+  it("ConfrontationOverlay imports InlineDiceTray as the production dice host", () => {
+    const overlaySrc = readSrc("components/ConfrontationOverlay.tsx");
+    expect(overlaySrc).toMatch(/import\s*\{\s*InlineDiceTray\s*\}\s*from\s*['"]@\/dice\/InlineDiceTray['"]/);
+    expect(overlaySrc).toMatch(/<InlineDiceTray/);
   });
 });
 
@@ -81,10 +87,12 @@ describe("Wiring: DICE_THROW message sending", () => {
     expect(appSrc).toMatch(/DICE_THROW/);
   });
 
-  it("App.tsx passes onThrow handler to DiceOverlay", () => {
+  it("App.tsx passes the throw handler down through GameBoard", () => {
+    // Post-DiceOverlay, the throw callback flows App → GameBoard
+    // (onDiceThrow) → ConfrontationWidget → ConfrontationOverlay →
+    // InlineDiceTray (onThrow). The App-level wire is `onDiceThrow`.
     const appSrc = readSrc("App.tsx");
-    // DiceOverlay must receive the throw callback
-    expect(appSrc).toMatch(/onThrow=\{/);
+    expect(appSrc).toMatch(/onDiceThrow=\{handleDiceThrow\}/);
   });
 
   it("handleDiceThrow sends message via WebSocket send()", () => {
@@ -174,9 +182,11 @@ describe("Wiring: DiceOverlay production props", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("Wiring: Player ID flows through for role determination", () => {
-  it("App.tsx passes playerId to DiceOverlay", () => {
+  it("App.tsx passes the local player id down to GameBoard", () => {
+    // currentPlayerId is the App-level identity that GameBoard hands to
+    // ConfrontationOverlay → InlineDiceTray for rolling-vs-spectator gating.
     const appSrc = readSrc("App.tsx");
-    expect(appSrc).toMatch(/playerId=\{/);
+    expect(appSrc).toMatch(/currentPlayerId=\{currentPlayerId/);
   });
 });
 
@@ -229,13 +239,17 @@ describe("Wiring: Physics-is-the-roll (story 34-12)", () => {
   it("App.tsx.handleDiceThrow forwards face to the wire DICE_THROW message", () => {
     const appSrc = readSrc("App.tsx");
     // The handler signature must accept face and the sent payload must
-    // include it.
+    // include it. Beat dispatch (story 34-12 + later) added a beat_id
+    // spread after `face`, so we no longer require face to be the last
+    // payload field — only that it appears inside the handler's body.
     expect(appSrc).toMatch(/handleDiceThrow\s*=\s*useCallback\s*\(\s*\(\s*params[^,)]*,\s*face/);
     const handlerMatch = appSrc.match(
       /handleDiceThrow\s*=\s*useCallback\([\s\S]*?\],\s*\)/,
     );
     expect(handlerMatch).not.toBeNull();
-    expect(handlerMatch![0]).toMatch(/face\s*,?\s*\}/);
+    // face must be a key in the DICE_THROW payload — accepts trailing
+    // comma + spread or a closing brace.
+    expect(handlerMatch![0]).toMatch(/face[,\s]/);
   });
 
   it("DiceOverlay.onThrow callback signature accepts face", () => {

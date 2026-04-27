@@ -285,9 +285,11 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () 
     );
     // Should import ConfrontationWidget
     expect(gameBoardSrc).toMatch(/import.*ConfrontationWidget/);
-    // Should pass confrontationData and onBeatSelect to ConfrontationWidget
-    expect(gameBoardSrc).toMatch(/ConfrontationWidget.*data=\{confrontationData\}/);
-    expect(gameBoardSrc).toMatch(/ConfrontationWidget.*onBeatSelect=\{onBeatSelect\}/);
+    // Should pass confrontationData and onBeatSelect to ConfrontationWidget.
+    // GameBoard renders the widget across multiple lines; use [\s\S]*? to
+    // span newlines between the JSX tag name and the prop name.
+    expect(gameBoardSrc).toMatch(/<ConfrontationWidget[\s\S]*?data=\{confrontationData\}/);
+    expect(gameBoardSrc).toMatch(/<ConfrontationWidget[\s\S]*?onBeatSelect=\{onBeatSelect\}/);
   });
 
   it("App.tsx declares a handleBeatSelect callback", async () => {
@@ -314,20 +316,30 @@ describe("Wiring: Production App.tsx → GameBoard → ConfrontationWidget", () 
     expect(gameBoardBlock?.[0]).toContain("onBeatSelect={handleBeatSelect}");
   });
 
-  it("handleBeatSelect sends BEAT_SELECTION messages to the server", async () => {
+  it("handleBeatSelect drives a beat-tagged DICE_THROW handshake", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const appSrc = fs.readFileSync(
       path.resolve(__dirname, "../App.tsx"),
       "utf-8",
     );
-    // The handler must:
-    // 1. Call send() (not just define the handler)
-    // 2. Use BEAT_SELECTION message type
-    // 3. Have [confrontationData, send] in its dependency array
+    // Beat dispatch was migrated off the BEAT_SELECTION wire message and onto
+    // the physics-is-the-roll DICE_THROW pipeline (story 34-12). handleBeatSelect
+    // now builds a local DiceRequest carrying the beat's stat_check + DC; the
+    // beat id is latched in pendingBeatIdRef and re-attached to DICE_THROW when
+    // dice settle. The handler must therefore:
+    // 1. Be declared as a useCallback (so its identity is stable for GameBoard).
+    // 2. Build a DiceRequest using the beat's stat_check + base difficulty.
+    // 3. Latch the beat id in pendingBeatIdRef so handleDiceThrow can attach it.
+    // 4. Have confrontationData in its dependency array (current beat list).
     expect(appSrc).toMatch(/const handleBeatSelect\s*=\s*useCallback/);
-    expect(appSrc).toMatch(/type:\s*MessageType\.BEAT_SELECTION/);
-    expect(appSrc).toMatch(/\[confrontationData,\s*send[\s,\w]*\]/);
+    expect(appSrc).toMatch(/setDiceRequest\(localReq\)/);
+    expect(appSrc).toMatch(/pendingBeatIdRef\.current\s*=\s*beatId/);
+    expect(appSrc).toMatch(/\[confrontationData,[\s\S]*?\]/);
+    // And the matching wire-message exit point on dice settle must tag the
+    // throw with beat_id when one is pending.
+    expect(appSrc).toMatch(/type:\s*MessageType\.DICE_THROW/);
+    expect(appSrc).toMatch(/beat_id\s*:\s*beatId/);
   });
 
   it("NARRATION_END clears confrontation when no CONFRONTATION message arrived this turn", async () => {
