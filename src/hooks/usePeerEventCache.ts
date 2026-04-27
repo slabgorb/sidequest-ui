@@ -47,6 +47,11 @@ export function usePeerEventCache(slug: string | undefined, playerId: string | n
   const latestSeqRef = useRef<number>(readHint(slug, playerId));
   const slugRef = useRef<string | undefined>(slug);
   const playerIdRef = useRef<string | null>(playerId);
+  // Promise that resolves once the IDB store is open (or settled as null on
+  // an unsupported environment / missing key). appendEvent awaits this so
+  // events that arrive between mount and IDB open are not silently dropped.
+  // Replaced on every (slug, playerId) re-open.
+  const storeReadyRef = useRef<Promise<PeerEventStore | null>>(Promise.resolve(null));
 
   useEffect(() => {
     slugRef.current = slug;
@@ -54,6 +59,7 @@ export function usePeerEventCache(slug: string | undefined, playerId: string | n
     if (!slug || !playerId) {
       storeRef.current = null;
       latestSeqRef.current = 0;
+      storeReadyRef.current = Promise.resolve(null);
       return;
     }
     // Re-read the hint in case slug/playerId changed since mount. Only bump
@@ -63,21 +69,23 @@ export function usePeerEventCache(slug: string | undefined, playerId: string | n
       latestSeqRef.current = hint;
     }
     let cancelled = false;
-    (async () => {
+    storeReadyRef.current = (async () => {
       try {
         const store = await PeerEventStore.open(slug, playerId);
-        if (cancelled) return;
+        if (cancelled) return null;
         storeRef.current = store;
         const seq = await store.latestSeq();
-        if (cancelled) return;
+        if (cancelled) return store;
         // IDB is authoritative — reconcile the hint up-or-down to match.
         if (seq !== latestSeqRef.current) {
           latestSeqRef.current = seq;
           writeHint(slug, playerId, seq);
         }
+        return store;
       } catch {
         // IDB unavailable — operate without a cache (last_seen_seq falls
         // back to the hint, which defaults to 0; server replays everything).
+        return null;
       }
     })();
     return () => {
@@ -88,7 +96,13 @@ export function usePeerEventCache(slug: string | undefined, playerId: string | n
   const getLatestSeq = useCallback(() => latestSeqRef.current, []);
 
   const appendEvent = useCallback(async (ev: PeerEvent) => {
-    const store = storeRef.current;
+    // Wait for the IDB open initiated by the most recent useEffect run.
+    // Without this await, an event that arrives between renderHook/mount and
+    // IDB open is silently dropped (storeRef.current still null) — the cache
+    // never learns about it, and the next reconnect's last_seen_seq is wrong
+    // by exactly one event. The await is cheap once IDB is open: storeReadyRef
+    // resolves immediately on the already-resolved promise.
+    const store = (await storeReadyRef.current) ?? storeRef.current;
     if (!store) return;
     await store.append(ev);
     if (ev.seq > latestSeqRef.current) {

@@ -181,6 +181,35 @@ describe('lobby → slug navigation — Leave + Start fresh game (playtest 2026-
       }),
     );
     localStorage.setItem('sq:display-name', 'Keith');
+    // Seed journey history with FIRST_SLUG so the slug-connect trust gate
+    // (App.tsx, slug-mode "is this slug known?" check — added 2026-04-26 in
+    // commit 7750347 to block stale-name silent rebinds) recognizes us as
+    // the client that created this game. In the real playtest flow this
+    // history entry is written by ConnectScreen.handleStart before it
+    // navigates to /solo/<slug>; the test mounts directly at /solo/<slug>
+    // and so must seed it here.
+    //
+    // Use a DIFFERENT player_name on the historical entry so the matching-
+    // journey resume short-circuit in ConnectScreen.handleStart (added in
+    // commit 1436ebd, playtest 2026-04-25 fix — typed name that DOES match
+    // a past journey resumes that slug instead of POSTing) does not fire on
+    // the second click. Real playtest narrative: "the previous Greyhawk
+    // session belonged to a different character; on this new Start the
+    // typed name does not match any past journey, so the lobby POSTs for a
+    // fresh slug" — exactly the scenario this test was written to cover.
+    localStorage.setItem(
+      'sidequest-history',
+      JSON.stringify([
+        {
+          player_name: 'Tarn',
+          genre: 'low_fantasy',
+          world: 'greyhawk',
+          game_slug: FIRST_SLUG,
+          mode: 'solo',
+          last_played_iso: new Date().toISOString(),
+        },
+      ]),
+    );
 
     const wsUrl = `ws://${location.host}/ws`;
     const firstServer = new WS(wsUrl, { jsonProtocol: true });
@@ -215,6 +244,17 @@ describe('lobby → slug navigation — Leave + Start fresh game (playtest 2026-
 
     // Back at "/" — ConnectScreen's Start button must be reachable.
     const startBtn = await screen.findByTestId('lobby-start-button');
+
+    // Clear journey history before the second Start click. By now the
+    // first-mount slug-connect effect has appended a (Keith, low_fantasy,
+    // greyhawk, FIRST_SLUG) entry that would otherwise match the lobby's
+    // prefill — the matching-journey resume short-circuit (ConnectScreen,
+    // commit 1436ebd) would then re-navigate to FIRST_SLUG instead of
+    // POSTing for a new one, which neuters the regression coverage. Wiping
+    // history mirrors the realistic "user decides to start fresh, not
+    // resume" path; the seeded Tarn entry was only needed for the
+    // first-mount trust gate.
+    localStorage.removeItem('sidequest-history');
 
     // Stand up a SECOND WS server — the first one is closed via disconnect().
     // A fresh WS object is about to be created by the slug-connect effect
