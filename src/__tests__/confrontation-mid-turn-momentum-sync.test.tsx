@@ -169,77 +169,11 @@ describe("AC3 negative: mid-turn clear payload unmounts overlay", () => {
   });
 });
 
-// ════════════════════════════════════════════════════════════════════════════
-// AC4 + AC5: App.tsx wiring — ref preservation across mid-turn re-emits
-// ════════════════════════════════════════════════════════════════════════════
-
-describe("AC4 + AC5: App.tsx wiring for mid-turn CONFRONTATION", () => {
-  it("App.tsx CONFRONTATION handler sets confrontationReceivedThisTurnRef on every emit", async () => {
-    // The fix is server-side; the UI handler must keep working as-is.
-    // Two CONFRONTATIONs in one turn → ref is true at NARRATION_END
-    // handling time → the existing auto-clear at App.tsx:475-477 does
-    // NOT fire. This test asserts the source-level invariant; the
-    // runtime behavior is exercised by the dial width test above.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const appSrc = fs.readFileSync(
-      path.resolve(__dirname, "../App.tsx"),
-      "utf-8",
-    );
-
-    // Per the existing wiring (App.tsx:760-765), the CONFRONTATION
-    // branch sets the ref unconditionally — every CONFRONTATION arrival
-    // sets it to true, mid-turn or post-narration. Without this the
-    // ref-based auto-clear logic breaks under two-frame turns.
-    const confrontationBlock = appSrc.match(
-      /CONFRONTATION[\s\S]{0,400}?confrontationReceivedThisTurnRef\.current\s*=\s*true/,
-    );
-    expect(confrontationBlock).not.toBeNull();
-  });
-
-  it("App.tsx NARRATION_END auto-clear gates on the ref (no clear when ref=true)", async () => {
-    // Regression guard for AC4 / AC5: NARRATION_END must consult the
-    // ref before clearing confrontationData. With two CONFRONTATIONs in
-    // one turn, the ref is true at NARRATION_END time and the clear
-    // does NOT fire — the overlay keeps the second frame's state.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const appSrc = fs.readFileSync(
-      path.resolve(__dirname, "../App.tsx"),
-      "utf-8",
-    );
-
-    // The conditional must be `if (!confrontationReceivedThisTurnRef.current)`
-    // — clear only when no CONFRONTATION arrived this turn.
-    expect(appSrc).toMatch(
-      /if\s*\(\s*!confrontationReceivedThisTurnRef\.current\s*\)\s*\{[\s\S]*?setConfrontationData\(null\)/,
-    );
-    // And NARRATION_END must reset the ref so the next turn starts clean.
-    expect(appSrc).toMatch(
-      /NARRATION_END[\s\S]*?confrontationReceivedThisTurnRef\.current\s*=\s*false/,
-    );
-  });
-
-  it("ConfrontationOverlay reads metric.current off the live data prop (not a snapshot)", async () => {
-    // Wire-first: the dial width comes off `data.player_metric.current /
-    // data.player_metric.threshold` at render time. A fix that cached
-    // the metric in component state on first mount would still pass the
-    // single-payload test above but break on the second emit. This source
-    // assertion guards against that regression.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const overlaySrc = fs.readFileSync(
-      path.resolve(
-        __dirname,
-        "../components/ConfrontationOverlay.tsx",
-      ),
-      "utf-8",
-    );
-
-    // The MetricBar receives `data.player_metric` / `data.opponent_metric`
-    // as props on every render — no useState/useRef caching of the metric
-    // value itself.
-    expect(overlaySrc).toMatch(/data\.player_metric/);
-    expect(overlaySrc).toMatch(/data\.opponent_metric/);
-  });
-});
+// AC4 + AC5 wiring (App.tsx confrontationReceivedThisTurnRef +
+// NARRATION_END auto-clear gating) is covered by the pre-existing
+// `confrontation-wiring.test.tsx` source-grep tests — duplicating them
+// here would add no behavioral coverage. The dial-reflects-the-second-
+// emit contract that AC4 / AC5 enable for the player is verified
+// behaviorally by the AC3 render tests above (rerender with a fresh
+// CONFRONTATION → MetricBar fill width updates; active=false → overlay
+// unmounts).
