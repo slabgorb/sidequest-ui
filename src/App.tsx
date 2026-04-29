@@ -283,6 +283,14 @@ function AppInner() {
   // next game's slug-connect effect short-circuits and never opens the WS
   // (playtest 2026-04-24 "post-lobby hang" bug).
   const slugConnectFired = useRef(false);
+  // Stashes the SESSION_EVENT{connect} payload between the slug-connect
+  // fetch resolution (when we have the slug + last_seen_seq) and the
+  // readyState=OPEN transition (when the WebSocket can actually receive
+  // the send). Replaces a 300ms setTimeout that fired blindly regardless
+  // of socket state — see story 45-25. Cleared after dispatch in the
+  // OPEN-transition effect below; also reset by handleLeave so the next
+  // game's slug-connect path starts from a clean slate.
+  const pendingConnectPayloadRef = useRef<GameMessage | null>(null);
 
   // Overlay data from server messages
   const [characterSheet, setCharacterSheet] = useState<CharacterSheetData | null>(null);
@@ -1069,6 +1077,7 @@ function AppInner() {
     // game" bug — confirmed genre-agnostic (MW → C&C, C&C → SO).
     slugConnectFired.current = false;
     justConnectedRef.current = false;
+    pendingConnectPayloadRef.current = null;
     setGameMetaError(null);
     setCurrentGenre(null);
     // Route off the slug — otherwise the slug-connect effect re-fires.
@@ -1241,29 +1250,26 @@ function AppInner() {
         });
         setConnectedPlayerName(displayName);
         justConnectedRef.current = true;
+        // Stash the SESSION_EVENT payload for dispatch from the
+        // readyState=OPEN effect below. player_name carries the
+        // human-readable display name from localStorage['sq:display-name'].
+        // Required: without it the server falls back to the opaque
+        // player_id for the lobby name, and any genre without a
+        // name-entry chargen scene (mutant_wasteland etc.) ends up with
+        // a UUID on the character sheet header. See playtest 2026-04-23
+        // Bug 1.
+        pendingConnectPayloadRef.current = {
+          type: MessageType.SESSION_EVENT,
+          payload: {
+            event: "connect",
+            game_slug: slug,
+            last_seen_seq: lastSeenSeq,
+            player_name: displayName,
+          },
+          player_id: displayName,
+        };
         connect();
         setConnected(true);
-        // Allow the WebSocket to open before sending the connect payload.
-        // 300ms gives the socket one event-loop tick to transition to OPEN
-        // before the SESSION_EVENT connect is sent.
-        setTimeout(() => {
-          sendRef.current?.({
-            type: MessageType.SESSION_EVENT,
-            // player_name carries the human-readable display name from
-            // localStorage['sq:display-name']. Required: without it the
-            // server falls back to the opaque player_id for the lobby
-            // name, and any genre without a name-entry chargen scene
-            // (mutant_wasteland etc.) ends up with a UUID on the
-            // character sheet header. See playtest 2026-04-23 Bug 1.
-            payload: {
-              event: "connect",
-              game_slug: slug,
-              last_seen_seq: lastSeenSeq,
-              player_name: displayName,
-            },
-            player_id: displayName,
-          });
-        }, 300);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -1289,6 +1295,26 @@ function AppInner() {
   // (canType=false, thinking=true) stays stuck until the user leaves the
   // session. See ping-pong playtest 2026-04-11 "InputBar stuck disabled".
   const prevReadyState = useRef(readyState);
+
+  // (0) Slug-connect SESSION_EVENT dispatch on readyState=OPEN.
+  // Replaces a 300ms setTimeout that fired blindly regardless of socket
+  // state (story 45-25). The slug-connect effect stashes the payload in
+  // `pendingConnectPayloadRef` and calls connect(); this effect drains
+  // the ref the moment the socket reaches OPEN. Synchronous-OPEN case
+  // (StrictMode remount, cached socket) is naturally covered: the effect
+  // also runs on mount, and if readyState is already OPEN with a
+  // pending payload, it dispatches.
+  //
+  // Critical: clear the ref AFTER dispatch. Under React 18 StrictMode
+  // the dev-mode double-mount runs effect → cleanup → effect; without
+  // the clear, the second run would re-send and the server would
+  // resolve the opening hook twice.
+  useEffect(() => {
+    if (readyState === WebSocket.OPEN && pendingConnectPayloadRef.current) {
+      sendRef.current?.(pendingConnectPayloadRef.current);
+      pendingConnectPayloadRef.current = null;
+    }
+  }, [readyState]);
 
   // (1) Defensive state reset — fires on ANY OPEN transition regardless of
   // whether we were "already connected" in App state. Clearing `canType` to
