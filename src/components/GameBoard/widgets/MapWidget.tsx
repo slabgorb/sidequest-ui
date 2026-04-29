@@ -2,15 +2,21 @@ import { useMemo } from "react";
 import { Automapper, type ExploredRoom } from "@/components/Automapper";
 import { MapOverlay, type MapState } from "@/components/MapOverlay";
 import { tacticalGridFromWire } from "@/lib/tacticalGridFromWire";
+import { OrreryView, getOrreryDataForWorld } from "@/components/Orrery";
 
 interface MapWidgetProps {
   mapData: MapState | null;
+  /** Active world slug — drives orrery routing for hierarchical worlds. */
+  worldSlug?: string;
 }
 
 /**
  * Map tab renderer.
  *
- * Routing:
+ * Routing (highest priority first):
+ * - Orrery world (e.g. coyote_reach) → OrreryView, regardless of mapData.
+ *   The orrery is the diegetic map for hierarchical star-system worlds and
+ *   should display before any exploration begins.
  * - Empty / no data → "no map yet" empty state.
  * - Room graph data (room_graph navigation mode, `explored[]` carries room
  *   exits) → graphical SVG dungeon map via Automapper. Room graphs have no
@@ -21,13 +27,23 @@ interface MapWidgetProps {
  *
  * Wiring story: the Automapper/DungeonMapRenderer components from story
  * 29-8 were built but never imported by the widget — this file is the
- * wiring fix (sq-playtest 2026-04-09).
+ * wiring fix (sq-playtest 2026-04-09). The orrery branch was added
+ * 2026-04-29 to render Coyote Reach's heliocentric system view.
  */
-export function MapWidget({ mapData }: MapWidgetProps) {
+export function MapWidget({ mapData, worldSlug }: MapWidgetProps) {
+  const orreryData = getOrreryDataForWorld(worldSlug);
   const roomGraph = useMemo(
     () => (mapData ? toExploredRooms(mapData) : []),
     [mapData]
   );
+
+  if (orreryData) {
+    return (
+      <div data-testid="map-panel-orrery" style={{ width: "100%", height: "100%" }}>
+        <OrreryView data={orreryData} />
+      </div>
+    );
+  }
 
   if (!mapData) {
     return (

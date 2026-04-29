@@ -37,6 +37,12 @@ const LazyDashboard = lazy(() =>
   import("@/components/Dashboard/DashboardApp").then((m) => ({ default: m.DashboardApp })),
 );
 
+const LazyOrrery = lazy(() =>
+  import("@/components/Orrery").then((m) => ({
+    default: () => <m.OrreryView data={m.COYOTE_REACH_ORRERY} />,
+  })),
+);
+
 // DiceOverlay overlay removed — dice now render inline in the Confrontation panel
 // via InlineDiceTray. The DiceOverlay component and DiceSpikePage are retained
 // for isolated testing.
@@ -1736,12 +1742,29 @@ function LobbyRoot() {
   );
 }
 
+function OrreryRoute() {
+  return (
+    <div style={{ width: "100%", height: "100vh", background: "#000" }}>
+      <Suspense
+        fallback={
+          <div style={{ color: "#f5d020", background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'VT323',monospace" }}>
+            loading orrery…
+          </div>
+        }
+      >
+        <LazyOrrery />
+      </Suspense>
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LobbyRoot />} />
       <Route path="/solo/:slug" element={<LobbyRoot />} />
       <Route path="/play/:slug" element={<LobbyRoot />} />
+      <Route path="/orrery" element={<OrreryRoute />} />
     </Routes>
   );
 }
