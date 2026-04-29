@@ -334,7 +334,7 @@ export function GameBoard({
       case "inventory":
         return inventoryData ? <InventoryWidget data={inventoryData} /> : null;
       case "map":
-        return <MapWidget mapData={mapData ?? null} />;
+        return <MapWidget mapData={mapData ?? null} worldSlug={worldSlug} />;
       case "knowledge":
         return knowledgeEntries ? <KnowledgeWidget entries={knowledgeEntries} /> : null;
       case "confrontation":
@@ -367,7 +367,7 @@ export function GameBoard({
   }, [messages, thinking, characterSheet, inventoryData, mapData,
       knowledgeEntries, confrontationData, onBeatSelect, onYield, diceRequest, diceResult,
       onDiceThrow, nowPlaying, volumes, muted,
-      handleVolumeChange, handleMuteToggle, resources, genreSlug,
+      handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
       activePlayerId]);
 
