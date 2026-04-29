@@ -138,6 +138,15 @@ export interface GameBoardProps {
   activePlayerId?: string | null;
   activePlayerName?: string | null;
   waitingForPlayer?: string;
+  /**
+   * MP input state derived from canType + per-player TURN_STATUS entries.
+   * Drives both the MultiplayerTurnBanner copy and the InputBar placeholder
+   * so the simultaneous-action server model is reflected truthfully (playtest
+   * 2026-04-29 HIGH/BUG-LOW + turn-indicator consolidation).
+   */
+  mpInputState?: "free" | "waiting-on-peers" | "waiting-on-narrator";
+  /** Names of peers who have NOT yet submitted this round. */
+  peersOutstanding?: string[];
   turnStatusEntries?: TurnStatusEntry[];
   resources?: Record<string, ResourcePool> | null;
   genreSlug?: string;
@@ -169,6 +178,8 @@ export function GameBoard({
   activePlayerId,
   activePlayerName,
   waitingForPlayer,
+  mpInputState,
+  peersOutstanding = [],
   turnStatusEntries = [],
   resources,
   genreSlug,
@@ -385,6 +396,8 @@ export function GameBoard({
         localPlayerId={currentPlayerId}
         localCharacterName={localCharacterName}
         thinking={thinking}
+        mpInputState={mpInputState}
+        peersOutstanding={peersOutstanding}
       />
       <InputBar
         onSend={onSend}

@@ -112,6 +112,100 @@ describe("MultiplayerTurnBanner", () => {
     expect(screen.getByText(/you have the floor/i)).toBeInTheDocument();
   });
 
+  // Playtest 2026-04-29 — simultaneous-action banner copy.
+  // The legacy "It's <peer>'s turn…" cue framed multiplayer as alternating
+  // turns and made Alex think she was holding up the group. With mpInputState
+  // wired up, the banner reflects the actual server model.
+  describe("simultaneous-action mode (mpInputState)", () => {
+    it("waiting-on-peers names the single outstanding peer", () => {
+      render(
+        <MultiplayerTurnBanner
+          isMultiplayer={true}
+          wsConnected={true}
+          mpInputState="waiting-on-peers"
+          peersOutstanding={["Shirley"]}
+          localPlayerId="p1"
+          localCharacterName="Laverne"
+        />,
+      );
+      const banner = screen.getByTestId("multiplayer-turn-banner");
+      expect(banner).toHaveAttribute("data-tone", "peer");
+      expect(banner).toHaveTextContent(/waiting on shirley to act/i);
+      // Critical: must NOT use the alternating-turn copy.
+      expect(banner).not.toHaveTextContent(/it's .* turn/i);
+    });
+
+    it("waiting-on-peers with multiple outstanding peers uses count form", () => {
+      render(
+        <MultiplayerTurnBanner
+          isMultiplayer={true}
+          wsConnected={true}
+          mpInputState="waiting-on-peers"
+          peersOutstanding={["Shirley", "Sebastien", "Alex"]}
+          localPlayerId="p1"
+          localCharacterName="Laverne"
+        />,
+      );
+      expect(screen.getByTestId("multiplayer-turn-banner")).toHaveTextContent(
+        /waiting on shirley \+ 2 others to act/i,
+      );
+    });
+
+    it("waiting-on-narrator says 'narrator' regardless of activePlayer state", () => {
+      render(
+        <MultiplayerTurnBanner
+          isMultiplayer={true}
+          wsConnected={true}
+          mpInputState="waiting-on-narrator"
+          activePlayerId="p2"
+          activePlayerName="Shirley"
+          localPlayerId="p1"
+          localCharacterName="Laverne"
+        />,
+      );
+      const banner = screen.getByTestId("multiplayer-turn-banner");
+      expect(banner).toHaveAttribute("data-tone", "thinking");
+      expect(banner).toHaveTextContent(/waiting for the narrator/i);
+    });
+
+    it("'free' + peer has acted reframes from 'their turn' to 'your move'", () => {
+      // Critical playtest 2026-04-29 fix: the prior banner said "It's
+      // Shirley's turn…" when Shirley submitted but Laverne hadn't, which
+      // implied alternating-turn (wrong for the simultaneous server model).
+      render(
+        <MultiplayerTurnBanner
+          isMultiplayer={true}
+          wsConnected={true}
+          mpInputState="free"
+          activePlayerId="p2"
+          activePlayerName="Shirley"
+          localPlayerId="p1"
+          localCharacterName="Laverne"
+          peersOutstanding={[]}
+        />,
+      );
+      const banner = screen.getByTestId("multiplayer-turn-banner");
+      expect(banner).toHaveAttribute("data-tone", "peer");
+      expect(banner).toHaveTextContent(/shirley acted — declare your action/i);
+      expect(banner).not.toHaveTextContent(/it's shirley's turn/i);
+    });
+
+    it("'free' + nobody has acted shows 'you have the floor'", () => {
+      render(
+        <MultiplayerTurnBanner
+          isMultiplayer={true}
+          wsConnected={true}
+          mpInputState="free"
+          localPlayerId="p1"
+          localCharacterName="Laverne"
+        />,
+      );
+      const banner = screen.getByTestId("multiplayer-turn-banner");
+      expect(banner).toHaveAttribute("data-tone", "you");
+      expect(banner).toHaveTextContent(/laverne — you have the floor/i);
+    });
+  });
+
   it("uses role='status' + aria-live='polite' for screen reader announcements", () => {
     render(
       <MultiplayerTurnBanner
