@@ -10,11 +10,17 @@
  *      like a freeze.
  *
  * Renders nothing in single-player (no peers to wait on, no turn to
- * announce). In multiplayer, renders one of three states:
- *   - "You have the floor" — local player's turn (active or no
- *     specific active player but local hasn't submitted).
- *   - "It's <Name>'s turn…" — peer is acting.
- *   - "Waiting for the narrator…" — turn submitted, narration pending.
+ * announce). In multiplayer, the banner is driven by ``mpInputState``
+ * (derived in App.tsx from canType + per-player TURN_STATUS counts) so
+ * the copy matches the simultaneous-action server model:
+ *   - 'free' + peer has acted → "<peer> acted — declare your action"
+ *     (NOT "It's <peer>'s turn…", which implied alternating turns and
+ *     made Alex think she was holding up the group; playtest 2026-04-29).
+ *   - 'free' + nobody has acted → "<local> — you have the floor".
+ *   - 'waiting-on-peers' → "Waiting on <peer> to act…" — local submitted
+ *     but peers haven't yet. Distinguishes from narrator-pending.
+ *   - 'waiting-on-narrator' → "Waiting for the narrator…" — every player
+ *     submitted, the merged dispatch is running.
  */
 export interface MultiplayerTurnBannerProps {
   isMultiplayer: boolean;
@@ -28,8 +34,19 @@ export interface MultiplayerTurnBannerProps {
   localPlayerId?: string | null;
   /** Local character's display name — used in "You have the floor". */
   localCharacterName?: string | null;
-  /** True after local player submits — narrator is thinking. */
+  /**
+   * True after local player submits. Retained for the legacy fallback
+   * branch only — when ``mpInputState`` is provided, it is the source
+   * of truth for narrator/peer disambiguation.
+   */
   thinking?: boolean;
+  /**
+   * Drives the simultaneous-action banner copy. When omitted, the legacy
+   * thinking/active-player branches are used (single-player, tests).
+   */
+  mpInputState?: "free" | "waiting-on-peers" | "waiting-on-narrator";
+  /** Names of peers who have NOT yet submitted this round. */
+  peersOutstanding?: string[];
 }
 
 export function MultiplayerTurnBanner({
@@ -40,6 +57,8 @@ export function MultiplayerTurnBanner({
   localPlayerId,
   localCharacterName,
   thinking,
+  mpInputState,
+  peersOutstanding = [],
 }: MultiplayerTurnBannerProps) {
   if (!isMultiplayer) return null;
 
@@ -54,14 +73,38 @@ export function MultiplayerTurnBanner({
   let label: string;
   let tone: "you" | "peer" | "thinking";
 
-  if (thinking) {
-    // Narrator is composing — show "thinking" regardless of who the active
-    // player is. Previously this branch required ``!localIsActive``, but
-    // once the server emits TURN_STATUS{active} on PLAYER_ACTION receipt
-    // (ADR-036 sealed-letter pacing), the actor's tab has BOTH
-    // ``thinking=true`` AND ``localIsActive=true``. "Waiting for the
-    // narrator…" is the right cue for that state — the actor knows they
-    // submitted and is waiting for prose to land.
+  // Preferred path (playtest 2026-04-29): mpInputState is the truth of the
+  // simultaneous-action turn model. The legacy ``thinking``/``activePlayerName``
+  // branches below are retained for single-player and the existing test
+  // harness that doesn't yet pass mpInputState.
+  if (mpInputState === "waiting-on-narrator") {
+    label = "Waiting for the narrator…";
+    tone = "thinking";
+  } else if (mpInputState === "waiting-on-peers") {
+    if (peersOutstanding.length === 1) {
+      label = `Waiting on ${peersOutstanding[0]} to act…`;
+    } else if (peersOutstanding.length > 1) {
+      label = `Waiting on ${peersOutstanding[0]} + ${peersOutstanding.length - 1} other${
+        peersOutstanding.length - 1 === 1 ? "" : "s"
+      } to act…`;
+    } else {
+      label = "Waiting on your party to act…";
+    }
+    tone = "peer";
+  } else if (mpInputState === "free" && activePlayerName && !localIsActive) {
+    // A peer has acted but local hasn't yet — simultaneous model: not
+    // their "turn", their declaration. Cue the local player to act
+    // rather than telling them to wait.
+    label = `${activePlayerName} acted — declare your action`;
+    tone = "peer";
+  } else if (mpInputState === "free") {
+    label = localCharacterName
+      ? `${localCharacterName} — you have the floor`
+      : "You have the floor";
+    tone = "you";
+  } else if (thinking) {
+    // Legacy branch (mpInputState not provided). Retained so existing
+    // tests + single-player paths keep their copy.
     label = "Waiting for the narrator…";
     tone = "thinking";
   } else if (

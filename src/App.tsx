@@ -1398,6 +1398,62 @@ function AppInner() {
     [partyMembers, activePlayerName],
   );
 
+  // MP input-state classifier (playtest 2026-04-29 HIGH/BUG-LOW + turn-indicator
+  // bugs). The UI used to conflate every locked-input state into one placeholder
+  // ("Waiting for other players…") and one banner ("It's <X>'s turn…"), neither
+  // of which matched the simultaneous-action server model:
+  //   - Banner "It's X's turn" implied alternating-turn → made Alex think she
+  //     was holding up the group, made Sebastien notice the UI/server mismatch.
+  //   - Placeholder "Waiting for other players" was sometimes correct (peers
+  //     hadn't submitted) and sometimes wrong (all submitted, narrator running).
+  //
+  // The classifier returns one of three states:
+  //   - 'free': local hasn't submitted yet — input enabled, banner says
+  //     "you have the floor" or "<peer> acted — declare yours when ready".
+  //   - 'waiting-on-peers': local submitted, at least one peer hasn't yet —
+  //     placeholder names the missing peer(s); banner echoes.
+  //   - 'waiting-on-narrator': local submitted AND all peers submitted —
+  //     merged dispatch is running, narration is being generated.
+  //
+  // Heuristic: turnStatusEntries is server-emitted, one entry per submission,
+  // cleared on TURN_STATUS{status="resolved"}. partyMembers.length is the
+  // visible playing peer count. When entries.length >= partyMembers.length,
+  // every peer has submitted and we're waiting on Claude.
+  const submittedPlayerIds = useMemo(
+    () => new Set(turnStatusEntries.map((e) => e.player_id)),
+    [turnStatusEntries],
+  );
+  const peersOutstanding = useMemo(
+    () =>
+      partyMembers
+        .filter(
+          (m) =>
+            m.player_id !== currentPlayerId &&
+            !submittedPlayerIds.has(m.player_id),
+        )
+        .map((m) => m.character_name || m.name)
+        .filter(Boolean),
+    [partyMembers, currentPlayerId, submittedPlayerIds],
+  );
+  const mpInputState: "free" | "waiting-on-peers" | "waiting-on-narrator" = useMemo(() => {
+    if (canType) return "free";
+    if (!isMultiplayer) return "waiting-on-narrator";
+    return peersOutstanding.length > 0 ? "waiting-on-peers" : "waiting-on-narrator";
+  }, [canType, isMultiplayer, peersOutstanding]);
+  // Build the placeholder string the InputBar will render. With a single
+  // outstanding peer we name them; with multiple we use a count to keep
+  // the placeholder short ("Waiting on Shirley + 1 other to act…").
+  const inputWaitingFor = useMemo(() => {
+    if (mpInputState === "free") return undefined;
+    if (mpInputState === "waiting-on-narrator") return undefined;
+    // waiting-on-peers
+    if (peersOutstanding.length === 0) return undefined;
+    if (peersOutstanding.length === 1) return `${peersOutstanding[0]} to act`;
+    return `${peersOutstanding[0]} + ${peersOutstanding.length - 1} other${
+      peersOutstanding.length - 1 === 1 ? "" : "s"
+    } to act`;
+  }, [mpInputState, peersOutstanding]);
+
   // In slug-mode, gate the WS connect on an explicit identity confirmation.
   //
   // Two cases require the prompt:
@@ -1579,7 +1635,9 @@ function AppInner() {
                 currentPlayerId={currentPlayerId ?? undefined}
                 activePlayerId={activePlayerId}
                 activePlayerName={activePlayerName}
-                waitingForPlayer={!canType && isMultiplayer ? "other players" : undefined}
+                waitingForPlayer={inputWaitingFor}
+                mpInputState={mpInputState}
+                peersOutstanding={peersOutstanding}
                 resources={partyResources}
                 genreSlug={currentGenre ?? undefined}
                 turnStatusEntries={turnStatusEntries}
