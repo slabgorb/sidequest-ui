@@ -830,6 +830,47 @@ function AppInner() {
         disconnectRef.current?.();
         return;
       }
+      // Playtest 2026-04-30: uvicorn ``--reload`` zombies session binding.
+      // The server's transport reconnects but the client's stored
+      // session is no longer bound to a fresh handler instance —
+      // every action gets rejected with "not connected" / "not in
+      // Playing state". The server now tags those rejections with
+      // ``code="session_unbound"`` so we can auto-recover by re-
+      // firing SESSION_EVENT{connect} from the saved slug. The
+      // player's original action is lost (one-click cost), but they
+      // can immediately retry instead of being stuck on a stale
+      // overlay or having to refresh the page.
+      if (code === "session_unbound") {
+        const saved = loadSession();
+        if (saved && displayName) {
+          console.info(
+            "[session-unbound] auto-rebinding via SESSION_EVENT{connect}",
+            { slug: saved.gameSlug, displayName },
+          );
+          sendRef.current?.({
+            type: MessageType.SESSION_EVENT,
+            payload: {
+              event: "connect",
+              game_slug: saved.gameSlug,
+              player_name: displayName,
+            },
+            player_id: displayName,
+          });
+          // Surface a non-alarming notice so the player knows their
+          // last click bounced AND that recovery is in flight. Don't
+          // reuse the generic transientError — that copy is for
+          // genuine validation rejections, not transparent recovery.
+          setTransientError(
+            "Server reconnecting — please retry your last action.",
+          );
+          setThinking(false);
+          setCanType(true);
+          return;
+        }
+        // No saved session OR no display name — fall through to the
+        // generic transient-error path. The player will see the
+        // message and can navigate manually.
+      }
       // Transient — session stays open. Surface a sanitized one-liner.
       // The raw payload (often a Pydantic dump) goes to the console for
       // dev/OTEL but never to the player surface.
@@ -844,7 +885,7 @@ function AppInner() {
     }
 
     setMessages((prev) => [...prev, msg]);
-  }, [connectedPlayerName, appendCachedEvent]);
+  }, [connectedPlayerName, appendCachedEvent, displayName]);
 
   const sendRef = useRef<typeof send | null>(null);
   // Disconnect ref so handleMessage (declared above useGameSocket) can stop
