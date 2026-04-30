@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import type { MagicState } from '@/types/magic';
 
 export interface CharacterState {
   name: string;
@@ -51,6 +52,10 @@ export interface ClientGameState {
   knowledge: KnowledgeEntry[];
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
+  /** Magic ledger state (Coyote Reach Phase 4). Mirrored from server's
+   *  GameSnapshot.magic_state via state_delta on NARRATION_END. Null
+   *  when the active world has no magic configured. */
+  magicState?: MagicState | null;
 }
 
 export interface GameStateContextValue {
