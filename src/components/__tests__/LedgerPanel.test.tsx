@@ -119,3 +119,63 @@ describe("LedgerPanel", () => {
     expect(barElement).not.toBeNull();
   });
 });
+
+describe("LedgerPanel wiring into CharacterPanel", () => {
+  it("CharacterPanel renders LedgerPanel bars when magicState is provided", async () => {
+    const { CharacterPanel } = await import("../CharacterPanel");
+
+    // Ledger keys must match character.name — server's add_character()
+    // contract uses character.core.name as the owner_id, and CharacterPanel
+    // passes character.name to LedgerPanel as characterId.
+    const characterName = "sira_mendes";
+    const sanityBar = makeBar("sanity", "character", "down", 0.78, {
+      threshold_low: 0.40,
+    });
+    const heatBar = makeBar("hegemony_heat", "world", "up", 0.31, {
+      threshold_high: 0.70,
+    });
+    const ledger = Object.fromEntries([sanityBar, heatBar]);
+    const magicState: MagicState = {
+      config: baseConfig,
+      ledger,
+      working_log: [],
+    };
+
+    render(
+      <CharacterPanel
+        character={{
+          name: characterName,
+          class: "drifter",
+          level: 1,
+          stats: {},
+          abilities: [],
+          backstory: "x",
+        }}
+        magicState={magicState}
+      />,
+    );
+
+    expect(screen.getByText("sanity")).toBeInTheDocument();
+    expect(screen.getByText("hegemony_heat")).toBeInTheDocument();
+  });
+
+  it("CharacterPanel renders without LedgerPanel when magicState is null", async () => {
+    const { CharacterPanel } = await import("../CharacterPanel");
+
+    const { container } = render(
+      <CharacterPanel
+        character={{
+          name: "Sira Mendes",
+          class: "drifter",
+          level: 1,
+          stats: {},
+          abilities: [],
+          backstory: "x",
+        }}
+        magicState={null}
+      />,
+    );
+
+    expect(container.querySelector(".ledger-panel")).toBeNull();
+  });
+});

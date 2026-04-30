@@ -1,8 +1,10 @@
 import { useRef } from "react";
 import type { CharacterSheetData } from "./CharacterSheet";
 import { GenericResourceBar, type ResourceThreshold } from "./GenericResourceBar";
+import { LedgerPanel } from "./LedgerPanel";
 import { useLocalPrefs } from "@/hooks/useLocalPrefs";
 import type { CharacterSummary } from "@/types/party";
+import type { MagicState } from "@/types/magic";
 type TabId = "stats" | "abilities" | "status";
 
 export interface ResourcePool {
@@ -31,6 +33,11 @@ export interface CharacterPanelProps {
   characters?: CharacterSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
+  /** Magic ledger state (Coyote Reach Phase 4). Null when the world has
+   *  no magic configured — LedgerPanel renders nothing. characterId for
+   *  ledger lookup is character.name (matches server add_character() contract).
+   */
+  magicState?: MagicState | null;
 }
 
 function toDisplayName(id: string): string {
@@ -56,6 +63,7 @@ export function CharacterPanel({
   characters = [],
   currentPlayerId,
   activePlayerId,
+  magicState = null,
 }: CharacterPanelProps) {
   const [prefs, setPref] = useLocalPrefs<CharacterPanelPrefs>(
     "sq-character-panel",
@@ -169,6 +177,12 @@ export function CharacterPanel({
           />
         )}
       </div>
+
+      {/* Magic ledger — Phase 4 (Coyote Reach). Null-safe: LedgerPanel
+          returns null when magicState is null or no bars match this
+          character. characterId is character.name to match the server's
+          add_character() contract (snapshot.magic_state ledger key). */}
+      <LedgerPanel magicState={magicState} characterId={character.name} />
 
       {/* Party members section */}
       {characters.length > 0 && (

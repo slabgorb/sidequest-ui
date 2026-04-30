@@ -39,6 +39,7 @@ import type { NowPlaying } from "@/hooks/useAudioCue";
 import type { GameMessage } from "@/types/protocol";
 import type { DiceRequestPayload, DiceResultPayload, DiceThrowParams } from "@/types/payloads";
 import type { LayoutMode } from "@/hooks/useLayoutMode";
+import type { MagicState } from "@/types/magic";
 
 import { WIDGET_REGISTRY, type WidgetId } from "./widgetRegistry";
 import { BackgroundCanvas } from "./BackgroundCanvas";
@@ -153,6 +154,8 @@ export interface GameBoardProps {
   worldSlug?: string;
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
+  /** Magic ledger (Coyote Reach Phase 4). Forwarded to CharacterWidget. */
+  magicState?: MagicState | null;
 }
 
 export function GameBoard({
@@ -186,6 +189,7 @@ export function GameBoard({
   worldSlug,
   depletions,
   resourceAlerts,
+  magicState,
 }: GameBoardProps) {
   const breakpoint = useBreakpoint();
   const isMobile = breakpoint === "mobile";
@@ -329,6 +333,7 @@ export function GameBoard({
             characters={characters}
             currentPlayerId={currentPlayerId}
             activePlayerId={activePlayerId}
+            magicState={magicState}
           />
         ) : null;
       case "inventory":
@@ -369,7 +374,7 @@ export function GameBoard({
       onDiceThrow, nowPlaying, volumes, muted,
       handleVolumeChange, handleMuteToggle, resources, genreSlug, worldSlug,
       handleResourceThresholdCrossed, characters, currentPlayerId,
-      activePlayerId]);
+      activePlayerId, magicState]);
 
   // InputBar component (shared between desktop grid and mobile tab view)
   const isMultiplayer =

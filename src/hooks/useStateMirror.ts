@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { MessageType, type GameMessage } from '../types/protocol';
 import { useGameState, EMPTY_GAME_STATE, type ClientGameState, type CharacterState, type JournalEntry, type KnowledgeEntry, type FactCategory, type FactSource, type Confidence, type ItemDepletion, type ResourceAlert } from '../providers/GameStateProvider';
+import type { MagicState } from '../types/magic';
 
 const VALID_CATEGORIES: string[] = ['Lore', 'Place', 'Person', 'Quest', 'Ability'];
 const VALID_SOURCES: string[] = ['Observation', 'Dialogue', 'Discovery', 'Backstory'];
@@ -250,6 +251,16 @@ function applyDelta(state: ClientGameState, delta: Record<string, unknown>): Cli
       charMap.set(cd.name, normalizeCharacter(cd));
     }
     next.characters = Array.from(charMap.values());
+  }
+
+  // Magic Phase 4: server rides the full MagicState dict on every
+  // NARRATION_END (see sidequest/server/session_handler.py — the wire
+  // payload is unconditional, not gated on the magic-changed flag).
+  // We mirror by replacement, not merge: the server registry is
+  // authoritative and the dict is small. Null indicates the world
+  // has no magic configured — clear any stale prior value.
+  if ('magic_state' in delta) {
+    next.magicState = (delta.magic_state as MagicState | null) ?? null;
   }
 
   return next;

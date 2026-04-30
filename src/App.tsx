@@ -1674,6 +1674,7 @@ function AppInner() {
                 genreSlug={currentGenre ?? undefined}
                 turnStatusEntries={turnStatusEntries}
                 layoutMode={layoutMode}
+                magicState={gameState.magicState ?? null}
               />
             </ImageBusProvider>
             {/* Dice overlay removed — dice now roll inline in the Confrontation panel */}
