@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { renderSegment } from "../narrativeRenderers";
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
 
@@ -32,6 +32,98 @@ describe("renderSegment — knowledge footnote presentation", () => {
     const seg: NarrativeSegment = { kind: "text", html: "<p>x</p>", footnotes: [] };
     render(<>{renderSegment(seg, 0)}</>);
     expect(screen.queryByTestId("world-facts")).toBeNull();
+  });
+});
+
+describe("renderSegment — knowledge collapsible", () => {
+  afterEach(() => {
+    // Reset URL hash between tests so :target-driven auto-open is isolated.
+    if (window.location.hash) {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  });
+
+  it("renders the Knowledge Gained block collapsed by default", () => {
+    const seg: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [
+        { marker: 1, summary: "Fact one.", is_new: true },
+        { marker: 2, summary: "Fact two.", is_new: true },
+      ],
+    };
+    render(<>{renderSegment(seg, 0)}</>);
+    const details = screen.getByTestId("world-facts") as HTMLDetailsElement;
+    expect(details.tagName).toBe("DETAILS");
+    expect(details.open).toBe(false);
+  });
+
+  it("shows '<N> new' in the summary when entries are new", () => {
+    const seg: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [
+        { marker: 1, summary: "A.", is_new: true },
+        { marker: 2, summary: "B.", is_new: true },
+        { marker: 3, summary: "C.", is_new: true },
+        { marker: 4, summary: "D.", is_new: false },
+      ],
+    };
+    render(<>{renderSegment(seg, 0)}</>);
+    expect(screen.getByTestId("world-facts-count")).toHaveTextContent(/^3 new$/);
+  });
+
+  it("shows total count when no entries are new (singular/plural)", () => {
+    const segOne: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [{ marker: 1, summary: "A.", is_new: false }],
+    };
+    const { unmount } = render(<>{renderSegment(segOne, 0)}</>);
+    expect(screen.getByTestId("world-facts-count")).toHaveTextContent(/^1 item$/);
+    unmount();
+
+    const segMany: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [
+        { marker: 1, summary: "A.", is_new: false },
+        { marker: 2, summary: "B.", is_new: false },
+      ],
+    };
+    render(<>{renderSegment(segMany, 0)}</>);
+    expect(screen.getByTestId("world-facts-count")).toHaveTextContent(/^2 items$/);
+  });
+
+  it("opens the details when the URL hash targets a contained footnote", () => {
+    history.replaceState(null, "", "#footnote-2");
+    const seg: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [
+        { marker: 1, summary: "A.", is_new: true },
+        { marker: 2, summary: "B.", is_new: true },
+      ],
+    };
+    render(<>{renderSegment(seg, 0)}</>);
+    const details = screen.getByTestId("world-facts") as HTMLDetailsElement;
+    expect(details.open).toBe(true);
+  });
+
+  it("opens the details when a hashchange targets a contained footnote", () => {
+    const seg: NarrativeSegment = {
+      kind: "text",
+      html: "<p>x</p>",
+      footnotes: [
+        { marker: 7, summary: "G.", is_new: false },
+      ],
+    };
+    render(<>{renderSegment(seg, 0)}</>);
+    const details = screen.getByTestId("world-facts") as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    history.replaceState(null, "", "#footnote-7");
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(details.open).toBe(true);
   });
 });
 
