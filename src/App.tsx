@@ -245,6 +245,7 @@ function AppInner() {
   const [genres, setGenres] = useState<GenresResponse>({});
   const [genreError, setGenreError] = useState(false);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
+  const [currentWorld, setCurrentWorld] = useState<string | null>(null);
   // Slug-mode: metadata fetched from GET /api/games/:slug before WS connect fires.
   // gameMetaError surfaces in the alert region; retryCount re-runs the fetch when
   // the user clicks Retry after a transient failure.
@@ -1080,6 +1081,7 @@ function AppInner() {
     pendingConnectPayloadRef.current = null;
     setGameMetaError(null);
     setCurrentGenre(null);
+    setCurrentWorld(null);
     // Route off the slug — otherwise the slug-connect effect re-fires.
     // disconnect() above already flushed the SESSION_EVENT outbound.
     navigate("/");
@@ -1230,6 +1232,7 @@ function AppInner() {
         // immediately — GameBoard key, chrome archetype, resource SFX all
         // depend on currentGenre being non-null on first game render.
         setCurrentGenre(body.genre_slug);
+        setCurrentWorld(body.world_slug);
         saveSession(slug);
         // Record this slug in journey history so a page refresh on this
         // tab doesn't re-trigger the slug-mode NamePrompt. Player 1 already
@@ -1672,6 +1675,7 @@ function AppInner() {
                 peersOutstanding={peersOutstanding}
                 resources={partyResources}
                 genreSlug={currentGenre ?? undefined}
+                worldSlug={currentWorld ?? undefined}
                 turnStatusEntries={turnStatusEntries}
                 layoutMode={layoutMode}
               />
