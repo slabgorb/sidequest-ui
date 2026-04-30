@@ -1,6 +1,6 @@
 // OrreryView — Star Wars: A New Hope HUD render of a star-system orrery.
 //
-// Style guide: the Coyote Reach Orrery design exemplar (claude.ai/design,
+// Style guide: the Coyote Star Orrery design exemplar (claude.ai/design,
 // 2026-04-29) — black ground, brass-amber phosphor lines (#f5d020), red
 // accents (#e62a18), VT323 + Orbitron for type. The bundled HTML was the
 // approved style-only spec; this component is data-driven from the
@@ -9,7 +9,7 @@
 // rendered. See ./types.ts.
 //
 // Today the only consumer is /orrery (a dev route) showing
-// COYOTE_REACH_ORRERY. The component takes data as a prop so a future
+// COYOTE_STAR_ORRERY. The component takes data as a prop so a future
 // integration with game state (current_region in hierarchical mode) drops
 // in without rewriting the renderer.
 

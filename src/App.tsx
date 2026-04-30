@@ -39,7 +39,7 @@ const LazyDashboard = lazy(() =>
 
 const LazyOrrery = lazy(() =>
   import("@/components/Orrery").then((m) => ({
-    default: () => <m.OrreryView data={m.COYOTE_REACH_ORRERY} />,
+    default: () => <m.OrreryView data={m.COYOTE_STAR_ORRERY} />,
   })),
 );
 

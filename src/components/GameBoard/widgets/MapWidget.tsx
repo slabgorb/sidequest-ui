@@ -14,7 +14,7 @@ interface MapWidgetProps {
  * Map tab renderer.
  *
  * Routing (highest priority first):
- * - Orrery world (e.g. coyote_reach) → OrreryView, regardless of mapData.
+ * - Orrery world (e.g. coyote_star) → OrreryView, regardless of mapData.
  *   The orrery is the diegetic map for hierarchical star-system worlds and
  *   should display before any exploration begins.
  * - Empty / no data → "no map yet" empty state.
@@ -28,7 +28,7 @@ interface MapWidgetProps {
  * Wiring story: the Automapper/DungeonMapRenderer components from story
  * 29-8 were built but never imported by the widget — this file is the
  * wiring fix (sq-playtest 2026-04-09). The orrery branch was added
- * 2026-04-29 to render Coyote Reach's heliocentric system view.
+ * 2026-04-29 to render Coyote Star's heliocentric system view.
  */
 export function MapWidget({ mapData, worldSlug }: MapWidgetProps) {
   const orreryData = getOrreryDataForWorld(worldSlug);
