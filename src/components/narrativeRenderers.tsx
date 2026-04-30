@@ -4,41 +4,89 @@
 // — but turning `renderSegment` into a component would invert every call
 // site (renderSegment(seg) → <RenderSegment seg={seg} />). Suppress.
 /* eslint-disable react-refresh/only-export-components */
+import { useEffect, useRef } from "react";
 import type { NarrativeSegment } from "@/lib/narrativeSegments";
 
 function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] }) {
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+
+  // Per-turn Knowledge blocks default to collapsed (Keith playtest 2026-04-29:
+  // 3–4 entries per turn × N turns dominated above-the-fold space). But inline
+  // footnote markers in the prose anchor to `#footnote-N`, and a collapsed
+  // <details> hides those anchor targets. Open the disclosure when the URL
+  // hash matches one of our contained footnote IDs so :target scrolling still
+  // works. Once opened by the browser hash navigation OR the user, native
+  // <details> persistence keeps it open — we only set, never clear.
+  useEffect(() => {
+    const el = detailsRef.current;
+    if (!el || !footnotes || footnotes.length === 0) return;
+    const openIfTargeted = () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+      const id = hash.startsWith("#") ? hash.slice(1) : hash;
+      if (el.querySelector(`#${CSS.escape(id)}`)) {
+        el.open = true;
+      }
+    };
+    openIfTargeted();
+    window.addEventListener("hashchange", openIfTargeted);
+    return () => window.removeEventListener("hashchange", openIfTargeted);
+  }, [footnotes]);
+
   if (!footnotes || footnotes.length === 0) return null;
+  const newCount = footnotes.filter((fn) => fn.is_new).length;
+  const countLabel =
+    newCount > 0 ? `${newCount} new` : `${footnotes.length} item${footnotes.length === 1 ? "" : "s"}`;
   return (
-    <aside
+    <details
+      ref={detailsRef}
       data-testid="world-facts"
       aria-label="World facts learned this turn"
-      className="mt-6 rounded-md border-l-4 border-[var(--primary)]/60 bg-[var(--primary)]/[0.06] pl-4 pr-3 py-3 space-y-1.5"
+      className="mt-6 rounded-md border-l-4 border-[var(--primary)]/60 bg-[var(--primary)]/[0.06] pl-4 pr-3 py-3 group"
     >
-      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]/90 mb-3">
-        Knowledge Gained
-      </div>
-      {footnotes.map((fn, fi) => (
-        <div
-          key={fi}
-          id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
-          data-footnote-id={fn.marker != null ? fn.marker : undefined}
-          className="text-base text-foreground/85 leading-relaxed flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 py-0.5 transition-colors"
+      <summary
+        data-testid="world-facts-summary"
+        className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--primary)]/90 cursor-pointer list-none flex items-center gap-2 select-none marker:hidden"
+      >
+        <span
+          aria-hidden="true"
+          className="inline-block transition-transform group-open:rotate-90 text-[var(--primary)]/70"
         >
-          {fn.marker != null && (
-            <span className="text-[var(--primary)]/70 shrink-0 font-semibold">[{fn.marker}]</span>
-          )}
-          <span>{fn.summary}</span>
-          {fn.is_new && (
-            <span
-              data-testid="knowledge-new-pill"
-              className="shrink-0 self-center inline-flex items-center rounded-full bg-[var(--primary)]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--primary)]"
-            >
-              New
-            </span>
-          )}
-        </div>
-      ))}
-    </aside>
+          ▸
+        </span>
+        <span>Knowledge Gained</span>
+        <span className="text-[var(--primary)]/60 font-normal normal-case tracking-normal">·</span>
+        <span
+          data-testid="world-facts-count"
+          className="text-[var(--primary)]/80 font-bold normal-case tracking-normal"
+        >
+          {countLabel}
+        </span>
+      </summary>
+      <div className="mt-3 space-y-1.5">
+        {footnotes.map((fn, fi) => (
+          <div
+            key={fi}
+            id={fn.marker != null ? `footnote-${fn.marker}` : undefined}
+            data-footnote-id={fn.marker != null ? fn.marker : undefined}
+            className="text-base text-foreground/85 leading-relaxed flex gap-2 target:bg-accent/20 scroll-mt-4 rounded px-1 py-0.5 transition-colors"
+          >
+            {fn.marker != null && (
+              <span className="text-[var(--primary)]/70 shrink-0 font-semibold">[{fn.marker}]</span>
+            )}
+            <span>{fn.summary}</span>
+            {fn.is_new && (
+              <span
+                data-testid="knowledge-new-pill"
+                className="shrink-0 self-center inline-flex items-center rounded-full bg-[var(--primary)]/25 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--primary)]"
+              >
+                New
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
