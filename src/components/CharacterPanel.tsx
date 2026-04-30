@@ -33,7 +33,7 @@ export interface CharacterPanelProps {
   characters?: CharacterSummary[];
   currentPlayerId?: string;
   activePlayerId?: string | null;
-  /** Magic ledger state (Coyote Reach Phase 4). Null when the world has
+  /** Magic ledger state (Coyote Star Phase 4). Null when the world has
    *  no magic configured — LedgerPanel renders nothing. characterId for
    *  ledger lookup is character.name (matches server add_character() contract).
    */
@@ -178,7 +178,7 @@ export function CharacterPanel({
         )}
       </div>
 
-      {/* Magic ledger — Phase 4 (Coyote Reach). Null-safe: LedgerPanel
+      {/* Magic ledger — Phase 4 (Coyote Star). Null-safe: LedgerPanel
           returns null when magicState is null or no bars match this
           character. characterId is character.name to match the server's
           add_character() contract (snapshot.magic_state ledger key). */}

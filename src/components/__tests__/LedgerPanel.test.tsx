@@ -19,12 +19,12 @@ function makeBar(
     starts_at_chargen: 1.0,
     ...thresholds,
   };
-  const owner = scope === "world" ? "coyote_reach" : "sira_mendes";
+  const owner = scope === "world" ? "coyote_star" : "sira_mendes";
   return [`${scope}|${owner}|${id}`, { spec, value }];
 }
 
 const baseConfig = {
-  world_slug: "coyote_reach",
+  world_slug: "coyote_star",
   genre_slug: "space_opera",
   allowed_sources: ["innate", "item_based"],
   active_plugins: ["innate_v1", "item_legacy_v1"],

@@ -52,7 +52,7 @@ export interface ClientGameState {
   knowledge: KnowledgeEntry[];
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
-  /** Magic ledger state (Coyote Reach Phase 4). Mirrored from server's
+  /** Magic ledger state (Coyote Star Phase 4). Mirrored from server's
    *  GameSnapshot.magic_state via state_delta on NARRATION_END. Null
    *  when the active world has no magic configured. */
   magicState?: MagicState | null;

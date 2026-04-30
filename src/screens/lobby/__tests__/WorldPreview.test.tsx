@@ -5,14 +5,14 @@ import type { GenreMeta, WorldMeta } from "@/types/genres";
 
 function makeWorld(overrides: Partial<WorldMeta> = {}): WorldMeta {
   return {
-    slug: "coyote_reach",
-    name: "Coyote Reach",
+    slug: "coyote_star",
+    name: "Coyote Star",
     description: "Frontier star system.",
     setting: "Outer rim",
     era: "Post-Hegemonic",
     axis_snapshot: {},
     inspirations: [],
-    hero_image: "/genre/space_opera/worlds/coyote_reach/assets/poi/mendes_post.png",
+    hero_image: "/genre/space_opera/worlds/coyote_star/assets/poi/mendes_post.png",
     ...overrides,
   };
 }
@@ -40,7 +40,7 @@ describe("WorldPreview — hero image states", () => {
 
   it("keys the img on world slug so stale image clears on world switch", () => {
     const { rerender, container } = render(
-      <WorldPreview pack={makePack()} world={makeWorld({ slug: "coyote_reach" })} />,
+      <WorldPreview pack={makePack()} world={makeWorld({ slug: "coyote_star" })} />,
     );
     const firstImg = container.querySelector("img");
     expect(firstImg).toBeInTheDocument();

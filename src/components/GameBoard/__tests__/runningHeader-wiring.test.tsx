@@ -7,7 +7,7 @@
  * through the actual top-level GameBoard component and asserts the chip text
  * updates when the party-status snapshot moves to a new location, *without*
  * any page refresh or remount. This guards the S2-UX (c) cache-invalidation
- * regression where the chip showed a stale "BRIDGE — OUTER COYOTE REACH"
+ * regression where the chip showed a stale "BRIDGE — OUTER COYOTE STAR"
  * even after the prose moved to Docking Crescent.
  *
  * Same file also asserts the S2-UX (d) banner-cluster dedupe — the redundant
@@ -94,11 +94,11 @@ describe("GameBoard running header — S2-UX (c) wiring", () => {
 
   it("updates the chip when party state moves to a new location (no remount, no refresh)", () => {
     const { rerender } = renderBoard({
-      characters: [makeChar("p1", "Bridge — Outer Coyote Reach")],
+      characters: [makeChar("p1", "Bridge — Outer Coyote Star")],
       currentPlayerId: "p1",
     });
     expect(screen.getByTestId("running-header")).toHaveTextContent(
-      "Bridge — Outer Coyote Reach",
+      "Bridge — Outer Coyote Star",
     );
 
     // PARTY_STATUS arrives with a new location for the local player. The chip
@@ -119,7 +119,7 @@ describe("GameBoard running header — S2-UX (c) wiring", () => {
     );
     // And the stale value is gone.
     expect(screen.getByTestId("running-header")).not.toHaveTextContent(
-      "Bridge — Outer Coyote Reach",
+      "Bridge — Outer Coyote Star",
     );
   });
 });

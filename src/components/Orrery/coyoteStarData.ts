@@ -1,15 +1,15 @@
-// Coyote Reach orrery data — derived from
-// sidequest-content/genre_packs/space_opera/worlds/coyote_reach/cartography.yaml.
+// Coyote Star orrery data — derived from
+// sidequest-content/genre_packs/space_opera/worlds/coyote_star/cartography.yaml.
 //
 // This is a hand-authored mirror today; the long-term path is a build-time
-// JSON snapshot or a REST endpoint (`/api/world/coyote_reach/cartography`)
+// JSON snapshot or a REST endpoint (`/api/world/coyote_star/cartography`)
 // that the renderer fetches. When that lands, replace this constant with
 // fetched data — the OrreryView component takes data as a prop precisely
 // so this swap is a one-line change.
 
 import type { OrreryData } from "./types";
 
-export const COYOTE_REACH_ORRERY: OrreryData = {
+export const COYOTE_STAR_ORRERY: OrreryData = {
   star: { id: "coyote", name: "COYOTE" },
 
   // Per-body angular state at the rendered moment. Today these are picked

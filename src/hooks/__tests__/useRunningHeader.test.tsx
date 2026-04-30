@@ -38,7 +38,7 @@ function character(id: string, current_location: string): CharacterSummary {
 describe("useRunningHeader — S2-UX (c) location chip cache invalidation", () => {
   it("falls back to most recent CHAPTER_MARKER when no party data is provided", () => {
     const messages = [
-      chapterMarker("Bridge — Outer Coyote Reach"),
+      chapterMarker("Bridge — Outer Coyote Star"),
       chapterMarker("Docking Crescent"),
     ];
     const { result } = renderHook(() => useRunningHeader(messages));
@@ -54,7 +54,7 @@ describe("useRunningHeader — S2-UX (c) location chip cache invalidation", () =
     // The cache-invalidation bug: chapter marker says BRIDGE but the prose
     // (and the party state) has moved to Docking Crescent. The chip should
     // follow PARTY_STATUS, not the stale marker.
-    const messages = [chapterMarker("Bridge — Outer Coyote Reach")];
+    const messages = [chapterMarker("Bridge — Outer Coyote Star")];
     const characters = [character("p1", "Docking Crescent")];
     const { result } = renderHook(() =>
       useRunningHeader(messages, characters, "p1"),
@@ -75,7 +75,7 @@ describe("useRunningHeader — S2-UX (c) location chip cache invalidation", () =
     // The chip must reflect MY location, not a peer's.
     const characters = [
       character("p1", "Docking Crescent"),
-      character("p2", "Bridge — Outer Coyote Reach"),
+      character("p2", "Bridge — Outer Coyote Star"),
     ];
     const { result } = renderHook(() =>
       useRunningHeader([], characters, "p1"),

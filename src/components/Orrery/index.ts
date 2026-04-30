@@ -1,8 +1,8 @@
-import { COYOTE_REACH_ORRERY } from "./coyoteReachData";
+import { COYOTE_STAR_ORRERY } from "./coyoteStarData";
 import type { OrreryData } from "./types";
 
 export { OrreryView } from "./OrreryView";
-export { COYOTE_REACH_ORRERY };
+export { COYOTE_STAR_ORRERY };
 export type { OrreryBody, OrreryData, OrreryAnomaly, OrreryMoment } from "./types";
 
 /**
@@ -17,7 +17,7 @@ export type { OrreryBody, OrreryData, OrreryAnomaly, OrreryMoment } from "./type
  * holds hand-authored mirrors of cartography.yaml.
  */
 const ORRERY_REGISTRY: Record<string, OrreryData> = {
-  coyote_reach: COYOTE_REACH_ORRERY,
+  coyote_star: COYOTE_STAR_ORRERY,
 };
 
 export function getOrreryDataForWorld(slug: string | undefined): OrreryData | null {

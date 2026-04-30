@@ -4,18 +4,18 @@
 // Pre-fix: App.tsx fetched both genre_slug AND world_slug from
 // `/api/games/:slug`, but only stashed genre_slug in React state. The
 // `<GameBoard>` call site forwarded `genreSlug={currentGenre}` and never
-// passed `worldSlug` at all. Net effect on the Coyote Reach session:
+// passed `worldSlug` at all. Net effect on the Coyote Star session:
 // MapWidget called `getOrreryDataForWorld(undefined)` (returns null), the
 // Orrery branch failed, and the empty-state "No map data yet" fallback
 // rendered instead of the registered Orrery view.
 //
 // MapWidget.test.tsx already covers the GameBoard→Orrery side (calling
-// <MapWidget worldSlug="coyote_reach" /> directly). The gap was at the
+// <MapWidget worldSlug="coyote_star" /> directly). The gap was at the
 // App.tsx call site — `getOrreryDataForWorld(undefined)` is the only
 // observable symptom from above. This test mocks <GameBoard> to capture
 // the worldSlug prop and asserts that, after the slug-connect handshake
-// completes for a Coyote Reach session, App actually forwards
-// worldSlug="coyote_reach" — the prop the production-fix added.
+// completes for a Coyote Star session, App actually forwards
+// worldSlug="coyote_star" — the prop the production-fix added.
 //
 // Why mock GameBoard? Mounting the real GameBoard in jsdom would pull in
 // Dockview + the full layout system for an assertion that's purely about
@@ -48,9 +48,9 @@ vi.mock("@/components/GameBoard/GameBoard", () => ({
 
 import App from "../App";
 
-const COYOTE_REACH_META = {
+const COYOTE_STAR_META = {
   genre_slug: "space_opera",
-  world_slug: "coyote_reach",
+  world_slug: "coyote_star",
   mode: "solo",
 };
 
@@ -58,7 +58,7 @@ function makeFetchMock() {
   return vi.fn().mockImplementation((url: string) => {
     if (typeof url === "string" && /\/api\/games\/[^?]+/.test(url)) {
       return Promise.resolve(
-        new Response(JSON.stringify(COYOTE_REACH_META), {
+        new Response(JSON.stringify(COYOTE_STAR_META), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
@@ -81,7 +81,7 @@ function makeFetchMock() {
 let slugCounter = 0;
 function freshSlug(): string {
   slugCounter += 1;
-  const slug = `coyote-reach-wiring-${Date.now()}-${slugCounter}`;
+  const slug = `coyote-star-wiring-${Date.now()}-${slugCounter}`;
   // Seed journey history so AppInner's silent-rebind trust gate recognizes
   // the player as the creator of this slug — same helper pattern as
   // mp-03-event-sync-wiring.test.tsx and slug-connect-readystate-effect.test.tsx.
@@ -91,7 +91,7 @@ function freshSlug(): string {
   existing.push({
     player_name: "vex",
     genre: "space_opera",
-    world: "coyote_reach",
+    world: "coyote_star",
     last_played_iso: new Date().toISOString(),
     game_slug: slug,
     mode: "solo",
@@ -116,8 +116,8 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-archetype");
 });
 
-describe("App → GameBoard worldSlug wiring (Coyote Reach)", () => {
-  it("forwards worldSlug=coyote_reach once the session reaches the game phase", async () => {
+describe("App → GameBoard worldSlug wiring (Coyote Star)", () => {
+  it("forwards worldSlug=coyote_star once the session reaches the game phase", async () => {
     const slug = freshSlug();
     const wsUrl = `ws://${location.host}/ws`;
     const server = new WS(wsUrl, { jsonProtocol: true });
@@ -149,7 +149,7 @@ describe("App → GameBoard worldSlug wiring (Coyote Reach)", () => {
       screen.getByTestId("gameboard-stub"),
     );
     expect(stub.getAttribute("data-genre-slug")).toBe("space_opera");
-    expect(stub.getAttribute("data-world-slug")).toBe("coyote_reach");
+    expect(stub.getAttribute("data-world-slug")).toBe("coyote_star");
   });
 
   it("never forwards an empty worldSlug — pre-fix regression guard", async () => {

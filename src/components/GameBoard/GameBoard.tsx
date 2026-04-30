@@ -154,7 +154,7 @@ export interface GameBoardProps {
   worldSlug?: string;
   depletions?: ItemDepletion[];
   resourceAlerts?: ResourceAlert[];
-  /** Magic ledger (Coyote Reach Phase 4). Forwarded to CharacterWidget. */
+  /** Magic ledger (Coyote Star Phase 4). Forwarded to CharacterWidget. */
   magicState?: MagicState | null;
 }
 
