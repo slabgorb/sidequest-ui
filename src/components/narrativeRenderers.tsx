@@ -34,9 +34,14 @@ function FootnoteList({ footnotes }: { footnotes: NarrativeSegment["footnotes"] 
   }, [footnotes]);
 
   if (!footnotes || footnotes.length === 0) return null;
-  const newCount = footnotes.filter((fn) => fn.is_new).length;
-  const countLabel =
-    newCount > 0 ? `${newCount} new` : `${footnotes.length} item${footnotes.length === 1 ? "" : "s"}`;
+  // Per-turn summary shows the stable item count, never an "N new" tally.
+  // Pingpong 2026-04-30 "KNOWLEDGE GAINED banner accumulates": once a turn
+  // is in scrollback the inline "N new" doesn't decrement on Knowledge-tab
+  // visit and reads as ever-climbing unread state. The Knowledge tab's
+  // badge (Story 33-11) is the authoritative ack surface; the per-item
+  // NEW pills inside the expanded block still carry first-introduction
+  // info. Keep the total-item count for at-a-glance density.
+  const countLabel = `${footnotes.length} item${footnotes.length === 1 ? "" : "s"}`;
   return (
     <details
       ref={detailsRef}

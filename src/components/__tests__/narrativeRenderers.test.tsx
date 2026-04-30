@@ -58,7 +58,12 @@ describe("renderSegment — knowledge collapsible", () => {
     expect(details.open).toBe(false);
   });
 
-  it("shows '<N> new' in the summary when entries are new", () => {
+  it("shows the total item count in the summary regardless of is_new flags", () => {
+    // Pingpong 2026-04-30 "KNOWLEDGE GAINED banner accumulates": the
+    // per-turn summary used to read "N new" and never decrement on
+    // Knowledge-tab visit. The Knowledge tab badge owns ack/dismiss; the
+    // inline summary now only carries a stable item count. Per-item NEW
+    // pills inside the expanded block continue to mark first-introduction.
     const seg: NarrativeSegment = {
       kind: "text",
       html: "<p>x</p>",
@@ -70,7 +75,9 @@ describe("renderSegment — knowledge collapsible", () => {
       ],
     };
     render(<>{renderSegment(seg, 0)}</>);
-    expect(screen.getByTestId("world-facts-count")).toHaveTextContent(/^3 new$/);
+    expect(screen.getByTestId("world-facts-count")).toHaveTextContent(/^4 items$/);
+    // Per-item NEW pills still render for the three new entries.
+    expect(screen.getAllByTestId("knowledge-new-pill")).toHaveLength(3);
   });
 
   it("shows total count when no entries are new (singular/plural)", () => {
